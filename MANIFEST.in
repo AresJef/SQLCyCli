@@ -1,0 +1,12 @@
+include LICENSE
+include README.md
+
+include src/sqlcycli/aio/*.pxd
+include src/sqlcycli/aio/*.py
+include src/sqlcycli/aio/*.pyx
+include src/sqlcycli/constants/*.pxd
+include src/sqlcycli/constants/*.py
+include src/sqlcycli/constants/*.pyx
+include src/sqlcycli/*.pxd
+include src/sqlcycli/*.py
+include src/sqlcycli/*.pyx

@@ -1,0 +1,8 @@
+# cython: language_level=3
+
+cdef:
+    unsigned int DECIMAL, TINY, SHORT, LONG, FLOAT, DOUBLE, NULL_
+    unsigned int TIMESTAMP, LONGLONG, INT24, DATE, TIME, DATETIME
+    unsigned int YEAR, NEWDATE, VARCHAR, BIT, JSON, NEWDECIMAL
+    unsigned int ENUM, SET, TINY_BLOB, MEDIUM_BLOB, LONG_BLOB, BLOB
+    unsigned int VAR_STRING, STRING, GEOMETRY, CHAR, INTERVAL

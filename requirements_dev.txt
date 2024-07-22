@@ -1,0 +1,11 @@
+# Development requirements
+Cython==3.0.10
+cryptography>=43.0.0
+pymysql>=1.1.0
+PyNaCl>=1.5.0
+# Package requirements
+cytimes>=1.0.3
+numpy>=1.25.2
+orjson>=3.10.2
+pandas>=2.1.0
+mysqlclient>=2.2.0
