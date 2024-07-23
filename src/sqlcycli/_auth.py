@@ -13,25 +13,27 @@ from cython.cimports.sqlcycli.protocol import pack_uint8  # type: ignore
 
 # Python imports
 try:
-    from cryptography.hazmat.backends import default_backend  # type: ignore
-    from cryptography.hazmat.primitives import serialization, hashes  # type: ignore
-    from cryptography.hazmat.primitives.asymmetric import padding  # type: ignore
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.backends import default_backend as _default_backend
 
-    CRYPTOGRAPHY_AVAILABLE = True
+    CRYPTOGRAPHY_AVAILABLE: cython.bint = True
 except ImportError:
-    CRYPTOGRAPHY_AVAILABLE = False
-CRYPTOGRAPHY_AVAILABLE_C: cython.bint = CRYPTOGRAPHY_AVAILABLE
+    CRYPTOGRAPHY_AVAILABLE: cython.bint = False
 # MariaDB's client_ed25519-plugin
 # https://mariadb.com/kb/en/library/connection/#client_ed25519-plugin
 try:
-    from nacl import bindings  # type: ignore
+    from nacl import bindings as _bindings  # type: ignore
 
-    NACL_AVAILABLE = True
+    NACL_AVAILABLE: cython.bint = True
 except ImportError:
-    NACL_AVAILABLE = False
-NACL_AVAILABLE_C: cython.bint = NACL_AVAILABLE
+    NACL_AVAILABLE: cython.bint = False
 
-from hashlib import sha1, sha256, sha512
+from hashlib import (
+    sha1 as _hashlib_sha1,
+    sha256 as _hashlib_sha256,
+    sha512 as _hashlib_sha512,
+)
 from sqlcycli import errors
 
 __all__ = [
@@ -60,7 +62,7 @@ class AuthPlugin:
     _dialog: type
     _plugins: dict[bytes, type]
 
-    def __init__(self, plugins: dict[str | bytes, type] = None) -> None:
+    def __init__(self, plugins: dict[str | bytes, type] | None = None) -> None:
         """The auth pluging handler for MySQL.
 
         :param plugins `<'dict'>`: The plugin handlers for MySQL auth, where key
@@ -76,7 +78,7 @@ class AuthPlugin:
             self._mysql_clear_password = None
             self._dialog = None
             self._plugins = {}
-        else:
+        elif isinstance(plugins, dict):
             _plugins: dict[bytes, type] = {}
             for name, plugin in plugins.items():
                 # . validate plugin name
@@ -102,6 +104,11 @@ class AuthPlugin:
             self._mysql_clear_password = _plugins.get(b"mysql_clear_password")
             self._dialog = _plugins.get(b"dialog")
             self._plugins = _plugins
+        else:
+            raise errors.InvalidAuthPluginError(
+                "<'%s'>\nAuth 'plugins' must be type of <'dict'>, instead of: %s"
+                % (self.__class__.__name__, type(plugins))
+            )
 
     # Property --------------------------------------------------------------------------------
     @property
@@ -177,7 +184,7 @@ class AuthPlugin:
     # Methods ---------------------------------------------------------------------------------
     @cython.ccall
     def get(self, plugin_name: bytes) -> object:
-        """Get the handler class for the plugin `<'type/None'>`."""
+        """Get the handler for the plugin `<'type/None'>`."""
         if plugin_name == b"mysql_native_password":
             return self._mysql_native_password
         if plugin_name == b"caching_sha2_password":
@@ -215,9 +222,9 @@ def scramble_native_password(password: bytes, salt: bytes) -> bytes:
     if not password:
         return b""
 
-    stage1: bytes = sha1(password).digest()
-    stage2: bytes = sha1(stage1).digest()
-    s = sha1()
+    stage1: bytes = _hashlib_sha1(password).digest()
+    stage2: bytes = _hashlib_sha1(stage1).digest()
+    s = _hashlib_sha1()
     s.update(salt[0:SCRAMBLE_LENGTH])
     s.update(stage2)
     res: bytes = s.digest()
@@ -240,9 +247,9 @@ def scramble_caching_sha2(password: bytes, salt: bytes) -> bytes:
     if not password:
         return b""
 
-    p1: bytes = sha256(password).digest()
-    p2: bytes = sha256(p1).digest()
-    p3: bytes = sha256(p2 + salt).digest()
+    p1: bytes = _hashlib_sha256(password).digest()
+    p2: bytes = _hashlib_sha256(p1).digest()
+    p3: bytes = _hashlib_sha256(p2 + salt).digest()
 
     msg1: cython.pchar = bytes_to_chars(p1)
     msg2: cython.pchar = bytes_to_chars(p3)
@@ -281,7 +288,7 @@ def sha2_rsa_encrypt(password: bytes, salt: bytes, public_key: bytes) -> bytes:
     message: bytes = bytes_fr_chars_wlen(msg1, pswd_len)
 
     # rsa encryption
-    rsa_key = serialization.load_pem_public_key(public_key, default_backend())
+    rsa_key = serialization.load_pem_public_key(public_key, _default_backend())
     return rsa_key.encrypt(
         message,
         padding.OAEP(
@@ -304,7 +311,7 @@ def ed25519_password(password: bytes, scramble: bytes) -> bytes:
             "'nacl (pynacl)' package is required for 'client_ed25519' auth method."
         )
     # h = SHA512(password)
-    h: bytes = sha512(password).digest()
+    h: bytes = _hashlib_sha512(password).digest()
 
     # s = prune(first_half(h))
     s32: bytearray = bytearray(h[0:32])
@@ -316,22 +323,22 @@ def ed25519_password(password: bytes, scramble: bytes) -> bytes:
 
     # r = SHA512(second_half(h) || M)
     length = bytes_len(h)
-    r = sha512(h[32:length] + scramble).digest()
+    r = _hashlib_sha512(h[32:length] + scramble).digest()
 
     # R = encoded point [r]B
-    r = bindings.crypto_core_ed25519_scalar_reduce(r)
-    R = bindings.crypto_scalarmult_ed25519_base_noclamp(r)
+    r = _bindings.crypto_core_ed25519_scalar_reduce(r)
+    R = _bindings.crypto_scalarmult_ed25519_base_noclamp(r)
 
     # A = encoded point [s]B
-    A = bindings.crypto_scalarmult_ed25519_base_noclamp(s)
+    A = _bindings.crypto_scalarmult_ed25519_base_noclamp(s)
 
     # k = SHA512(R || A || M)
-    k = sha512(R + A + scramble).digest()
+    k = _hashlib_sha512(R + A + scramble).digest()
 
     # S = (k * s + r) mod L
-    k = bindings.crypto_core_ed25519_scalar_reduce(k)
-    ks = bindings.crypto_core_ed25519_scalar_mul(k, s)
-    S = bindings.crypto_core_ed25519_scalar_add(ks, r)
+    k = _bindings.crypto_core_ed25519_scalar_reduce(k)
+    ks = _bindings.crypto_core_ed25519_scalar_mul(k, s)
+    S = _bindings.crypto_core_ed25519_scalar_add(ks, r)
 
     # signature = R || S
     return R + S
