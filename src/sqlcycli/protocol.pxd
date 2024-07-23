@@ -260,7 +260,7 @@ cdef class MysqlPacket:
     cdef inline bint rewind(self, unsigned long long position) except -1
     # Error
     cpdef bint check_error(self) except -1
-    cpdef bint raise_for_error(self) except -1
+    cdef inline bint raise_error(self) except -1
 
 cdef class FieldDescriptorPacket(MysqlPacket):
     cdef:

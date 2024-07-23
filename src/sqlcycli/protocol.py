@@ -26,7 +26,7 @@ UNSIGNED_INT64_COLUMN: cython.uint = 254
 # MySQL Packet --------------------------------------------------------------------------------
 @cython.cclass
 class MysqlPacket:
-    """Representation of a MySQL response packet. Reads in the packet
+    """Representation of the MySQL response packet. Reads in the packet
     from the network socket, removes packet header and provides an interface
     for reading/parsing the packet results."""
 
@@ -47,8 +47,10 @@ class MysqlPacket:
     _plugin_name: bytes
     _salt: bytes
 
-    def __init__(self, data: bytes, encoding: cython.bytes) -> None:
-        """MySQL response packet.
+    def __init__(self, data: bytes, encoding: bytes) -> None:
+        """The MySQL response packet. Reads in the packet from the
+        network socket, removes packet header and provides an interface
+        for reading/parsing the packet results.
 
         :param data `<'bytes'>`: The raw data of the packet.
         :param encoding `<'bytes'>`: The encoding of the packet data.
@@ -73,52 +75,71 @@ class MysqlPacket:
     # Property --------------------------------------------------------------------------------
     @property
     def affected_rows(self) -> int:
+        """The number of affected rows by the query `<'int'>`.
+        Only valid for OKPacket after 'read', else returns 0."""
         return self._affected_rows
 
     @property
     def insert_id(self) -> int:
+        """The last insert id of the query `<'int'>`.
+        Only valid for OKPacketafter 'read', else returns 0."""
         return self._insert_id
 
     @property
     def server_status(self) -> int | None:
+        """The server status of the query `<'int/None'>`.
+        Valid for OKPacket, EOFPacket after 'read', else returns None."""
         return None if self._server_status == -1 else self._server_status
 
     @property
     def warning_count(self) -> int:
+        """The number of warnings raised by the query `<'int'>`.
+        Only valid for OKPacket after 'read', else returns 0."""
         return self._warning_count
 
     @property
     def has_next(self) -> bool:
+        """The flag represents if there is more result exists `<'bool'>`.
+        Only valid for OKPacket, EOFPacket after 'read', else returns False."""
         return self._has_next
 
     @property
     def message(self) -> bytes | None:
+        """The message of the query `<'bytes/None'>`.
+        Only valid for OKPacket after 'read', else returns None."""
         return self._message
 
     @property
     def filename(self) -> bytes | None:
+        """The filename of local file to be load `<'bytes/None'>`.
+        Only valid for LoadLocalPacket after 'read', else returns None."""
         return self._filename
 
     @property
     def plugin_name(self) -> bytes | None:
+        """The plugin name for authentication switch `<'bytes/None'>`.
+        Only valid for AuthSwitchRequest after 'read', else returns None."""
         return self._plugin_name
 
     @property
     def salt(self) -> bytes | None:
+        """The salt for authentication switch `<'bytes/None'>`.
+        Only valid for AuthSwitchRequest after 'read', else returns None."""
         return self._salt
 
     # Read Data -------------------------------------------------------------------------------
     @cython.cfunc
     @cython.inline(True)
     def read_all_data(self) -> bytes:
-        """(cfunc) Return all the data of the MySQL packet `<'bytes'>`."""
+        """(cfunc) Read all of the data at once without
+        affecting packet cursor position `<'bytes'>`."""
         return self._data
 
     @cython.cfunc
     @cython.inline(True)
     def read(self, size: cython.ulonglong) -> bytes:
-        """(cfunc) Read the data of the given 'size' from the current
-        position and then advance MySQL packet cursor `<'bytes'>`."""
+        """(cfunc) Read data of the given 'size' from the current packet
+        cursor position and advance cursor forward `<'bytes'>`."""
         pos: cython.ulonglong = self._pos
         end: cython.ulonglong = pos + size
         if end > self._size:
@@ -133,7 +154,7 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def read_remains(self) -> bytes:
-        """(cfunc) Read the data remains in the MySQL packet `<'bytes'>`."""
+        """(cfunc) Read the data remains in the packet `<'bytes'>`."""
         # No more data remains
         pos: cython.ulonglong = self._pos
         if pos >= self._size:
@@ -145,9 +166,10 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def read_length_encoded_integer(self) -> cython.ulonglong:
-        """(cfunc) Read a 'Length Coded Integer' from the MySQL packet buffer `<'int'>`.
+        """(cfunc) Read the 'Length Coded Integer' from the
+        current packet cursor position `<'int'>`.
 
-        Length coded numbers can be anywhere from 1 to 9
+        Length Coded Integer can be anywhere from 1 to 9
         bytes depending on the value of the first byte.
         """
         code: cython.uint = self._read_uint8()
@@ -166,11 +188,13 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def read_length_encoded_string(self) -> bytes:
-        """(cfunc) Read a 'Length Coded String' from the MySQL packet buffer `<'bytes'>`.
+        """(cfunc) Read the 'Length Coded String' from the
+        current packet cursor position `<'bytes'>`.
 
-        A 'Length Coded String' consists first of a length coded
-        (unsigned, positive) integer represented in 1-9 bytes followed by
-        that many bytes of binary data.  (For example "cat" would be "3cat".)
+        Length Coded String consists first of a Length Coded
+        Integer represented in 1-9 bytes followed by that many
+        bytes of binary string.
+        (For example "cat" would be "3cat".)
         """
         length: cython.uint = self._read_uint8()
         if length < UNSIGNED_CHAR_COLUMN:
@@ -188,7 +212,8 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def _read_uint8(self) -> cython.uint:
-        """(cfunc) Read 8-bit binary and advance the cursor `<'int'>`."""
+        """(cfunc) Read the 8-bit unsigned integer from the current packet
+        cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 1
         return unpack_uint8(self._data_c, pos)  # type: ignore
@@ -196,7 +221,8 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def _read_uint16(self) -> cython.uint:
-        """(cfunc) Read 16-bit binary and advance the cursor `<'int'>`."""
+        """(cfunc) Read the 16-bit unsigned integer from the current packet
+        cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 2
         return unpack_uint16(self._data_c, pos)  # type: ignore
@@ -204,7 +230,8 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def _read_uint24(self) -> cython.uint:
-        """(cfunc) Read 24-bit binary and advance the cursor `<'int'>`."""
+        """(cfunc) Read the 24-bit unsigned integer from the current packet
+        cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 3
         return unpack_uint24(self._data_c, pos)  # type: ignore
@@ -212,7 +239,8 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def _read_uint32(self) -> cython.ulonglong:
-        """(cfunc) Read 32-bit binary and advance the cursor `<'int'>`."""
+        """(cfunc) Read the 32-bit unsigned integer from the current packet
+        cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 4
         return unpack_uint32(self._data_c, pos)  # type: ignore
@@ -220,7 +248,8 @@ class MysqlPacket:
     @cython.cfunc
     @cython.inline(True)
     def _read_uint64(self) -> cython.ulonglong:
-        """(cfunc) Read 64-bit binary and advance the cursor `<'int'>`."""
+        """(cfunc) Read the 64-bit unsigned integer from the current packet
+        cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 8
         return unpack_uint64(self._data_c, pos)  # type: ignore
@@ -239,8 +268,8 @@ class MysqlPacket:
     def read_ok_packet(self) -> cython.bint:
         """Read OKPacket data `<'bool'>`.
 
-        Returns `True` if is OKPacket and parsed successfully,
-        else `False` if the packet is not OKPacket.
+        Returns True if is OKPacket and parsed successfully,
+        else False if is `NOT` OKPacket.
         """
         # Not OKPacket
         if not self.is_ok_packet():
@@ -267,8 +296,8 @@ class MysqlPacket:
     def read_load_local_packet(self) -> cython.bint:
         """Read LoadLocalPacket data `<'bool'>`.
 
-        Returns `True` if is LoadLocalPacket and parsed successfully,
-        else `False` if the packet is not LoadLocalPacket.
+        Returns True if is LoadLocalPacket and parsed successfully,
+        else False if is `NOT` LoadLocalPacket.
         """
         # Not LoadLocalPacket
         if not self.is_load_local_packet():
@@ -282,6 +311,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_eof_packet(self) -> cython.bint:
+        """(cfunc) Check if is EOFPacket `<'bool'>`."""
         # http://dev.mysql.com/doc/internals/en/generic-response-packets.html#packet-EOF_Packet
         # Caution: \xFE may be LengthEncodedInteger.
         # If \xFE is LengthEncodedInteger header, 8bytes followed.
@@ -292,8 +322,8 @@ class MysqlPacket:
     def read_eof_packet(self) -> cython.bint:
         """Read EOFPacket data `<'bool'>.
 
-        Returns `True` if is EOFPacket and parsed successfully,
-        else `False` if the packet is not EOFPacket.
+        Returns True if is EOFPacket and parsed successfully,
+        else False if is `NOT` EOFPacket.
         """
         # Not EOFPacket
         if not self.is_eof_packet():
@@ -309,17 +339,17 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_auth_switch_request(self) -> cython.bint:
-        """(cfunc) Check if is 'auth switch request' packet `<'bool'>`."""
+        """(cfunc) Check if is AuthSwitchRequest Packet `<'bool'>`."""
         # http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthSwitchRequest
         return unpack_uint8(self._data_c, 0) == 0xFE  # type: ignore
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def read_auth_switch_request(self) -> cython.bint:
-        """Read 'auth switch request' packet data `<'bool'>.
+        """Read AuthSwitchRequest Packet data `<'bool'>.
 
-        Returns `True` if is 'auth switch request' packet
-        and parsed successfully, else `False`.
+        Returns True if is AuthSwitchRequest Packet and parsed
+        successfully, else False if `NOT` AuthSwitchRequest Packet.
         """
         # Not auth switch request
         if not self.is_auth_switch_request():
@@ -344,7 +374,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_extra_auth_data(self) -> cython.bint:
-        """(cfunc) Check if is the packet has extra auth data `<'bool'>`."""
+        """(cfunc) Check if has EXTRA AUTH data `<'bool'>`."""
         # https://dev.mysql.com/doc/internals/en/successful-authentication.html
         return self._data_c[0] == 1
 
@@ -352,14 +382,14 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_resultset_packet(self) -> cython.bint:
-        """(cfunc) Check if is 'ResultPacket' `<'bool'>`."""
+        """(cfunc) Check if is ResultPacket `<'bool'>`."""
         return 1 <= unpack_uint8(self._data_c, 0) <= 250  # type: ignore
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_error_packet(self) -> cython.bint:
-        """(cfunc) Check if is 'ErrorPacket' `<'bool'>`."""
+        """(cfunc) Check if is ErrorPacket `<'bool'>`."""
         return unpack_uint8(self._data_c, 0) == 0xFF  # type: ignore
 
     # Curosr ----------------------------------------------------------------------------------
@@ -367,7 +397,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def advance(self, length: cython.ulonglong) -> cython.bint:
-        """(cfunc) Advance the MySQL packet cursor by the given 'length' `<'bool'>`."""
+        """(cfunc) Advance the packet cursor position by the given 'length' `<'bool'>`."""
         pos: cython.ulonglong = self._pos + length
         if pos > self._size:
             raise errors.MysqlPacketCursorError(
@@ -382,7 +412,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def rewind(self, position: cython.ulonglong) -> cython.bint:
-        """(cfunc) Set the MySQL packet cursor to 'position' `<'bool'>`."""
+        """(cfunc) Set the packet cursor to the given 'position' `<'bool'>`."""
         if position > self._size:
             raise errors.MysqlPacketCursorError(
                 "'<%s'>\nCan't set packet cursor position to: %s\n"
@@ -396,24 +426,26 @@ class MysqlPacket:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def check_error(self) -> cython.bint:
-        """(cfunc) Check & raise packet error."""
+        """Check & raise packet error (if exists)."""
         if self.is_error_packet():
-            self.raise_for_error()
+            self.raise_error()
         return True
 
-    @cython.ccall
+    @cython.cfunc
+    @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def raise_for_error(self) -> cython.bint:
-        """Raise packet error."""
+    def raise_error(self) -> cython.bint:
+        """(cfunc) Raise packet error. Should only be called if
+        the packet is known to be an ErrorPacket."""
         errors.raise_mysql_exception(self._data_c, self._size)
+        return True
 
 
 @cython.cclass
 class FieldDescriptorPacket(MysqlPacket):
-    """A MysqlPacket that represents a specific column's metadata in the result.
-
-    Parsing is done automatically and the results are exported via c-attributes
-    on the class such as: db, table_name, name, length, type_code.
+    """Representation of the specific MySQL response packet which
+    contains column's metadata in the result. Parsing is done
+    automatically.
     """
 
     # Packet Data
@@ -453,56 +485,75 @@ class FieldDescriptorPacket(MysqlPacket):
     # Property --------------------------------------------------------------------------------
     @property
     def catalog(self) -> bytes:
+        """The name of the catalog `<'bytes'>`.
+
+        In MySQL, the catalog is alwasy `b'def'`. This field
+        is included for compatibility with SQL standards but
+        is generally not used in MySQL."""
         return self._catalog
 
     @property
     def db(self) -> str:
+        """The name of the database where the table is located `<'str'>`."""
         return self._db
 
     @property
     def table(self) -> str:
+        """The alias of the table as specified in the SQL query `<'str'>`."""
         return self._table
 
     @property
     def table_org(self) -> str:
+        """The original name of the table in the database `<'str'>`."""
         return self._table_org
 
     @property
     def column(self) -> str:
+        """The alias of the column as specified in the SQL query `<'str'>`."""
         return self._column
 
     @property
     def column_org(self) -> str:
+        """The original name of the column in the table `<'str'>`."""
         return self._column_org
 
     @property
     def charsetnr(self) -> int:
+        """The character set number for the column `<'int'>`."""
         return self._charsetnr
 
     @property
     def length(self) -> int:
+        """The maximum length of the column `<'int'>`."""
         return self._length
 
     @property
     def type_code(self) -> int:
+        """The type code of the column `<'int'>`.
+
+        Please refer to 'sqlcycli.constants.FIELD_TYPE'
+        for the corresponding data type."""
         return self._type_code
 
     @property
     def flags(self) -> int:
+        """The flag that provides additional information about the column `<'int'>`."""
         return self._flags
 
     @property
     def scale(self) -> int:
+        """The number of decimal places for numeric columns `<'int'>`."""
         return self._scale
 
     @property
     def is_binary(self) -> bool:
+        """Whether the column is binary `<'bool'>`."""
         return self._is_binary
 
     # Read Packet -----------------------------------------------------------------------------
     @cython.ccall
     def description(self) -> tuple[str, int, int, int, int, int, bool]:
-        """Provides a 7-item tuple compatible with the Python PEP249 DB Spec.
+        """Provides a 7-item tuple compatible with the Python PEP249 DB Spec `<'tuple'>`.
         >>> (name, type_code, display_length, internal_size, precision, scale, null_ok)
         """
         length: cython.uint = self._get_column_length()
@@ -519,7 +570,7 @@ class FieldDescriptorPacket(MysqlPacket):
     @cython.cfunc
     @cython.inline(True)
     def _get_column_length(self) -> cython.ulonglong:
-        """(cfunc) Return the column length `<'int'>`."""
+        """(cfunc) Get the maximum length of the column `<'int'>`."""
         if self._type_code == _FIELD_TYPE.VAR_STRING:
             # PyMySQL.charset MBLENGTH
             # {8: 1, 33: 3, 88: 2, 91: 2}
