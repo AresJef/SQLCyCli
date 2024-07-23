@@ -8,8 +8,8 @@ from cython.cimports.sqlcycli._ssl import SSL_ENABLED_C, SSL  # type: ignore
 
 
 # Python imports
+import os
 from os import PathLike
-from os.path import expanduser, exists
 from configparser import RawConfigParser
 from sqlcycli import errors
 from sqlcycli._ssl import SSL
@@ -19,6 +19,8 @@ __all__ = ["OptionFile"]
 
 # Parser --------------------------------------------------------------------------------------
 class _Parser(RawConfigParser):
+    """Custom parser for MySQL option file."""
+
     def __init__(self, **kwargs):
         kwargs["allow_no_value"] = True
         RawConfigParser.__init__(self, **kwargs)
@@ -212,19 +214,20 @@ class OptionFile:
     @cython.cfunc
     @cython.inline(True)
     def _validate_path(self, path: object, arg_name: str) -> object:
-        """(cfunc) Expand '~' and '~user' constructions and validate path existence.
-        If user or $HOME is unknown, do nothing. Only
-        applies to <'str'> or <'Path'> objects."""
+        """(cfunc) Expand '~' and '~user' constructions and validate 
+        path existence. If user or $HOME is unknown, do nothing. 
+        Only applies to <'str'> or <'Path'> objects.
+        """
         if path is None:
             return None
         try:
-            path = expanduser(path)
+            path = os.path.expanduser(path)
         except Exception as err:
             raise errors.InvalidOptionFileError(
                 "<'%s'>\nPath for '%s' is invalid: '%s'.\n"
                 "Error: %s" % (self.__class__.__name__, arg_name, path, err)
             ) from err
-        if not exists(path):
+        if not os.path.exists(path):
             raise errors.OptionFileNotFoundError(
                 "<'%s'>\nPath for '%s' does not exist: '%s'."
                 % (self.__class__.__name__, arg_name, path)

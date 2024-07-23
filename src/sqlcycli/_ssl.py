@@ -6,38 +6,35 @@
 import cython
 
 # Pyhton imports
+import os, warnings
 from os import PathLike
-from os.path import expanduser, exists
-from warnings import warn
 from typing import Literal
 from sqlcycli import errors
 
 try:
-    from ssl import SSLContext  # type: ignore
-    from ssl import create_default_context  # type: ignore
-    from ssl import CERT_NONE, CERT_REQUIRED, CERT_OPTIONAL  # type: ignore
+    import ssl as _py_ssl
 
     SSL_ENABLED: bool = True
 except ImportError:
     SSL_ENABLED: bool = False
 SSL_ENABLED_C: cython.bint = SSL_ENABLED
 
-__all__ = ["SSL_ENABLED", "is_ssl", "is_ssl_ctx", "SSL"]
+__all__ = ["SSL_ENABLED", "SSL", "is_ssl", "is_ssl_ctx"]
 
 
 # Utils ---------------------------------------------------------------------------------------
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl(obj: object) -> cython.bint:
-    """Check if an object is <'SSL'> `<'bool'>`."""
+    """Check if is type of 'SSL' `<'bool'>`."""
     return isinstance(obj, SSL) if SSL_ENABLED_C else False
 
 
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl_ctx(obj: object) -> cython.bint:
-    """Check if an object is <'ssl.SSLContext'> `<'bool'>`."""
-    return isinstance(obj, SSLContext) if SSL_ENABLED_C else False
+    """Check if is type of 'ssl.SSLContext' `<'bool'>`."""
+    return isinstance(obj, _py_ssl.SSLContext) if SSL_ENABLED_C else False
 
 
 # SSL -----------------------------------------------------------------------------------------
@@ -49,9 +46,9 @@ class SSL:
     for MySQL from 'PyMySQL' package's <'Connection'> class.
 
     ### Notice
-    Access the generated <'SSLContext'> through `context` attribute.
-    If Python `ssl` module is not available, a `RuntimeWarning` will
-    be raised and the context attribute will be `None`.
+    Please access the generated <'SSLContext'> through `context` attribute.
+    If Python `ssl` module is not available, a `RuntimeWarning` will be 
+    issued and the context attribute will be `None`.
     """
 
     _has_ca: cython.bint
@@ -82,9 +79,9 @@ class SSL:
         for MySQL from 'PyMySQL' package's <'Connection'> class.
 
         ### Notice
-        Access the generated <'SSLContext'> through `context` attribute.
-        If Python `ssl` module is not available, a `RuntimeWarning` will
-        be raised and the context attribute will be `None`.
+        Please access the final <'SSLContext'> through `context` attribute.
+        If Python `ssl` module is not available, a `RuntimeWarning` will be 
+        issued and the context attribute will be `None`.
 
         ### Arguments
         :param ca_file `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted CA certificate. Defaults to `None`.
@@ -105,19 +102,21 @@ class SSL:
         self._verify_identity = self._has_ca and bool(verify_identity)
         self._verify_mode = verify_mode
         self._cipher = cipher
-        if SSL_ENABLED:
+        if SSL_ENABLED_C:
             try:
                 self._create_ssl_context()
             except Exception as err:
                 raise errors.InvalidSSLConfigError(
-                    "<'%s'>\nSSL settings is invalid.\n"
-                    "Error: %s" % (self.__class__.__name__, err)
+                    "<'%s'>\nSSL settings is invalid.\nError: %s"
+                    % (self.__class__.__name__, err)
                 ) from err
         else:
             self._context = None
-            # fmt: off
-            warn("<'%s'> Python 'ssl' module is not available." % self.__class__.__name__, RuntimeWarning)
-            # fmt: on
+            warnings.warn(
+                "<'%s'> Python 'ssl' module is not available."
+                % self.__class__.__name__,
+                RuntimeWarning,
+            )
 
     # Property --------------------------------------------------------------------------------
     @property
@@ -136,38 +135,40 @@ class SSL:
     def _create_ssl_context(self) -> cython.bint:
         """(cfunc) Generate the 'SSLContext' `<'bool'>`."""
         # . ca certificate
-        context = create_default_context(cafile=self._ca_file, capath=self._ca_path)
+        context = _py_ssl.create_default_context(
+            cafile=self._ca_file, capath=self._ca_path
+        )
         # . check hostname
         context.check_hostname = self._verify_identity
         # . verify mode
         if self._verify_mode is None:
             if self._has_ca:
-                context.verify_mode = CERT_REQUIRED
+                context.verify_mode = _py_ssl.CERT_REQUIRED
                 self._verify_mode = "Required"
             else:
-                context.verify_mode = CERT_NONE
+                context.verify_mode = _py_ssl.CERT_NONE
                 self._verify_mode = "None"
         elif isinstance(self._verify_mode, bool):
             if self._verify_mode:
-                context.verify_mode = CERT_REQUIRED
+                context.verify_mode = _py_ssl.CERT_REQUIRED
                 self._verify_mode = "Required"
             else:
-                context.verify_mode = CERT_NONE
+                context.verify_mode = _py_ssl.CERT_NONE
                 self._verify_mode = "None"
         else:
             if isinstance(self._verify_mode, str):
                 self._verify_mode = self._verify_mode.lower()
             if self._verify_mode in ("none", "0", "false", "no"):
-                context.verify_mode = CERT_NONE
+                context.verify_mode = _py_ssl.CERT_NONE
                 self._verify_mode = "None"
             elif self._verify_mode == "optional":
-                context.verify_mode = CERT_OPTIONAL
+                context.verify_mode = _py_ssl.CERT_OPTIONAL
                 self._verify_mode = "Optional"
             elif self._has_ca or self._verify_mode in ("required", "1", "true", "yes"):
-                context.verify_mode = CERT_REQUIRED
+                context.verify_mode = _py_ssl.CERT_REQUIRED
                 self._verify_mode = "Required"
             else:
-                context.verify_mode = CERT_NONE
+                context.verify_mode = _py_ssl.CERT_NONE
                 self._verify_mode = "None"
         # . client certificate
         if self._cert_file is not None:
@@ -192,13 +193,13 @@ class SSL:
         if path is None:
             return None
         try:
-            path = expanduser(path)
+            path = os.path.expanduser(path)
         except Exception as err:
             raise errors.InvalidSSLConfigError(
                 "<'%s'>\nPath for '%s' is invalid: '%s'.\n"
                 "Error: %s" % (self.__class__.__name__, arg_name, path, err)
             ) from err
-        if not exists(path):
+        if not os.path.exists(path):
             raise errors.SSLConfigFileNotFoundError(
                 "<'%s'>\nPath for '%s' does not exist: '%s'."
                 % (self.__class__.__name__, arg_name, path)

@@ -68,27 +68,27 @@ class Charset:
     # Properties -------------------------------------------------------------------
     @property
     def id(self) -> int:
-        "Access ID of the charset `<'int'>`."
+        "The 'ID' of the charset `<'int'>`."
         return self._id
 
     @property
     def name(self) -> str:
-        "Access Name of the charset `<'str'>`."
+        "The 'name' of the charset `<'str'>`."
         return self._name
 
     @property
     def collation(self) -> str:
-        "Access Collation of the charset `<'str'>`."
+        "The 'collation' of the charset `<'str'>`."
         return self._collation
 
     @property
     def is_default(self) -> bool:
-        "Whether belongs to the default charsets of MySQL `<'bool'>`."
+        "Whether is MySQL default charset `<'bool'>`."
         return self._is_default
 
     @property
     def encoding(self) -> bytes:
-        "The encoding of the charset `<'bytes'>`."
+        "The 'encoding' of the charset `<'bytes'>`."
         return self._encoding
 
     @cython.ccall
@@ -141,7 +141,7 @@ class Charset:
 
 @cython.cclass
 class Charsets:
-    """Represent the Collection for MySQL charsets."""
+    """Represent the collection of MySQL charsets."""
 
     _by_id: dict[int, Charset]
     _by_name: dict[str, Charset]
@@ -149,7 +149,7 @@ class Charsets:
     _by_name_n_collation: dict[str, Charset]
 
     def __init__(self) -> None:
-        """The Collection for MySQL charsets."""
+        """The collection of MySQL charsets."""
         self._by_id = {}
         self._by_name = {}
         self._by_collation = {}
@@ -313,7 +313,7 @@ _charsets: Charsets = Charsets()
 
 @cython.ccall
 def all_charsets() -> Charsets:
-    """Get MySQL charsets `<'Charsets'>`."""
+    """Get the collection of all the MySQL charsets `<'Charsets'>`."""
     return _charsets
 
 
