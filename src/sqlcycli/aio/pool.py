@@ -11,28 +11,26 @@ from cython.cimports.cpython.set import PySet_Add as set_add  # type: ignore
 from cython.cimports.cpython.set import PySet_Clear as set_clear  # type: ignore
 from cython.cimports.cpython.set import PySet_GET_SIZE as set_len  # type: ignore
 from cython.cimports.cpython.set import PySet_Discard as set_discard  # type: ignore
-from cython.cimports.sqlcycli import connection as sync_conn  # type: ignore
-from cython.cimports.sqlcycli.aio.connection import validate_cursor  # type: ignore
 from cython.cimports.sqlcycli.aio.connection import BaseConnection, Cursor  # type: ignore
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.transcode import decode_bytes  # type: ignore
+from cython.cimports.sqlcycli import connection as sync_conn, utils  # type: ignore
 
 # Python imports
 from os import PathLike
 from collections import deque
 from typing import Literal, Generator, Any
-from asyncio import gather, get_event_loop
 from asyncio import AbstractEventLoop, Condition, Future
-from sqlcycli import connection as sync_conn
+from asyncio import gather as _gather, get_event_loop as _get_event_loop
 from sqlcycli.aio.connection import BaseConnection, Cursor
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
-from sqlcycli import errors
+from sqlcycli import connection as sync_conn, utils, errors
 
 __all__ = ["PoolConnection", "PoolConnectionManager", "Pool"]
 
@@ -322,32 +320,35 @@ class Pool:
 
         # fmt: off
         # . charset
-        self._charset = sync_conn.validate_charset(charset, collation)
+        self._charset = utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET)
         encoding_c: cython.pchar = self._charset._encoding_c
         # . basic
-        self._host = sync_conn.validate_arg_str(host, "host", "localhost")
-        self._port = sync_conn.validate_arg_uint(port, "port", 1, 65_535)
-        self._user = sync_conn.validate_arg_bytes(user, "user", encoding_c, sync_conn.DEFAULT_USER)
-        self._password = sync_conn.validate_arg_bytes(password, "password", "latin1", "")
-        self._database = sync_conn.validate_arg_bytes(database, "database", encoding_c, None)
+        self._host = utils.validate_arg_str(host, "host", "localhost")
+        self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
+        self._user = utils.validate_arg_bytes(user, "user", encoding_c, sync_conn.DEFAULT_USER)
+        self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
+        self._database = utils.validate_arg_bytes(database, "database", encoding_c, None)
         # . timeouts
-        self._connect_timeout = sync_conn.validate_arg_uint(connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
-        self._read_timeout = sync_conn.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
-        self._write_timeout = sync_conn.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
-        self._wait_timeout = sync_conn.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
+        self._connect_timeout = utils.validate_arg_uint(
+            connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
+        self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
+        self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
+        self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
         # . client
-        self._bind_address = sync_conn.validate_arg_str(bind_address, "bind_address", None)
-        self._unix_socket = sync_conn.validate_arg_str(unix_socket, "unix_socket", None)
-        self._autocommit_mode = sync_conn.validate_autocommit(autocommit)
+        self._bind_address = utils.validate_arg_str(bind_address, "bind_address", None)
+        self._unix_socket = utils.validate_arg_str(unix_socket, "unix_socket", None)
+        self._autocommit_mode = utils.validate_autocommit(autocommit)
         self._local_infile = bool(local_infile)
-        self._max_allowed_packet = sync_conn.validate_max_allowed_packet(max_allowed_packet)
-        self._sql_mode = sync_conn.validate_sql_mode(sql_mode)
-        self._init_command = sync_conn.validate_arg_str(init_command, "init_command", None)
-        self._cursor = validate_cursor(cursor)
-        self._client_flag = sync_conn.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX)
-        self._program_name = sync_conn.validate_arg_str(program_name, "program_name", None)
+        self._max_allowed_packet = utils.validate_max_allowed_packet(
+            max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
+        self._sql_mode = utils.validate_sql_mode(sql_mode)
+        self._init_command = utils.validate_arg_str(init_command, "init_command", None)
+        self._cursor = utils.validate_cursor(cursor, Cursor)
+        self._client_flag = utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX)
+        self._program_name = utils.validate_arg_str(program_name, "program_name", None)
         # . ssl
-        self._ssl_ctx = sync_conn.validate_ssl(ssl)
+        self._ssl_ctx = utils.validate_ssl(ssl)
+        # fmt: on
         # . auth
         if auth_plugin is not None:
             if isinstance(auth_plugin, AuthPlugin):
@@ -362,8 +363,9 @@ class Pool:
                 )
         else:
             self._auth_plugin = None
-        self._server_public_key = sync_conn.validate_arg_bytes(server_public_key, "server_public_key", "ascii", None)
-        # fmt: on
+        self._server_public_key = utils.validate_arg_bytes(
+            server_public_key, "server_public_key", "ascii", None
+        )
         # . decode
         self._use_decimal = bool(use_decimal)
         self._decode_json = bool(decode_json)
@@ -417,7 +419,7 @@ class Pool:
         self._free_conn = deque(maxlen=self._max_size)
         self._used_conn = set()
         if loop is None or not isinstance(loop, AbstractEventLoop):
-            self._loop = get_event_loop()
+            self._loop = _get_event_loop()
         else:
             self._loop = loop
         self._cond = Condition()
@@ -766,7 +768,7 @@ class Pool:
 
         total: cython.uint = self.get_total()
         if total < self._min_size:
-            await gather(*[self._fill_new() for _ in range(self._min_size - total)])
+            await _gather(*[self._fill_new() for _ in range(self._min_size - total)])
             self._cond.notify()
 
     async def fill(self, num: cython.int = 1) -> None:
@@ -788,7 +790,7 @@ class Pool:
                 n = num
                 n = min(n, self._max_size - total)
 
-            await gather(*[self._fill_new() for _ in range(n)])
+            await _gather(*[self._fill_new() for _ in range(n)])
             self._cond.notify()
 
     async def release(self, conn: PoolConnection) -> None:

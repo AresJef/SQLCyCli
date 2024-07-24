@@ -19,15 +19,14 @@ from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS  # type: ignore
 from cython.cimports.sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket  # type: ignore
-from cython.cimports.sqlcycli.protocol import pack_int32, pack_uint8, unpack_uint8, unpack_uint16, unpack_uint32  # type: ignore
 from cython.cimports.sqlcycli.transcode import escape_item, encode_item, decode_item, decode_bytes, decode_bytes_utf8  # type: ignore
-from cython.cimports.sqlcycli import _auth, typeref  # type: ignore
+from cython.cimports.sqlcycli import _auth, typeref, utils  # type: ignore
 
 # Python imports
 from typing import Literal
 from io import BufferedReader
-from os import PathLike, getpid
 import socket, errno, warnings, re
+from os import PathLike, getpid as _getpid
 from pandas import DataFrame
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
@@ -36,7 +35,7 @@ from sqlcycli._optionfile import OptionFile
 from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
 from sqlcycli.transcode import escape_item, encode_item, decode_item
 from sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS, CR, ER
-from sqlcycli import _auth, typeref, errors
+from sqlcycli import _auth, typeref, utils, errors
 
 __all__ = [
     "MysqlResult",
@@ -67,8 +66,8 @@ MAX_CONNECT_TIMEOUT: cython.int = 31_536_000  # 1 year
 DEFALUT_MAX_ALLOWED_PACKET: cython.int = 16_777_216  # 16MB
 MAXIMUM_MAX_ALLOWED_PACKET: cython.int = 1_073_741_824  # 1GB
 # fmt: off
-DEFAULT_CONNECT_ATTRS: bytes = gen_connect_attrs(  # type: ignore
-    ["_client_name", "sqlcycli", "_client_version", "0.0.0"] )
+DEFAULT_CONNECT_ATTRS: bytes = utils.gen_connect_attrs(
+    ["_client_name", "sqlcycli", "_client_version", "0.0.0", "_pid"] )
 # fmt: on
 MAX_PACKET_LENGTH: cython.uint = 2**24 - 1
 #: Max statement size which :meth:`executemany` generates.
@@ -132,6 +131,7 @@ class MysqlResult:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def read(self) -> cython.bint:
+        """Read the packet data `<'bool'>`."""
         try:
             pkt = self._conn._read_packet()
             if pkt.read_ok_packet():
@@ -147,10 +147,7 @@ class MysqlResult:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def init_unbuffered_query(self) -> cython.bint:
-        """
-        :raise OperationalError: If the connection to the server is lost.
-        :raise InternalError:
-        """
+        """Initiate unbuffered query mode `<'bool'>`."""
         self.unbuffered_active = True
         try:
             pkt = self._conn._read_packet()
@@ -177,6 +174,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_ok_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read OKPacket data. Call when the packet
+        is known to be OKPacket `<'bool'>`."""
         self.affected_rows = pkt._affected_rows
         self.insert_id = pkt._insert_id
         self.server_status = pkt._server_status
@@ -189,6 +188,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_load_local_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read LoadLocalPacket data. Call when the
+        packet is known to be LoadLocalPacket `<'bool'>`."""
         if not self._conn._local_infile:
             raise RuntimeError(
                 "**WARNING**: Received LOAD_LOCAL packet but option 'local_infile=False'."
@@ -231,6 +232,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_eof_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read EOFPacket data. Call when the packet
+        is known to be EOFPacket `<'bool'>`."""
         # TODO: Support CLIENT.DEPRECATE_EOF
         # 1) Add DEPRECATE_EOF to CAPABILITIES
         # 2) Mask CAPABILITIES with server_capabilities
@@ -244,6 +247,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_result_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read ResultPacket data. Call in buffered mode
+        and the packet is known to be ResultPacket `<'bool'>`."""
         # Fields
         self._read_result_packet_fields(pkt)
         # Rows
@@ -265,6 +270,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_result_packet_fields(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read all the FieldDescriptor packets
+        of the query `<'bool'>`."""
         self.field_count = pkt.read_length_encoded_integer()
         self.fields = list_to_tuple(
             [
@@ -279,8 +286,10 @@ class MysqlResult:
     @cython.cfunc
     @cython.inline(True)
     def _read_result_packet_row(self, pkt: MysqlPacket) -> tuple:
+        """(cfunc) Read and decode one row of data
+        from the query `<'tuple'>`."""
         # Settings
-        encoding: cython.pchar = self._conn._encoding_c
+        encoding_c: cython.pchar = self._conn._encoding_c
         use_decimal: cython.bint = self._use_decimal
         decode_json: cython.bint = self._decode_json
         # Read data
@@ -296,7 +305,7 @@ class MysqlResult:
                 data = decode_item(
                     value,
                     field._type_code,
-                    encoding,
+                    encoding_c,
                     field._is_binary,
                     use_decimal,
                     decode_json,
@@ -310,6 +319,8 @@ class MysqlResult:
     @cython.cfunc
     @cython.inline(True)
     def _read_result_packet_row_unbuffered(self) -> tuple:
+        """(cfunc) Read and decode one row of data
+        from unbuffered query `<'tuple/None'>`"""
         # Check if in an active query
         if not self.unbuffered_active:
             return None
@@ -331,6 +342,7 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _drain_result_packet_unbuffered(self) -> cython.bint:
+        """(cfunc) Drain all the remaining unbuffered data `<'bool'>`."""
         # After much reading on the protocol, it appears that there is,
         # in fact, no way to stop from sending all the data after
         # executing a query, so we just spin, and wait for an EOF packet.
@@ -612,7 +624,7 @@ class Cursor:
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
-        return encode_str(sql, self._encoding_c)  # type: ignore
+        return utils.encode_str(sql, self._encoding_c)
 
     @cython.cfunc
     @cython.inline(True)
@@ -666,7 +678,7 @@ class Cursor:
 
         # Unbuffered
         else:
-            row = self._next_row()
+            row = self._next_row_unbuffered()
             if row is None:
                 self._warning_count = self._result.warning_count
                 return None  # exit: no rows
@@ -735,7 +747,7 @@ class Cursor:
             # . fetch all
             if size == 0:
                 while True:
-                    row = self._next_row()
+                    row = self._next_row_unbuffered()
                     if row is None:
                         self._warning_count = self._result.warning_count
                         break
@@ -744,7 +756,7 @@ class Cursor:
             # . fetch many
             else:
                 for _ in range(size):
-                    row = self._next_row()
+                    row = self._next_row_unbuffered()
                     if row is None:
                         self._warning_count = self._result.warning_count
                         break
@@ -844,7 +856,7 @@ class Cursor:
         else:
             raise errors.InvalidCursorArgsError("Inavlid scroll mode %r." % mode)
         for _ in range(val):
-            if self._next_row() is None:
+            if self._next_row_unbuffered() is None:
                 break
         return True
 
@@ -865,7 +877,7 @@ class Cursor:
 
     @cython.cfunc
     @cython.inline(True)
-    def _next_row(self) -> tuple:
+    def _next_row_unbuffered(self) -> tuple:
         row = self._result._read_result_packet_row_unbuffered()
         if row is not None:
             self._row_idx += 1
@@ -1347,14 +1359,14 @@ class BaseConnection:
     def _init_connect_attrs(self, program_name: str | None) -> cython.bint:
         """(cfunc) Initialize the 'connect_attrs' `<'bool'>`."""
         if program_name is None:
-            attrs: bytes = DEFAULT_CONNECT_ATTRS + gen_connect_attrs(  # type: ignore
-                ["_pid", str(getpid)]
+            attrs: bytes = DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+                [str(_getpid)]
             )
         else:
-            attrs: bytes = DEFAULT_CONNECT_ATTRS + gen_connect_attrs(  # type: ignore
-                ["_pid", str(getpid), "program_name", program_name]
+            attrs: bytes = DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+                [str(_getpid), "program_name", program_name]
             )
-        self._connect_attrs = gen_length_encoded_integer(bytes_len(attrs)) + attrs  # type: ignore
+        self._connect_attrs = utils.gen_length_encoded_integer(bytes_len(attrs)) + attrs
         return True
 
     @cython.cfunc
@@ -1595,18 +1607,14 @@ class BaseConnection:
     @cython.ccall
     def cursor(self, cursor: type[Cursor] = None) -> CursorManager:
         self._verify_connected()
-        return CursorManager(
-            self,
-            self._cursor if cursor is None else validate_cursor(cursor),  # type: ignore
-        )
+        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        return CursorManager(self, cur)
 
     @cython.ccall
     def transaction(self, cursor: type[Cursor] = None) -> TransactionManager:
         self._verify_connected()
-        return TransactionManager(
-            self,
-            self._cursor if cursor is None else validate_cursor(cursor),  # type: ignore
-        )
+        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        return TransactionManager(self, cur)
 
     @cython.cfunc
     @cython.inline(True)
@@ -1665,7 +1673,7 @@ class BaseConnection:
         Send "SET NAMES charset [COLLATE collation]" query.
         Update Connection.encoding based on charset.
         """
-        ch: Charset = validate_charset(charset, collation)  # type: ignore
+        ch: Charset = utils.validate_charset(charset, collation, DEFUALT_CHARSET)
         if ch._name != self._charset or ch._collation != self._collation:
             self._init_charset(ch)
             sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
@@ -1678,7 +1686,7 @@ class BaseConnection:
     def set_read_timeout(self, value: int | None) -> cython.bint:
         name = "net_read_timeout"
         # Validate timeout
-        value = validate_arg_uint(value, name, 1, UINT_MAX)  # type: ignore
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._read_timeout is None:
@@ -1699,7 +1707,7 @@ class BaseConnection:
     def set_write_timeout(self, value: int | None) -> cython.bint:
         name = "net_write_timeout"
         # Validate timeout
-        value = validate_arg_uint(value, name, 1, UINT_MAX)  # type: ignore
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._write_timeout is None:
@@ -1720,7 +1728,7 @@ class BaseConnection:
     def set_wait_timeout(self, value: int | None) -> cython.bint:
         name = "wait_timeout"
         # Validate timeout
-        value = validate_arg_uint(value, name, 1, UINT_MAX)  # type: ignore
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._wait_timeout is None:
@@ -1869,7 +1877,7 @@ class BaseConnection:
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
-        return encode_str(sql, self._encoding_c)  # type: ignore
+        return utils.encode_str(sql, self._encoding_c)
 
     # Connect / Close -------------------------------------------------------------------------
     @cython.ccall
@@ -1940,7 +1948,7 @@ class BaseConnection:
             # - https://github.com/wagtail/wagtail/issues/9477
             # - https://zenn.dev/methane/articles/2023-mysql-collation (Japanese)
             sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
-            self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))  # type: ignore
+            self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
             self._read_packet()
 
             # . timeouts
@@ -2012,7 +2020,7 @@ class BaseConnection:
             return True
         # Close connection
         try:
-            self._write_bytes(pack_IB(1, _COMMAND.COM_QUIT))  # type: ignore
+            self._write_bytes(utils.pack_IB(1, _COMMAND.COM_QUIT))
         finally:
             self.force_close()
         return True
@@ -2047,7 +2055,9 @@ class BaseConnection:
     @cython.exceptval(-1, check=False)
     def kill(self, thread_id: cython.int) -> cython.bint:
         try:
-            self._execute_command(_COMMAND.COM_PROCESS_KILL, pack_int32(thread_id))
+            self._execute_command(
+                _COMMAND.COM_PROCESS_KILL, utils.pack_int32(thread_id)
+            )
             self._read_ok_packet()
         except errors.OperationalUnknownCommandError:
             # if COM_PROCESS_KILL [0x0C] gets 'unknown command' error,
@@ -2091,16 +2101,16 @@ class BaseConnection:
         length: cython.Py_ssize_t = pkt._size
 
         # . protocol version
-        self._server_protocol_version = unpack_uint8(data, 0)
+        self._server_protocol_version = utils.unpack_uint8(data, 0)
 
         # . server version
-        loc: cython.Py_ssize_t = find_null_term(data, 1)  # type: ignore
+        loc: cython.Py_ssize_t = utils.find_null_term(data, 1)
         self._server_info = decode_bytes(data[1:loc], "latin1")
         self._server_version_major = int(str_split(self._server_info, ".", 1)[0])
         i: cython.Py_ssize_t = loc + 1
 
         # . server_thred_id
-        self._server_thred_id = unpack_uint32(data, i)
+        self._server_thred_id = utils.unpack_uint32(data, i)
         i += 4
 
         # . salt
@@ -2108,18 +2118,18 @@ class BaseConnection:
         i += 9  # 8 + 1(filler)
 
         # . server capabilities
-        self._server_capabilities = unpack_uint16(data, i)
+        self._server_capabilities = utils.unpack_uint16(data, i)
         i += 2
 
         # . server_status & adj server_capabilities
         salt_len: cython.Py_ssize_t
         if length >= i + 6:
             i += 1
-            self._server_status = unpack_uint16(data, i)
+            self._server_status = utils.unpack_uint16(data, i)
             i += 2
-            self._server_capabilities |= unpack_uint16(data, i) << 16
+            self._server_capabilities |= utils.unpack_uint16(data, i) << 16
             i += 2
-            salt_len = max(12, unpack_uint8(data, i) - 9)
+            salt_len = max(12, utils.unpack_uint8(data, i) - 9)
             i += 1
         else:
             salt_len = 0
@@ -2141,7 +2151,7 @@ class BaseConnection:
             # ref: https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::Handshake
             # didn't use version checks as mariadb is corrected and reports
             # earlier than those two.
-            loc = find_null_term(data, i)  # type: ignore
+            loc = utils.find_null_term(data, i)
             if loc < 0:  # pragma: no cover - very specific upstream bug
                 # not found \0 and last field so take it all
                 auth_plugin_name: bytes = data[i:length]
@@ -2168,7 +2178,7 @@ class BaseConnection:
             )
 
         # . init data
-        data: bytes = pack_IIB23s(  # type: ignore
+        data: bytes = utils.pack_IIB23s(
             self._client_flag, MAX_PACKET_LENGTH, self._charset_id
         )
 
@@ -2211,9 +2221,9 @@ class BaseConnection:
             plugin_name = None
             authres = b""
         if self._server_capabilities & _CLIENT.PLUGIN_AUTH_LENENC_CLIENT_DATA:
-            data += gen_length_encoded_integer(bytes_len(authres)) + authres  # type: ignore
+            data += utils.gen_length_encoded_integer(bytes_len(authres)) + authres
         elif self._server_capabilities & _CLIENT.SECURE_CONNECTION:
-            data += pack_uint8(bytes_len(authres)) + authres
+            data += utils.pack_uint8(bytes_len(authres)) + authres
         else:
             data += authres + b"\0"
 
@@ -2493,7 +2503,7 @@ class BaseConnection:
         pkt_size: cython.uint = min(
             sql_size + 1, MAX_PACKET_LENGTH
         )  # +1 is for command
-        data = pack_IB(pkt_size, command) + sql[0 : pkt_size - 1]  # type: ignore
+        data = utils.pack_IB(pkt_size, command) + sql[0 : pkt_size - 1]
         self._write_bytes(data)
         self._next_seq_id = 1
 
@@ -2517,7 +2527,7 @@ class BaseConnection:
         """
         # Internal note: when you build packet manually and calls _write_bytes()
         # directly, you should set self._next_seq_id properly.
-        data = pack_I24B(bytes_len(payload), self._next_seq_id) + payload  # type: ignore
+        data = utils.pack_I24B(bytes_len(payload), self._next_seq_id) + payload
         self._write_bytes(data)
         self._next_seq_id = (self._next_seq_id + 1) % 256
         return True
@@ -2588,7 +2598,7 @@ class BaseConnection:
         if pkt.is_error_packet():
             if self._result is not None and self._result.unbuffered_active:
                 self._result.unbuffered_active = False
-            pkt.raise_for_error()
+            pkt.raise_error()
         return pkt
 
     @cython.cfunc
@@ -2605,7 +2615,7 @@ class BaseConnection:
         if pkt.is_error_packet():
             if self._result is not None and self._result.unbuffered_active:
                 self._result.unbuffered_active = False
-            pkt.raise_for_error()
+            pkt.raise_error()
         return pkt
 
     @cython.cfunc
@@ -2622,9 +2632,9 @@ class BaseConnection:
         while True:
             data: bytes = self._read_bytes(4)
             packet_header: cython.pchar = data
-            btrl: cython.uint = unpack_uint16(packet_header, 0)
-            btrh: cython.uint = unpack_uint8(packet_header, 2)
-            packet_number: cython.uint = unpack_uint8(packet_header, 3)
+            btrl: cython.uint = utils.unpack_uint16(packet_header, 0)
+            btrh: cython.uint = utils.unpack_uint8(packet_header, 2)
+            packet_number: cython.uint = utils.unpack_uint8(packet_header, 3)
             bytes_to_read: cython.uint = btrl + (btrh << 16)
             if packet_number != self._next_seq_id:
                 if packet_number == 0:
@@ -2757,31 +2767,34 @@ class Connection(BaseConnection):
 
         # fmt: off
         # . charset
-        self._init_charset(validate_charset(charset, collation)) # type: ignore
+        self._init_charset(utils.validate_charset(charset, collation, DEFUALT_CHARSET))
         # . basic
-        self._host = validate_arg_str(host, "host", "localhost")  # type: ignore
-        self._port = validate_arg_uint(port, "port", 1, 65_535)  # type: ignore
-        self._user = validate_arg_bytes(user, "user", self._encoding_c, DEFAULT_USER)  # type: ignore
-        self._password = validate_arg_bytes(password, "password", "latin1", "")  # type: ignore
-        self._database = validate_arg_bytes(database, "database", self._encoding_c, None)  # type: ignore
+        self._host = utils.validate_arg_str(host, "host", "localhost")
+        self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
+        self._user = utils.validate_arg_bytes(user, "user", self._encoding_c, DEFAULT_USER)
+        self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
+        self._database = utils.validate_arg_bytes(database, "database", self._encoding_c, None)
         # . timeouts
-        self._connect_timeout = validate_arg_uint(connect_timeout, "connect_timeout", 1, MAX_CONNECT_TIMEOUT) # type: ignore
-        self._read_timeout = validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX) # type: ignore
-        self._write_timeout = validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX) # type: ignore
-        self._wait_timeout = validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX) # type: ignore
+        self._connect_timeout = utils.validate_arg_uint(
+            connect_timeout, "connect_timeout", 1, MAX_CONNECT_TIMEOUT)
+        self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
+        self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
+        self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
         # . client
-        self._bind_address = validate_arg_str(bind_address, "bind_address", None)  # type: ignore
-        self._unix_socket = validate_arg_str(unix_socket, "unix_socket", None)  # type: ignore
-        self._autocommit_mode = validate_autocommit(autocommit)  # type: ignore
+        self._bind_address = utils.validate_arg_str(bind_address, "bind_address", None)
+        self._unix_socket = utils.validate_arg_str(unix_socket, "unix_socket", None)
+        self._autocommit_mode = utils.validate_autocommit(autocommit)
         self._local_infile = bool(local_infile)
-        self._max_allowed_packet = validate_max_allowed_packet(max_allowed_packet)  # type: ignore
-        self._sql_mode = validate_sql_mode(sql_mode)  # type: ignore
-        self._init_command = validate_arg_str(init_command, "init_command", None)  # type: ignore
-        self._cursor = validate_cursor(cursor)  # type: ignore
-        self._init_client_flag(validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))  # type: ignore
-        self._init_connect_attrs(validate_arg_str(program_name, "program_name", None)) # type: ignore
+        self._max_allowed_packet = utils.validate_max_allowed_packet(
+            max_allowed_packet, DEFALUT_MAX_ALLOWED_PACKET, MAXIMUM_MAX_ALLOWED_PACKET)
+        self._sql_mode = utils.validate_sql_mode(sql_mode)
+        self._init_command = utils.validate_arg_str(init_command, "init_command", None)
+        self._cursor = utils.validate_cursor(cursor, Cursor)
+        self._init_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))
+        self._init_connect_attrs(utils.validate_arg_str(program_name, "program_name", None))
         # . ssl
-        self._ssl_ctx = validate_ssl(ssl)  # type: ignore
+        self._ssl_ctx = utils.validate_ssl(ssl)
+        # fmt: on
         # . auth
         if auth_plugin is not None:
             if isinstance(auth_plugin, AuthPlugin):
@@ -2796,11 +2809,11 @@ class Connection(BaseConnection):
                 )
         else:
             self._auth_plugin = None
-        self._server_public_key = validate_arg_bytes( # type: ignore
-            server_public_key, "server_public_key", "ascii", None) 
+        self._server_public_key = utils.validate_arg_bytes(
+            server_public_key, "server_public_key", "ascii", None
+        )
         # . decode
         self._use_decimal = bool(use_decimal)
         self._decode_json = bool(decode_json)
         # . internal
         self._init_internal()
-        # fmt: on

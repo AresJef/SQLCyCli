@@ -9,7 +9,7 @@ from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  #
 from cython.cimports.cpython.bytes import PyBytes_FromStringAndSize as bytes_fr_chars_wlen  # type: ignore
 from cython.cimports.cpython.bytearray import PyByteArray_GET_SIZE as bytearray_len  # type: ignore
 from cython.cimports.cpython.bytearray import PyByteArray_AS_STRING as bytearray_to_chars  # type: ignore
-from cython.cimports.sqlcycli.protocol import pack_uint8  # type: ignore
+from cython.cimports.sqlcycli import utils  # type: ignore
 
 # Python imports
 try:
@@ -23,7 +23,7 @@ except ImportError:
 # MariaDB's client_ed25519-plugin
 # https://mariadb.com/kb/en/library/connection/#client_ed25519-plugin
 try:
-    from nacl import bindings as _bindings  # type: ignore
+    from nacl import bindings
 
     NACL_AVAILABLE: cython.bint = True
 except ImportError:
@@ -34,7 +34,7 @@ from hashlib import (
     sha256 as _hashlib_sha256,
     sha512 as _hashlib_sha512,
 )
-from sqlcycli import errors
+from sqlcycli import utils, errors
 
 __all__ = [
     "AuthPlugin",
@@ -316,8 +316,8 @@ def ed25519_password(password: bytes, scramble: bytes) -> bytes:
     # s = prune(first_half(h))
     s32: bytearray = bytearray(h[0:32])
     ba: cython.pchar = bytearray_to_chars(s32)
-    ba0: bytes = pack_uint8(ba[0] & 248)
-    ba31: bytes = pack_uint8((ba[31] & 127) | 64)
+    ba0: bytes = utils.pack_uint8(ba[0] & 248)
+    ba31: bytes = utils.pack_uint8((ba[31] & 127) | 64)
     ba_m: bytes = ba[1:31]
     s: bytes = ba0 + ba_m + ba31
 
@@ -326,19 +326,19 @@ def ed25519_password(password: bytes, scramble: bytes) -> bytes:
     r = _hashlib_sha512(h[32:length] + scramble).digest()
 
     # R = encoded point [r]B
-    r = _bindings.crypto_core_ed25519_scalar_reduce(r)
-    R = _bindings.crypto_scalarmult_ed25519_base_noclamp(r)
+    r = bindings.crypto_core_ed25519_scalar_reduce(r)
+    R = bindings.crypto_scalarmult_ed25519_base_noclamp(r)
 
     # A = encoded point [s]B
-    A = _bindings.crypto_scalarmult_ed25519_base_noclamp(s)
+    A = bindings.crypto_scalarmult_ed25519_base_noclamp(s)
 
     # k = SHA512(R || A || M)
     k = _hashlib_sha512(R + A + scramble).digest()
 
     # S = (k * s + r) mod L
-    k = _bindings.crypto_core_ed25519_scalar_reduce(k)
-    ks = _bindings.crypto_core_ed25519_scalar_mul(k, s)
-    S = _bindings.crypto_core_ed25519_scalar_add(ks, r)
+    k = bindings.crypto_core_ed25519_scalar_reduce(k)
+    ks = bindings.crypto_core_ed25519_scalar_mul(k, s)
+    S = bindings.crypto_core_ed25519_scalar_add(ks, r)
 
     # signature = R || S
     return R + S

@@ -1,6 +1,6 @@
 # cython: language_level=3
 
-# Charset(s) ----------------------------------------------------------------------------------
+# Charset(s)
 cdef class Charset:
     cdef:
         int _id
@@ -26,7 +26,7 @@ cdef class Charsets:
     cpdef Charset by_collation(self, str collation)
     cpdef Charset by_name_n_collation(self, str name, str collation)
 
-# Init ----------------------------------------------------------------------------------------
+# Init
 cdef Charsets _charsets
 cpdef Charsets all_charsets()
 cpdef Charset by_id(object id)

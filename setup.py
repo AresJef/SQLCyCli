@@ -65,27 +65,18 @@ if platform.system() == "Windows":
         extension("_ssl.py", False),
         extension("charset.py", False),
         extension("connection.py", True),
-        extension("errors.py", False),
+        extension("errors.py", True),
         extension("protocol.py", True),
         extension("transcode.py", True),
         extension("typeref.py", False),
+        extension("utils.py", True),
     ]
 else:
     extensions = [
-        folder_extension(
-            "aio",
-            "connection.py",
-            True,
-            "-Wno-unreachable-code",
-            "-Wno-incompatible-pointer-types",
-        ),
-        folder_extension(
-            "aio",
-            "pool.py",
-            True,
-            "-Wno-unreachable-code",
-            "-Wno-incompatible-pointer-types",
-        ),
+        # fmt: off
+        folder_extension("aio", "connection.py", True, "-Wno-unreachable-code", "-Wno-incompatible-pointer-types"),
+        folder_extension("aio", "pool.py", True, "-Wno-unreachable-code", "-Wno-incompatible-pointer-types"),
+        # fmt: on
         folder_extension("constants", "_CLIENT.py", False),
         folder_extension("constants", "_COMMAND.py", False),
         folder_extension("constants", "_FIELD_TYPE.py", False),
@@ -95,10 +86,11 @@ else:
         extension("_ssl.py", False, "-Wno-unreachable-code"),
         extension("charset.py", False, "-Wno-unreachable-code"),
         extension("connection.py", True, "-Wno-unreachable-code"),
-        extension("errors.py", False),
+        extension("errors.py", True, "-Wno-unreachable-code"),
         extension("protocol.py", True, "-Wno-unreachable-code"),
         extension("transcode.py", True, "-Wno-unreachable-code"),
         extension("typeref.py", False),
+        extension("utils.py", True, "-Wno-unreachable-code"),
     ]
 
 # Build

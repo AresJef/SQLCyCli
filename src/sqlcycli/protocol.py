@@ -5,12 +5,12 @@
 # Cython imports
 import cython
 from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
-from cython.cimports.sqlcycli import errors  # type: ignore
+from cython.cimports.sqlcycli import errors, utils  # type: ignore
 from cython.cimports.sqlcycli.transcode import decode_bytes  # type: ignore
 from cython.cimports.sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS  # type: ignore
 
 # Python imports
-from sqlcycli import errors
+from sqlcycli import errors, utils
 from sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS
 
 __all__ = ["MysqlPacket", "FieldDescriptorPacket"]
@@ -216,7 +216,7 @@ class MysqlPacket:
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 1
-        return unpack_uint8(self._data_c, pos)  # type: ignore
+        return utils.unpack_uint8(self._data_c, pos)
 
     @cython.cfunc
     @cython.inline(True)
@@ -225,7 +225,7 @@ class MysqlPacket:
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 2
-        return unpack_uint16(self._data_c, pos)  # type: ignore
+        return utils.unpack_uint16(self._data_c, pos)
 
     @cython.cfunc
     @cython.inline(True)
@@ -234,7 +234,7 @@ class MysqlPacket:
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 3
-        return unpack_uint24(self._data_c, pos)  # type: ignore
+        return utils.unpack_uint24(self._data_c, pos)
 
     @cython.cfunc
     @cython.inline(True)
@@ -243,7 +243,7 @@ class MysqlPacket:
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 4
-        return unpack_uint32(self._data_c, pos)  # type: ignore
+        return utils.unpack_uint32(self._data_c, pos)
 
     @cython.cfunc
     @cython.inline(True)
@@ -252,7 +252,7 @@ class MysqlPacket:
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
         self._pos = pos + 8
-        return unpack_uint64(self._data_c, pos)  # type: ignore
+        return utils.unpack_uint64(self._data_c, pos)
 
     # Read Packet -----------------------------------------------------------------------------
     @cython.cfunc
@@ -261,7 +261,7 @@ class MysqlPacket:
     def is_ok_packet(self) -> cython.bint:
         """(cfunc) Check if is OKPacket `<'bool'>`."""
         # https://dev.mysql.com/doc/internals/en/packet-OK_Packet.html
-        return self._size >= 7 and self._data_c[0] == 0  # type: ignore
+        return self._size >= 7 and self._data_c[0] == 0
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -289,7 +289,7 @@ class MysqlPacket:
     @cython.exceptval(-1, check=False)
     def is_load_local_packet(self) -> cython.bint:
         """(cfunc) Check if is LoadLocalPacket `<'bool'>`."""
-        return unpack_uint8(self._data_c, 0) == 0xFB  # type: ignore
+        return utils.unpack_uint8(self._data_c, 0) == 0xFB
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -315,7 +315,7 @@ class MysqlPacket:
         # http://dev.mysql.com/doc/internals/en/generic-response-packets.html#packet-EOF_Packet
         # Caution: \xFE may be LengthEncodedInteger.
         # If \xFE is LengthEncodedInteger header, 8bytes followed.
-        return self._size < 9 and unpack_uint8(self._data_c, 0) == 0xFE  # type: ignore
+        return self._size < 9 and utils.unpack_uint8(self._data_c, 0) == 0xFE
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -341,7 +341,7 @@ class MysqlPacket:
     def is_auth_switch_request(self) -> cython.bint:
         """(cfunc) Check if is AuthSwitchRequest Packet `<'bool'>`."""
         # http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthSwitchRequest
-        return unpack_uint8(self._data_c, 0) == 0xFE  # type: ignore
+        return utils.unpack_uint8(self._data_c, 0) == 0xFE
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -357,13 +357,13 @@ class MysqlPacket:
         # Parse
         self._pos += 1  # skip 1 (0)
         # . plugin name
-        loc: cython.Py_ssize_t = find_null_term(self._data_c, self._pos)  # type: ignore
+        loc: cython.Py_ssize_t = utils.find_null_term(self._data_c, self._pos)
         if loc < 0:
             return True
         self._plugin_name = self._data_c[self._pos : loc]
         self._pos = loc + 1
         # . salt
-        loc = find_null_term(self._data_c, self._pos)  # type: ignore
+        loc = utils.find_null_term(self._data_c, self._pos)
         if loc < 0:
             return True
         self._salt = self._data_c[self._pos : loc]
@@ -383,14 +383,14 @@ class MysqlPacket:
     @cython.exceptval(-1, check=False)
     def is_resultset_packet(self) -> cython.bint:
         """(cfunc) Check if is ResultPacket `<'bool'>`."""
-        return 1 <= unpack_uint8(self._data_c, 0) <= 250  # type: ignore
+        return 1 <= utils.unpack_uint8(self._data_c, 0) <= 250
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def is_error_packet(self) -> cython.bint:
         """(cfunc) Check if is ErrorPacket `<'bool'>`."""
-        return unpack_uint8(self._data_c, 0) == 0xFF  # type: ignore
+        return utils.unpack_uint8(self._data_c, 0) == 0xFF
 
     # Curosr ----------------------------------------------------------------------------------
     @cython.cfunc

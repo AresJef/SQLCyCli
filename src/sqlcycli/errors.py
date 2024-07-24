@@ -4,9 +4,10 @@
 
 # Cython imports
 import cython
-from cython.cimports.sqlcycli.protocol import unpack_int16  # type: ignore
+from cython.cimports.sqlcycli import utils  # type: ignore
 
 # Python imports
+from sqlcycli import utils
 from sqlcycli.constants import ER
 
 
@@ -159,7 +160,7 @@ del _map_error, ER
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def raise_mysql_exception(data: cython.pchar, size: cython.ulonglong) -> cython.bint:
-    errno: cython.int = unpack_int16(data, 1)
+    errno: cython.int = utils.unpack_int16(data, 1)
     # https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html
     # Error packet has optional sqlstate that is 5 bytes and starts with '#'.
     if data[3] == 0x23:  # '#'

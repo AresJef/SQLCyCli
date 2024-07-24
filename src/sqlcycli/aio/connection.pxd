@@ -2,19 +2,6 @@
 from sqlcycli.charset cimport Charset
 from sqlcycli._auth cimport AuthPlugin
 from sqlcycli.protocol cimport MysqlPacket
-from sqlcycli import errors
-
-# Validator
-cdef inline object validate_cursor(object cursor):
-    """Validate if the 'cursor' argument is valid `<'type[Cursor]'>`."""
-    if cursor is None:
-        return Cursor
-    if type(cursor) is not type or not issubclass(cursor, Cursor):
-        raise errors.InvalidConnectionArgsError(
-            "Invalid 'cursor' argument: %r, "
-            "must be a class type of <'aio.Cursor'>." % cursor
-        )
-    return cursor
 
 # Result
 cdef class MysqlResult:

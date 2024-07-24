@@ -17,31 +17,28 @@ from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
-from cython.cimports.sqlcycli import connection as sync_conn  # type: ignore
 from cython.cimports.sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS  # type: ignore
 from cython.cimports.sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket  # type: ignore
-from cython.cimports.sqlcycli.protocol import pack_int32, pack_uint8, unpack_uint8, unpack_uint16, unpack_uint32  # type: ignore
 from cython.cimports.sqlcycli.transcode import escape_item, encode_item, decode_item, decode_bytes, decode_bytes_utf8  # type: ignore
-from cython.cimports.sqlcycli import _auth, typeref  # type: ignore
+from cython.cimports.sqlcycli import connection as sync_conn, _auth, typeref, utils  # type: ignore
 
 # Python imports
 from io import BufferedReader
-from os import PathLike, getpid
+from os import PathLike, getpid as _getpid
 import asyncio, socket, errno, warnings
 from typing import Literal, Generator, Any
-from asyncio import get_event_loop, wait_for
 from asyncio import AbstractEventLoop, Transport
 from asyncio import StreamReader, StreamReaderProtocol, StreamWriter
+from asyncio import get_event_loop as _get_event_loop, wait_for as _wait_for
 from pandas import DataFrame
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
 from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
-from sqlcycli import connection as sync_conn
 from sqlcycli.transcode import escape_item, encode_item, decode_item
 from sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS, CR, ER
-from sqlcycli import _auth, typeref, errors
+from sqlcycli import connection as sync_conn, _auth, typeref, utils, errors
 
 __all__ = [
     "MysqlResult",
@@ -578,7 +575,7 @@ class Cursor:
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
-        return sync_conn.encode_str(sql, self._encoding_c)
+        return utils.encode_str(sql, self._encoding_c)
 
     async def _query_str(self, sql: str) -> int:
         return await self._query_bytes(self.encode_sql(sql))
@@ -1328,20 +1325,14 @@ class BaseConnection:
     def _init_connect_attrs(self, program_name: str | None) -> cython.bint:
         """(cfunc) Initialize the 'connect_attrs' `<'bool'>`."""
         if program_name is None:
-            attrs: bytes = (
-                sync_conn.DEFAULT_CONNECT_ATTRS
-                + sync_conn.gen_connect_attrs(["_pid", str(getpid)])
+            attrs: bytes = sync_conn.DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+                [str(_getpid)]
             )
         else:
-            attrs: bytes = (
-                sync_conn.DEFAULT_CONNECT_ATTRS
-                + sync_conn.gen_connect_attrs(
-                    ["_pid", str(getpid), "program_name", program_name]
-                )
+            attrs: bytes = sync_conn.DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+                [str(_getpid), "program_name", program_name]
             )
-        self._connect_attrs = (
-            sync_conn.gen_length_encoded_integer(bytes_len(attrs)) + attrs
-        )
+        self._connect_attrs = utils.gen_length_encoded_integer(bytes_len(attrs)) + attrs
         return True
 
     @cython.cfunc
@@ -1582,18 +1573,14 @@ class BaseConnection:
     @cython.ccall
     def cursor(self, cursor: type[Cursor] = None) -> CursorManager:
         self._verify_connected()
-        return CursorManager(
-            self,
-            self._cursor if cursor is None else validate_cursor(cursor),  # type: ignore
-        )
+        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        return CursorManager(self, cur)
 
     @cython.ccall
     def transaction(self, cursor: type[Cursor] = None) -> TransactionManager:
         self._verify_connected()
-        return TransactionManager(
-            self,
-            self._cursor if cursor is None else validate_cursor(cursor),  # type: ignore
-        )
+        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        return TransactionManager(self, cur)
 
     @cython.cfunc
     @cython.inline(True)
@@ -1640,7 +1627,9 @@ class BaseConnection:
         Send "SET NAMES charset [COLLATE collation]" query.
         Update Connection.encoding based on charset.
         """
-        ch: Charset = sync_conn.validate_charset(charset, collation)
+        ch: Charset = utils.validate_charset(
+            charset, collation, sync_conn.DEFUALT_CHARSET
+        )
         if ch._name != self._charset or ch._collation != self._collation:
             self._init_charset(ch)
             sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
@@ -1650,7 +1639,7 @@ class BaseConnection:
     async def set_read_timeout(self, value: int | None) -> None:
         name = "net_read_timeout"
         # Validate timeout
-        value = sync_conn.validate_arg_uint(value, name, 1, UINT_MAX)
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._read_timeout is None:
@@ -1668,7 +1657,7 @@ class BaseConnection:
     async def set_write_timeout(self, value: int | None) -> None:
         name = "net_write_timeout"
         # Validate timeout
-        value = sync_conn.validate_arg_uint(value, name, 1, UINT_MAX)
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._write_timeout is None:
@@ -1686,7 +1675,7 @@ class BaseConnection:
     async def set_wait_timeout(self, value: int | None) -> None:
         name = "wait_timeout"
         # Validate timeout
-        value = sync_conn.validate_arg_uint(value, name, 1, UINT_MAX)
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
         if value is None:
             # Global timeout
             if self._wait_timeout is None:
@@ -1821,7 +1810,7 @@ class BaseConnection:
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
-        return sync_conn.encode_str(sql, self._encoding_c)
+        return utils.encode_str(sql, self._encoding_c)
 
     # Connect / Close -------------------------------------------------------------------------
     async def connect(self) -> None:
@@ -1835,14 +1824,14 @@ class BaseConnection:
         try:
             # . create socket
             if self._unix_socket is not None:
-                await wait_for(
+                await _wait_for(
                     self._open_unix(self._unix_socket),
                     timeout=self._connect_timeout,
                 )
                 self._host_info = "Localhost via UNIX socket"
                 self._secure = True
             else:
-                await wait_for(
+                await _wait_for(
                     self._open_tcp(
                         self._host,
                         self._port,
@@ -1974,7 +1963,7 @@ class BaseConnection:
             return None
         # Close connection
         try:
-            self._write_bytes(sync_conn.pack_IB(1, _COMMAND.COM_QUIT))
+            self._write_bytes(utils.pack_IB(1, _COMMAND.COM_QUIT))
             await self._writer.drain()
         finally:
             self.force_close()
@@ -2008,7 +1997,7 @@ class BaseConnection:
     async def kill(self, thread_id: int) -> None:
         try:
             await self._execute_command(
-                _COMMAND.COM_PROCESS_KILL, pack_int32(thread_id)
+                _COMMAND.COM_PROCESS_KILL, utils.pack_int32(thread_id)
             )
             await self._read_ok_packet()
         except errors.OperationalUnknownCommandError:
@@ -2046,16 +2035,16 @@ class BaseConnection:
         length: cython.Py_ssize_t = pkt._size
 
         # . protocol version
-        self._server_protocol_version = unpack_uint8(data, 0)
+        self._server_protocol_version = utils.unpack_uint8(data, 0)
 
         # . server version
-        loc: cython.Py_ssize_t = sync_conn.find_null_term(data, 1)
+        loc: cython.Py_ssize_t = utils.find_null_term(data, 1)
         self._server_info = decode_bytes(data[1:loc], "latin1")
         self._server_version_major = int(str_split(self._server_info, ".", 1)[0])
         i: cython.Py_ssize_t = loc + 1
 
         # . server_thred_id
-        self._server_thred_id = unpack_uint32(data, i)
+        self._server_thred_id = utils.unpack_uint32(data, i)
         i += 4
 
         # . salt
@@ -2063,18 +2052,18 @@ class BaseConnection:
         i += 9  # 8 + 1(filler)
 
         # . server capabilities
-        self._server_capabilities = unpack_uint16(data, i)
+        self._server_capabilities = utils.unpack_uint16(data, i)
         i += 2
 
         # . server_status & adj server_capabilities
         salt_len: cython.Py_ssize_t
         if length >= i + 6:
             i += 1
-            self._server_status = unpack_uint16(data, i)
+            self._server_status = utils.unpack_uint16(data, i)
             i += 2
-            self._server_capabilities |= unpack_uint16(data, i) << 16
+            self._server_capabilities |= utils.unpack_uint16(data, i) << 16
             i += 2
-            salt_len = max(12, unpack_uint8(data, i) - 9)
+            salt_len = max(12, utils.unpack_uint8(data, i) - 9)
             i += 1
         else:
             salt_len = 0
@@ -2096,7 +2085,7 @@ class BaseConnection:
             # ref: https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::Handshake
             # didn't use version checks as mariadb is corrected and reports
             # earlier than those two.
-            loc = sync_conn.find_null_term(data, i)
+            loc = utils.find_null_term(data, i)
             if loc < 0:  # pragma: no cover - very specific upstream bug
                 # not found \0 and last field so take it all
                 auth_plugin_name: bytes = data[i:length]
@@ -2117,7 +2106,7 @@ class BaseConnection:
             )
 
         # . init data
-        data: bytes = sync_conn.pack_IIB23s(
+        data: bytes = utils.pack_IIB23s(
             self._client_flag, sync_conn.MAX_PACKET_LENGTH, self._charset_id
         )
 
@@ -2171,9 +2160,9 @@ class BaseConnection:
             plugin_name = None
             authres = b""
         if self._server_capabilities & _CLIENT.PLUGIN_AUTH_LENENC_CLIENT_DATA:
-            data += sync_conn.gen_length_encoded_integer(bytes_len(authres)) + authres
+            data += utils.gen_length_encoded_integer(bytes_len(authres)) + authres
         elif self._server_capabilities & _CLIENT.SECURE_CONNECTION:
-            data += pack_uint8(bytes_len(authres)) + authres
+            data += utils.pack_uint8(bytes_len(authres)) + authres
         else:
             data += authres + b"\0"
 
@@ -2438,7 +2427,7 @@ class BaseConnection:
         pkt_size: cython.uint = min(
             sql_size + 1, sync_conn.MAX_PACKET_LENGTH
         )  # +1 is for command
-        data = sync_conn.pack_IB(pkt_size, command) + sql[0 : pkt_size - 1]
+        data = utils.pack_IB(pkt_size, command) + sql[0 : pkt_size - 1]
         self._write_bytes(data)
         self._next_seq_id = 1
 
@@ -2460,7 +2449,7 @@ class BaseConnection:
         """
         # Internal note: when you build packet manually and calls _write_bytes()
         # directly, you should set self._next_seq_id properly.
-        data = sync_conn.pack_I24B(bytes_len(payload), self._next_seq_id) + payload
+        data = utils.pack_I24B(bytes_len(payload), self._next_seq_id) + payload
         self._write_bytes(data)
         self._next_seq_id = (self._next_seq_id + 1) % 256
         return True
@@ -2527,7 +2516,7 @@ class BaseConnection:
         if pkt.is_error_packet():
             if self._result is not None and self._result.unbuffered_active:
                 self._result.unbuffered_active = False
-            pkt.raise_for_error()
+            pkt.raise_error()
         return pkt
 
     async def _read_field_descriptor_packet(self) -> FieldDescriptorPacket:
@@ -2542,7 +2531,7 @@ class BaseConnection:
         if pkt.is_error_packet():
             if self._result is not None and self._result.unbuffered_active:
                 self._result.unbuffered_active = False
-            pkt.raise_for_error()
+            pkt.raise_error()
         return pkt
 
     async def _read_packet_buffer(self) -> bytes:
@@ -2557,9 +2546,9 @@ class BaseConnection:
         while True:
             data: bytes = await self._read_bytes(4)
             packet_header: cython.pchar = data
-            btrl: cython.uint = unpack_uint16(packet_header, 0)
-            btrh: cython.uint = unpack_uint8(packet_header, 2)
-            packet_number: cython.uint = unpack_uint8(packet_header, 3)
+            btrl: cython.uint = utils.unpack_uint16(packet_header, 0)
+            btrh: cython.uint = utils.unpack_uint8(packet_header, 2)
+            packet_number: cython.uint = utils.unpack_uint8(packet_header, 3)
             bytes_to_read: cython.uint = btrl + (btrh << 16)
             if packet_number != self._next_seq_id:
                 if packet_number == 0:
@@ -2695,31 +2684,34 @@ class Connection(BaseConnection):
 
         # fmt: off
         # . charset
-        self._init_charset(sync_conn.validate_charset(charset, collation)) 
+        self._init_charset(utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET))
         # . basic
-        self._host = sync_conn.validate_arg_str(host, "host", "localhost")  
-        self._port = sync_conn.validate_arg_uint(port, "port", 1, 65_535)  
-        self._user = sync_conn.validate_arg_bytes(user, "user", self._encoding_c, sync_conn.DEFAULT_USER)  
-        self._password = sync_conn.validate_arg_bytes(password, "password", "latin1", "")  
-        self._database = sync_conn.validate_arg_bytes(database, "database", self._encoding_c, None)  
+        self._host = utils.validate_arg_str(host, "host", "localhost")
+        self._port = utils.validate_arg_uint(port, "port", 1, 65_535) 
+        self._user = utils.validate_arg_bytes(user, "user", self._encoding_c, sync_conn.DEFAULT_USER)
+        self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
+        self._database = utils.validate_arg_bytes(database, "database", self._encoding_c, None)
         # . timeouts
-        self._connect_timeout = sync_conn.validate_arg_uint(connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
-        self._read_timeout = sync_conn.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
-        self._write_timeout = sync_conn.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
-        self._wait_timeout = sync_conn.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
+        self._connect_timeout = utils.validate_arg_uint(
+            connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
+        self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
+        self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
+        self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
         # . client
-        self._bind_address = sync_conn.validate_arg_str(bind_address, "bind_address", None)  
-        self._unix_socket = sync_conn.validate_arg_str(unix_socket, "unix_socket", None)  
-        self._autocommit_mode = sync_conn.validate_autocommit(autocommit)  
+        self._bind_address = utils.validate_arg_str(bind_address, "bind_address", None)
+        self._unix_socket = utils.validate_arg_str(unix_socket, "unix_socket", None)
+        self._autocommit_mode = utils.validate_autocommit(autocommit)
         self._local_infile = bool(local_infile)
-        self._max_allowed_packet = sync_conn.validate_max_allowed_packet(max_allowed_packet)  
-        self._sql_mode = sync_conn.validate_sql_mode(sql_mode)  
-        self._init_command = sync_conn.validate_arg_str(init_command, "init_command", None)  
-        self._cursor = validate_cursor(cursor) # type: ignore
-        self._init_client_flag(sync_conn.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))  
-        self._init_connect_attrs(sync_conn.validate_arg_str(program_name, "program_name", None)) 
+        self._max_allowed_packet = utils.validate_max_allowed_packet(
+            max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
+        self._sql_mode = utils.validate_sql_mode(sql_mode)
+        self._init_command = utils.validate_arg_str(init_command, "init_command", None)
+        self._cursor = utils.validate_cursor(cursor, Cursor)
+        self._init_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))
+        self._init_connect_attrs(utils.validate_arg_str(program_name, "program_name", None))
         # . ssl
-        self._ssl_ctx = sync_conn.validate_ssl(ssl)  
+        self._ssl_ctx = utils.validate_ssl(ssl)
+        # fmt: on
         # . auth
         if auth_plugin is not None:
             if isinstance(auth_plugin, AuthPlugin):
@@ -2734,8 +2726,9 @@ class Connection(BaseConnection):
                 )
         else:
             self._auth_plugin = None
-        self._server_public_key = sync_conn.validate_arg_bytes( 
-            server_public_key, "server_public_key", "ascii", None) 
+        self._server_public_key = utils.validate_arg_bytes(
+            server_public_key, "server_public_key", "ascii", None
+        )
         # . decode
         self._use_decimal = bool(use_decimal)
         self._decode_json = bool(decode_json)
@@ -2743,7 +2736,6 @@ class Connection(BaseConnection):
         self._init_internal()
         # . loop
         if loop is None or not isinstance(loop, AbstractEventLoop):
-            self._loop = get_event_loop()
+            self._loop = _get_event_loop()
         else:
             self._loop = loop
-        # fmt: on

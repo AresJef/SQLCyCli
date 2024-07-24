@@ -1,5 +1,4 @@
 # cython: language_level=3
-
 cimport cython
 from libc.math cimport isfinite
 from libc.stdlib cimport strtoll, strtoull, strtold
