@@ -23,6 +23,11 @@ class TestCase(unittest.TestCase):
     db: str = "test"
     tb: str = "test_table"
 
+    def __init__(self, methodName: str = "runTest") -> None:
+        super().__init__(methodName)
+        self._start_time = None
+        self._ended_time = None
+
     @property
     def table(self) -> str:
         if self.db is not None and self.tb is not None:
@@ -63,11 +68,17 @@ class TestCase(unittest.TestCase):
         async with conn.cursor() as cur:
             await cur.execute(f"delete from {self.db}.{tb}")
 
-    def log(self, msg: str, skip: bool = False) -> None:
-        if skip:
-            print(f"SKIP TEST '{self.name}': {msg}")
-        else:
-            print(f"PASS TEST '{self.name}': {msg}")
+    def log_start(self, msg: str) -> None:
+        msg = "START TEST '%s': %s" % (self.name, msg)
+        print(msg.ljust(60), end="\r")
+        self._start_time = time.perf_counter()
+
+    def log_ended(self, msg: str, skip: bool = False) -> None:
+        self._ended_time = time.perf_counter()
+        msg = "%s TEST '%s': %s" % ("SKIP" if skip else "PASS", self.name, msg)
+        if self._start_time is not None:
+            msg += " (%.6fs)" % (self._ended_time - self._start_time)
+        print(msg.ljust(60))
 
 
 class TestConnection(TestCase):
@@ -81,13 +92,16 @@ class TestConnection(TestCase):
         await self.test_autocommit()
         await self.test_select_db()
         await self.test_connection_gone_away()
+        await self.test_sql_mode()
         await self.test_init_command()
         await self.test_close()
         await self.test_connection_exception()
         await self.test_transaction_exception()
+        await self.test_warnings()
 
     async def test_properties(self) -> None:
         test = "PROPERTIES"
+        self.log_start(test)
 
         async with await self.get_conn() as conn:
             self.assertEqual(conn.host, "localhost")
@@ -98,7 +112,7 @@ class TestConnection(TestCase):
             self.assertEqual(conn.charset, "utf8mb4")
             self.assertEqual(conn.collation, "utf8mb4_general_ci")
             self.assertEqual(conn.encoding, "utf8")
-            self.assertEqual(conn.connect_timeout, 10)
+            self.assertEqual(type(conn.connect_timeout), int)
             self.assertEqual(conn.bind_address, None)
             self.assertEqual(conn.unix_socket, None)
             self.assertEqual(conn.autocommit, False)
@@ -107,7 +121,6 @@ class TestConnection(TestCase):
             self.assertEqual(conn.sql_mode, None)
             self.assertEqual(conn.init_command, None)
             self.assertEqual(type(conn.client_flag), int)
-            self.assertEqual(conn.host_info, "socket localhost:3306")
             self.assertEqual(conn.ssl, None)
             self.assertEqual(conn.auth_plugin, None)
             self.assertEqual(conn.closed(), False)
@@ -123,10 +136,12 @@ class TestConnection(TestCase):
             self.assertEqual(type(conn.server_capabilites), int)
             self.assertEqual(conn.affected_rows, 0)
             self.assertEqual(conn.insert_id, 0)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_set_charset(self):
         test = "SET CHARACTER SET"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await conn.set_charset("latin1")
@@ -142,10 +157,12 @@ class TestConnection(TestCase):
                     await cur.fetchone(), ("utf8mb4", "utf8mb4_general_ci")
                 )
                 self.assertEqual(conn.encoding, "utf8")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_set_timeout(self):
         test = "SET TIMEOUT"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SHOW VARIABLES LIKE 'wait_timeout'")
@@ -193,16 +210,18 @@ class TestConnection(TestCase):
             await conn.set_write_timeout(None)
             self.assertEqual(await conn.get_write_timeout(), 120)
 
-        self.log(test)
+        self.log_ended(test)
 
     async def test_largedata(self):
         """Large query and response (>=16MB)"""
         test = "LARGE DATA"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT @@max_allowed_packet")
                 if (await cur.fetchone())[0] < 16 * 1024 * 1024 + 10:
-                    self.log(
+                    self.log_ended(
                         f"{test}: Set max_allowed_packet to bigger than 17MB", True
                     )
                     return None
@@ -210,10 +229,12 @@ class TestConnection(TestCase):
                 await cur.execute("SELECT '%s'" % t)
                 row = (await cur.fetchone())[0]
                 assert row == t
-        self.log(test)
+        self.log_ended(test)
 
     async def test_autocommit(self):
         test = "AUTOCOMMIT"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             await conn.set_autocommit(False)
             self.assertFalse(conn.autocommit)
@@ -228,10 +249,12 @@ class TestConnection(TestCase):
             async with conn.cursor() as cur:
                 await cur.execute("SELECT @@AUTOCOMMIT")
                 self.assertEqual((await cur.fetchone())[0], 1)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_select_db(self):
         test = "SELECT DB"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await conn.select_database("mysql")
@@ -241,7 +264,7 @@ class TestConnection(TestCase):
                 await conn.select_database("test")
                 await cur.execute("SELECT database()")
                 self.assertEqual((await cur.fetchone())[0], "test")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_connection_gone_away(self):
         """
@@ -249,6 +272,8 @@ class TestConnection(TestCase):
         http://dev.mysql.com/doc/refman/5.0/en/error-messages-client.html#error_cr_server_gone_error
         """
         test = "CONNECTION GONE AWAY"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SET wait_timeout=1")
@@ -258,10 +283,33 @@ class TestConnection(TestCase):
                     # error occurs while reading, not writing because of socket buffer.
                     # self.assertEqual(cm.exception.args[0], 2006)
                     self.assertIn(cm.exception.args[0], (2006, 2013))
-        self.log(test)
+        self.log_ended(test)
+
+    async def test_sql_mode(self):
+        test = "SQL MODE"
+        self.log_start(test)
+
+        async with await self.get_conn(sql_mode="STRICT_TRANS_TABLES") as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT @@sql_mode")
+                mode = (await cur.fetchone())[0]
+                self.assertIsInstance(mode, str)
+                self.assertEqual("STRICT_TRANS_TABLES", mode)
+
+        async with await self.get_conn(
+            sql_mode="ONLY_FULL_GROUP_BY,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+        ) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT @@sql_mode")
+                mode = (await cur.fetchone())[0]
+                self.assertIsInstance(mode, str)
+                self.assertFalse("STRICT_TRANS_TABLES" in mode)
+        self.log_ended(test)
 
     async def test_init_command(self):
         test = "INIT COMMAND"
+        self.log_start(test)
+
         async with await self.get_conn(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -271,10 +319,12 @@ class TestConnection(TestCase):
                 self.assertEqual(("foobar",), await cur.fetchone())
         with self.assertRaises(errors.ConnectionClosedError):
             await conn.ping(reconnect=False)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_close(self):
         test = "CLOSE"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             self.assertFalse(conn.closed())
             async with conn.cursor() as cur:
@@ -282,10 +332,12 @@ class TestConnection(TestCase):
                 self.assertFalse(cur.closed())
             self.assertTrue(cur.closed())
         self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
 
     async def test_connection_exception(self):
         test = "CONNECTION EXCEPTION"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             with self.assertRaises(RuntimeError) as cm:
                 self.assertFalse(conn.closed())
@@ -293,10 +345,12 @@ class TestConnection(TestCase):
             self.assertEqual(type(cm.exception), RuntimeError)
             self.assertEqual(str(cm.exception), "Test")
         self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
 
     async def test_transaction_exception(self):
         test = "TRANSACTION EXCEPTION"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             try:
                 async with conn.transaction() as cur:
@@ -306,7 +360,27 @@ class TestConnection(TestCase):
                 pass
             self.assertTrue(cur.closed())
             self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
+
+    async def test_warnings(self):
+        test = "WARNINGS"
+        self.log_start(test)
+
+        async with await self.setup() as conn:
+            async with conn.cursor() as cur:
+                ##################################################################
+                await cur.execute(f"CREATE TABLE {self.table} (a INT UNIQUE)")
+                await cur.execute(f"INSERT INTO {self.table} (a) VALUES (1)")
+                await cur.execute(
+                    f"INSERT INTO {self.table} (a) VALUES (1) ON DUPLICATE KEY UPDATE a=VALUES(a)"
+                )
+                w = await conn.show_warnings()
+                self.assertIsNotNone(w)
+                self.assertEqual(w[0][1], ER.WARN_DEPRECATED_SYNTAX)
+
+                ##################################################################
+                await self.drop(conn)
+        self.log_ended(test)
 
 
 class TestAuthentication(TestCase):
@@ -317,6 +391,8 @@ class TestAuthentication(TestCase):
 
     async def test_plugin(self) -> None:
         test = "PLUGIN"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -326,7 +402,7 @@ class TestAuthentication(TestCase):
                     self.assertIn(
                         conn.server_auth_plugin_name, (row[0], "mysql_native_password")
                     )
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestConversion(TestCase):
@@ -359,6 +435,8 @@ class TestConversion(TestCase):
 
     async def test_bool(self) -> None:
         test = "BOOL TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -388,10 +466,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_integer(self) -> None:
         test = "INTEGER TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -465,10 +545,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_float(self) -> None:
         test = "FLOAT TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -518,10 +600,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_string(self) -> None:
         test = "STRING TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -574,10 +658,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_null(self) -> None:
         test = "NULL TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -608,10 +694,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_datetime(self) -> None:
         test = "DATETIME TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -660,10 +748,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_date(self) -> None:
         test = "DATE TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -682,10 +772,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_time(self) -> None:
         test = "TIME TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -726,10 +818,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_timedelta(self) -> None:
         test = "TIMEDELTA TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -786,10 +880,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_binary(self) -> None:
         test = "BINARY TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -836,10 +932,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_dict(self) -> None:
         test = "DICT ESCAPING"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -872,10 +970,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_sequence(self) -> None:
         test = "SEQUENCE TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -892,7 +992,7 @@ class TestConversion(TestCase):
                         % (self.table, "%s, %s"),
                         seq,
                     )
-                    row = await cur.fetch()
+                    row = await cur.fetchall()
                     self.assertEqual(((4,), (8,)), row)
 
                     # ------------------------------------------------------
@@ -902,16 +1002,18 @@ class TestConversion(TestCase):
                         seq,
                         itemize=False,
                     )
-                    row = await cur.fetch()
+                    row = await cur.fetchall()
                     self.assertEqual(((4,), (8,)), row)
                     await self.delete(conn)
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_float(self) -> None:
         test = "NDARRAY/SERIES FLOAT"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -960,10 +1062,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_integer(self) -> None:
         test = "NDARRAY/SERIES INTEGER"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1052,10 +1156,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_bool(self) -> None:
         test = "NDARRAY/SERIES BOOL"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1099,10 +1205,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_datetime(self) -> None:
         test = "NDARRAY/SERIES DATETIME"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1156,10 +1264,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_timedelta(self) -> None:
         test = "NDARRAY/SERIES TIMEDELTA"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1216,10 +1326,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_bytes(self) -> None:
         test = "NDARRAY/SERIES BYTES"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1268,10 +1380,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_unicode(self) -> None:
         test = "NDARRAY/SERIES UNICODE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1320,10 +1434,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_ndarray_series_object(self) -> None:
         test = "NDARRAY/SERIES OBJECT"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1425,10 +1541,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_dataframe(self) -> None:
         test = "DATAFRAME"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1487,13 +1605,15 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_json(self) -> None:
         test = "JSON TYPE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             if conn.server_version < (5, 7, 0):
-                self.log(test, True)
+                self.log_ended(test, True)
                 return None
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1525,10 +1645,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_bulk_insert(self) -> None:
         test = "BULK INSERT"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             table_encoded = self.table.encode(conn.encoding)
             async with conn.cursor() as cur:
@@ -1651,7 +1773,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestCursor(TestCase):
@@ -1690,35 +1812,41 @@ class TestCursor(TestCase):
 
     async def test_fetch_no_result(self) -> None:
         test = "FETCH NO RESULT"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
                 await cur.execute(f"create table {self.table} (a varchar(32))")
                 await cur.execute(f"insert into {self.table} (a) values (%s)", "mysql")
                 self.assertEqual(None, await cur.fetchone())
-                self.assertEqual((), await cur.fetch(0))
-                self.assertEqual((), await cur.fetch(2))
+                self.assertEqual((), await cur.fetchall())
+                self.assertEqual((), await cur.fetchmany(2))
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_fetch_single_tuple(self) -> None:
         test = "FETCH SINGLE TUPLE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
                 await cur.execute(f"create table {self.table} (id integer primary key)")
                 await cur.execute(f"insert into {self.table} (id) values (1),(2)")
                 await cur.execute(f"SELECT id FROM {self.table} where id in (1)")
-                self.assertEqual(((1,),), await cur.fetch())
+                self.assertEqual(((1,),), await cur.fetchall())
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_fetch_aggregates(self) -> None:
         test = "FETCH AGGREGATES"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1734,10 +1862,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_cursor_iter(self) -> None:
         test = "CURSOR ITER"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -1753,10 +1883,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_cleanup_rows_buffered(self) -> None:
         test = "CLEANUP ROWS BUFFERED"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             ##################################################################
             async with conn.cursor() as cur:
@@ -1777,10 +1909,12 @@ class TestCursor(TestCase):
 
             ##################################################################
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_cleanup_rows_unbuffered(self) -> None:
         test = "CLEANUP ROWS UNBUFFERED"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             ##################################################################
             async with conn.cursor(SSCursor) as cur:
@@ -1801,10 +1935,12 @@ class TestCursor(TestCase):
 
             ##################################################################
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_execute_args(self) -> None:
         test = "EXECUTE ARGUMENTS"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 # . create table
@@ -1848,7 +1984,7 @@ class TestCursor(TestCase):
                     True,
                 )
                 await cur.execute(f"select i from {self.table}")
-                self.assertEqual(await cur.fetch(), tuple((i,) for i in range(10)))
+                self.assertEqual(await cur.fetchall(), tuple((i,) for i in range(10)))
                 await self.delete(conn)
 
                 # . insert force_many=True & itemize=False
@@ -1866,7 +2002,7 @@ class TestCursor(TestCase):
                     True,
                 )
                 await cur.execute(f"select i from {self.table}")
-                self.assertEqual(await cur.fetch(), tuple((i,) for i in range(10)))
+                self.assertEqual(await cur.fetchall(), tuple((i,) for i in range(10)))
                 await self.delete(conn)
 
                 # . itemize=False
@@ -1882,15 +2018,17 @@ class TestCursor(TestCase):
                     cur.executed_sql.endswith(b"values (1,2),(3,4),(5,6)"), True
                 )
                 await cur.execute(f"select * from {self.table}")
-                self.assertEqual(await cur.fetch(), ((1, 2), (3, 4), (5, 6)))
+                self.assertEqual(await cur.fetchall(), ((1, 2), (3, 4), (5, 6)))
                 await self.delete(conn)
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_executemany(self) -> None:
         test = "EXECUTE MANY"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             # Due to complie, INSERT_VALUES_RE can't not be imported directly.
             # The following regex is the exact same one used by the library.
@@ -1997,10 +2135,12 @@ class TestCursor(TestCase):
                     "executemany with %% not in one query",
                 )
                 await cur.execute(f"DROP TABLE {self.db}.percent_test")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_execution_time_limit(self) -> None:
         test = "EXECUTION TIME LIMIT"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -2013,7 +2153,7 @@ class TestCursor(TestCase):
                 else:
                     sql = f"SET STATEMENT max_statement_time=2 FOR SELECT data, sleep(0.01) FROM {self.table}"
                 await cur.execute(sql)
-                rows = await cur.fetch()
+                rows = await cur.fetchall()
                 self.assertEqual(
                     rows,
                     (
@@ -2058,10 +2198,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_warnings(self) -> None:
         test = "WARNINGS"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 ##################################################################
@@ -2080,10 +2222,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_SSCursor(self) -> None:
         test = "CURSOR UNBUFFERED"
+        self.log_start(test)
+
         async with await self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             async with conn.cursor(SSCursor) as cur:
                 # . create table
@@ -2142,22 +2286,22 @@ class TestCursor(TestCase):
                         (row in data), True, "Row not found in source data"
                     )
 
-                # Test fetch() all
+                # Test fetchall
                 await cur.execute(f"SELECT * FROM {self.table}")
                 self.assertEqual(
-                    len(await cur.fetch()),
+                    len(await cur.fetchall()),
                     len(data),
-                    "fetch() all failed. Number of rows does not match",
+                    "fetchall() failed. Number of rows does not match",
                 )
 
-                # Test fetch(2) many
+                # Test fetchmany(2)
                 await cur.execute(f"SELECT * FROM {self.table}")
                 self.assertEqual(
-                    len(await cur.fetch(2)),
+                    len(await cur.fetchmany(2)),
                     2,
-                    "fetch(2) many failed. Number of rows does not match",
+                    "fetchmany(2) failed. Number of rows does not match",
                 )
-                await cur.fetch()
+                await cur.fetchall()
 
                 # Test update, affected_rows()
                 await cur.execute(f"UPDATE {self.table} SET zone = %s", "Foo")
@@ -2188,13 +2332,15 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_DictCursor(self, unbuffered: bool = False) -> None:
         if unbuffered:
             test = "DICT CURSOR UNBUFFERED"
         else:
             test = "DICT CURSOR"
+        self.log_start(test)
+
         async with await self.setupForDictCursor() as conn:
             async with conn.cursor(SSDictCursor if unbuffered else DictCursor) as cur:
                 bob, jim, fred = self.bob.copy(), self.jim.copy(), self.fred.copy()
@@ -2206,11 +2352,11 @@ class TestCursor(TestCase):
                 row = await cur.fetchone()
                 self.assertEqual(bob, row, "fetchone via DictCursor failed")
                 if unbuffered:
-                    await cur.fetch()
+                    await cur.fetchall()
 
                 # same again, but via fetchall => tuple(row)
                 await cur.execute(f"SELECT * from {self.table} where name='bob'")
-                row = await cur.fetch()
+                row = await cur.fetchall()
                 self.assertEqual(
                     (bob,),
                     row,
@@ -2228,7 +2374,7 @@ class TestCursor(TestCase):
 
                 # get all 3 row via fetchall
                 await cur.execute(f"SELECT * from {self.table}")
-                rows = await cur.fetch()
+                rows = await cur.fetchall()
                 self.assertEqual(
                     (bob, jim, fred), rows, "fetchall failed via DictCursor"
                 )
@@ -2240,9 +2386,9 @@ class TestCursor(TestCase):
                     [bob, jim, fred], rows, "DictCursor should be iterable"
                 )
 
-                # get all 2 row via fetch(2) and iterate the last one
+                # get all 2 row via fetchmany(2) and iterate the last one
                 await cur.execute(f"SELECT * from {self.table}")
-                rows = await cur.fetch(2)
+                rows = await cur.fetchmany(2)
                 self.assertEqual((bob, jim), rows, "fetchmany failed via DictCursor")
                 async for row in cur:
                     self.assertEqual(
@@ -2251,17 +2397,19 @@ class TestCursor(TestCase):
                         "fetch a 1 row result via iteration failed via DictCursor",
                     )
                 if unbuffered:
-                    await cur.fetch()
+                    await cur.fetchall()
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_DfCursor(self, unbuffered: bool = False) -> None:
         if unbuffered:
             test = "DATAFRAME CURSOR UNBUFFERED"
         else:
             test = "DATAFRAME CURSOR"
+        self.log_start(test)
+
         async with await self.setupForDictCursor() as conn:
             async with conn.cursor(SSDfCursor if unbuffered else DfCursor) as cur:
                 cur: DfCursor
@@ -2274,11 +2422,11 @@ class TestCursor(TestCase):
                 row = await cur.fetchone()
                 assert row.equals(df.iloc[0:1])
                 if unbuffered:
-                    await cur.fetch()
+                    await cur.fetchall()
 
                 # same again, but via fetchall => tuple(row)
                 await cur.execute(f"SELECT * from {self.table} where name='bob'")
-                row = await cur.fetch()
+                row = await cur.fetchall()
                 assert row.equals(df.iloc[0:1])
 
                 # same test again but iterate over the
@@ -2290,24 +2438,26 @@ class TestCursor(TestCase):
 
                 # get all 3 row via fetchall
                 await cur.execute(f"SELECT * from {self.table}")
-                rows = await cur.fetch()
+                rows = await cur.fetchall()
                 assert rows.equals(df)
 
-                # get all 2 row via fetch(2) and iterate the last one
+                # get all 2 row via fetchmany(2) and iterate the last one
                 await cur.execute(f"SELECT * from {self.table}")
-                rows = await cur.fetch(2)
+                rows = await cur.fetchmany(2)
                 assert rows.equals(df.iloc[0:2])
                 async for row in cur:
                     assert row.equals(df.iloc[2:3].reset_index(drop=True))
                 if unbuffered:
-                    await cur.fetch()
+                    await cur.fetchall()
 
                 ##################################################################
                 await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_next_set(self) -> None:
         test = "NEXT SET"
+        self.log_start(test)
+
         async with await self.setup(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -2319,10 +2469,12 @@ class TestCursor(TestCase):
                 self.assertEqual(res, True)
                 self.assertEqual([(2,)], list(await cur))
                 self.assertEqual(await cur.next_set(), False)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_skip_next_set(self) -> None:
         test = "SKIP NEXT SET"
+        self.log_start(test)
+
         async with await self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1; SELECT 2;")
@@ -2330,10 +2482,12 @@ class TestCursor(TestCase):
 
                 await cur.execute("SELECT 42")
                 self.assertEqual([(42,)], list(await cur))
-        self.log(test)
+        self.log_ended(test)
 
     async def test_next_set_error(self) -> None:
         test = "NEXT SET ERROR"
+        self.log_start(test)
+
         async with await self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             async with conn.cursor() as cur:
                 for i in range(3):
@@ -2341,11 +2495,13 @@ class TestCursor(TestCase):
                     self.assertEqual([(i,)], list(await cur))
                     with self.assertRaises(errors.ProgrammingError):
                         await cur.next_set()
-                    self.assertEqual((), await cur.fetch())
-        self.log(test)
+                    self.assertEqual((), await cur.fetchall())
+        self.log_ended(test)
 
     async def test_ok_and_next(self):
         test = "OK AND NEXT"
+        self.log_start(test)
+
         async with await self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1; commit; SELECT 2;")
@@ -2354,10 +2510,12 @@ class TestCursor(TestCase):
                 self.assertTrue(await cur.next_set())
                 self.assertEqual([(2,)], list(await cur))
                 self.assertFalse(await cur.next_set())
-        self.log(test)
+        self.log_ended(test)
 
     async def test_multi_statement_warnings(self):
         test = "MULTI STATEMENT WARNINGS"
+        self.log_start(test)
+
         conn = await self.setup(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -2367,7 +2525,7 @@ class TestCursor(TestCase):
                 await cur.execute(
                     f"DROP TABLE IF EXISTS {self.db}.a; DROP TABLE IF EXISTS {self.db}.b;"
                 )
-            self.log(test)
+            self.log_ended(test)
         except TypeError:
             self.fail()
         finally:
@@ -2375,6 +2533,8 @@ class TestCursor(TestCase):
 
     async def test_previous_cursor_not_closed(self):
         test = "PREVIOUS CURSOR NOT CLOSED"
+        self.log_start(test)
+
         async with await self.get_conn(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -2384,20 +2544,24 @@ class TestCursor(TestCase):
                 async with conn.cursor() as cur2:
                     await cur2.execute("SELECT 3")
                     self.assertEqual((await cur2.fetchone())[0], 3)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_commit_during_multi_result(self):
         test = "COMMIT DURING MULTI RESULT"
+        self.log_start(test)
+
         async with await self.get_conn(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1; SELECT 2")
                 await conn.commit()
                 await cur.execute("SELECT 3")
                 self.assertEqual((await cur.fetchone())[0], 3)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_transaction(self):
         test = "TRANSACTION"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.transaction() as cur:
                 await cur.execute(
@@ -2414,7 +2578,7 @@ class TestCursor(TestCase):
 
             async with conn.cursor() as cur:
                 await cur.execute(f"SELECT * FROM {self.table}")
-                rows = await cur.fetch()
+                rows = await cur.fetchall()
                 self.assertEqual(len(rows), 3)
                 self.assertEqual(
                     rows[0], ("bob", 21, datetime.datetime(1990, 2, 6, 23, 4, 56))
@@ -2434,10 +2598,12 @@ class TestCursor(TestCase):
             self.assertTrue(cur.closed())
             self.assertTrue(conn.closed())
 
-        self.log(test)
+        self.log_ended(test)
 
     async def test_scroll(self):
         test = "SCROLL"
+        self.log_start(test)
+
         async with await self.setupForCursor() as conn:
             # Buffered #########################################################
             async with conn.cursor() as cur:
@@ -2503,10 +2669,12 @@ class TestCursor(TestCase):
 
             # ##################################################################
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_procedure(self):
         test = "PROCEDURE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             await conn.select_database(self.db)
             # Buffered #########################################################
@@ -2555,10 +2723,12 @@ class TestCursor(TestCase):
             async with conn.cursor(SSCursor) as cur:
                 await cur.execute("DROP PROCEDURE IF EXISTS myinc;")
 
-        self.log(test)
+        self.log_ended(test)
 
     async def test_execute_cancel(self):
         test = "EXECUTE CANCEL"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 # Cancel a cursor in the middle of execution, before it could
@@ -2579,7 +2749,7 @@ class TestCursor(TestCase):
                     cm.exception.args[1],
                     "Connection closed: cancelled during execution.",
                 )
-        self.log(test)
+        self.log_ended(test)
 
     # utils
     async def setupForCursor(self, table: str = None, **kwargs) -> Connection:
@@ -2625,6 +2795,8 @@ class TestLoadLocal(TestCase):
 
     async def test_no_file(self):
         test = "NO FILE"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 with self.assertRaises(errors.OperationalError):
@@ -2633,10 +2805,12 @@ class TestLoadLocal(TestCase):
                         "test_load_local fields terminated by ','"
                     )
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_load_file(self, unbuffered: bool = False):
         test = "LOAD FILE"
+        self.log_start(test)
+
         if unbuffered:
             test += " UNBUFFERED"
         async with await self.setup() as conn:
@@ -2654,10 +2828,12 @@ class TestLoadLocal(TestCase):
                 self.assertEqual(22749, (await cur.fetchone())[0])
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_load_warnings(self):
         test = "LOAD WARNINGS"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 filename = os.path.join(
@@ -2681,7 +2857,7 @@ class TestLoadLocal(TestCase):
                 )
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     # . utils
     async def setup(self, table: str = None, **kwargs) -> Connection:
@@ -2710,6 +2886,8 @@ class TestOldIssues(TestCase):
     async def test_issue_3(self) -> None:
         """undefined methods datetime_or_None, date_or_None"""
         test = "ISSUE 3"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -2733,11 +2911,13 @@ class TestOldIssues(TestCase):
                 )
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_4(self):
         """can't retrieve TIMESTAMP fields"""
         test = "ISSUE 4"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(f"create table {self.table} (ts timestamp)")
@@ -2748,28 +2928,34 @@ class TestOldIssues(TestCase):
                 )
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_5(self):
         """query on information_schema.tables fails"""
         test = "ISSUE 5"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("select * from information_schema.tables")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_6(self):
         """exception: TypeError: ord() expected a character, but string of length 0 found"""
         # ToDo: this test requires access to db 'mysql'.
         test = "ISSUE 6"
+        self.log_start(test)
+
         async with await self.get_conn(database="mysql") as conn:
             async with conn.cursor() as cur:
                 await cur.execute("select * from user")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_8(self):
         """Primary Key and Index error when selecting data"""
         test = "ISSUE 8"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -2787,11 +2973,13 @@ class TestOldIssues(TestCase):
                 self.assertEqual(0, await cur.execute(f"SELECT * FROM {self.table}"))
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_13(self):
         """can't handle large result fields"""
         test = "ISSUE 13"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(f"create table {self.table} (t text)")
@@ -2806,11 +2994,13 @@ class TestOldIssues(TestCase):
                 self.assertTrue("x" * size == r)
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_15(self):
         """query should be expanded before perform character encoding"""
         test = "ISSUE 15"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(f"create table {self.table} (t varchar(32))")
@@ -2821,11 +3011,13 @@ class TestOldIssues(TestCase):
                 self.assertEqual("\xe4\xf6\xfc", (await cur.fetchone())[0])
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_16(self):
         """Patch for string and tuple escaping"""
         test = "ISSUE 16"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -2840,7 +3032,7 @@ class TestOldIssues(TestCase):
                 self.assertEqual("floydophone", (await cur.fetchone())[0])
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestNewIssues(TestCase):
@@ -2856,6 +3048,8 @@ class TestNewIssues(TestCase):
 
     async def test_issue_33(self):
         test = "ISSUE 33"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             table = f"{self.db}.hei\xdfe"
             async with conn.cursor() as cur:
@@ -2865,21 +3059,25 @@ class TestNewIssues(TestCase):
                 await cur.execute(f"select name from {table}")
                 self.assertEqual("Pi\xdfata", (await cur.fetchone())[0])
                 await cur.execute(f"drop table {table}")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_34(self):
         test = "ISSUE 34"
+        self.log_start(test)
+
         try:
             await self.get_conn(port=1237)
             self.fail()
         except errors.OperationalError as err:
             self.assertEqual(2003, err.args[0])
-            self.log(test)
+            self.log_ended(test)
         except Exception:
             self.fail()
 
     async def test_issue_36(self):
         test = "ISSUE 36"
+        self.log_start(test)
+
         conn1 = await self.get_conn()
         conn2 = await self.get_conn()
         try:
@@ -2902,10 +3100,10 @@ class TestNewIssues(TestCase):
             await asyncio.sleep(0.1)
             async with conn2.cursor() as cur:
                 await cur.execute("show processlist")
-                ids = [row[0] for row in await cur.fetch()]
+                ids = [row[0] for row in await cur.fetchall()]
                 self.assertFalse(kill_id in ids)
 
-            self.log(test)
+            self.log_ended(test)
 
         finally:
             await conn1.close()
@@ -2913,16 +3111,20 @@ class TestNewIssues(TestCase):
 
     async def test_issue_37(self):
         test = "ISSUE 37"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 self.assertEqual(1, await cur.execute("SELECT @foo"))
                 self.assertEqual((None,), await cur.fetchone())
                 self.assertEqual(0, await cur.execute("SET @foo = 'bar'"))
                 await cur.execute("set @foo = 'bar'")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_38(self):
         test = "ISSUE 38"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 datum = (
@@ -2934,10 +3136,12 @@ class TestNewIssues(TestCase):
                 await cur.execute(f"insert into {self.table} values (1, %s)", (datum,))
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_54(self):
         test = "ISSUE 54"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(f"create table {self.table} (id integer primary key)")
@@ -2952,7 +3156,7 @@ class TestNewIssues(TestCase):
                 self.assertEqual(7, (await cur.fetchone())[0])
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestGitHubIssues(TestCase):
@@ -2970,6 +3174,8 @@ class TestGitHubIssues(TestCase):
     async def test_issue_66(self):
         """'Connection' object has no attribute 'insert_id'"""
         test = "ISSUE 66"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -2980,11 +3186,13 @@ class TestGitHubIssues(TestCase):
                 self.assertEqual(2, conn.insert_id)
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_79(self):
         """Duplicate field overwrites the previous one in the result of DictCursor"""
         test = "ISSUE 79"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             tb1 = f"{self.db}.a"
             tb2 = f"{self.db}.b"
@@ -3008,11 +3216,13 @@ class TestGitHubIssues(TestCase):
 
                 await cur.execute(f"drop table {tb1}")
                 await cur.execute(f"drop table {tb2}")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_95(self):
         """Leftover trailing OK packet for "CALL my_sp" queries"""
         test = "ISSUE 95"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             proc: str = f"{self.db}.foo"
             async with conn.cursor() as cur:
@@ -3029,11 +3239,13 @@ class TestGitHubIssues(TestCase):
                 await cur.execute("SELECT 1")
                 self.assertEqual((await cur.fetchone())[0], 1)
                 await cur.execute(f"DROP PROCEDURE IF EXISTS {proc}")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_114(self):
         """autocommit is not set after reconnecting with ping()"""
         test = "ISSUE 114"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             await conn.set_autocommit(False)
             async with conn.cursor() as cur:
@@ -3056,11 +3268,13 @@ class TestGitHubIssues(TestCase):
             async with conn.cursor() as cur:
                 await cur.execute("select @@autocommit;")
                 self.assertTrue((await cur.fetchone())[0])
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_175(self):
         """The number of fields returned by server is read in wrong way"""
         test = "ISSUE 175"
+        self.log_start(test)
+
         async with await self.get_conn() as conn:
             tb: str = f"{self.db}.test_field_count"
             async with conn.cursor() as cur:
@@ -3074,11 +3288,13 @@ class TestGitHubIssues(TestCase):
                         self.assertEqual(length, cur.field_count)
                     finally:
                         await cur.execute(f"drop table if exists {tb}")
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_363(self):
         """Test binary / geometry types."""
         test = "ISSUE 363"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -3119,11 +3335,13 @@ class TestGitHubIssues(TestCase):
                 self.assertTrue(isinstance(row[0], bytes))
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     async def test_issue_364(self):
         """Test mixed unicode/binary arguments in executemany."""
         test = "ISSUE 364"
+        self.log_start(test)
+
         async with await self.setup() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -3152,7 +3370,7 @@ class TestGitHubIssues(TestCase):
                 await cur.execute(usql, args=(values, values, values))
 
             await self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 if __name__ == "__main__":

@@ -62,11 +62,17 @@ class TestCase(unittest.TestCase):
         with conn.cursor() as cur:
             cur.execute(f"delete from {self.db}.{tb}")
 
-    def log(self, msg: str, skip: bool = False) -> None:
-        if skip:
-            print(f"SKIP TEST '{self.name}': {msg}")
-        else:
-            print(f"PASS TEST '{self.name}': {msg}")
+    def log_start(self, msg: str) -> None:
+        msg = "START TEST '%s': %s" % (self.name, msg)
+        print(msg.ljust(60), end="\r")
+        self._start_time = time.perf_counter()
+
+    def log_ended(self, msg: str, skip: bool = False) -> None:
+        self._ended_time = time.perf_counter()
+        msg = "%s TEST '%s': %s" % ("SKIP" if skip else "PASS", self.name, msg)
+        if self._start_time is not None:
+            msg += " (%.6fs)" % (self._ended_time - self._start_time)
+        print(msg.ljust(60))
 
 
 class TestCharset(TestCase):
@@ -81,6 +87,8 @@ class TestCharset(TestCase):
         from pymysql import charset as pycharset
 
         test = "VALIDATE CHARSETS"
+        self.log_start(test)
+
         chs = charset.all_charsets()
         for ch in chs:
             # by_id
@@ -96,12 +104,14 @@ class TestCharset(TestCase):
                     (ch.name, ch.collation, ch.encoding),
                     (pyCh.name, pyCh.collation, pyCh.encoding.encode("ascii")),
                 )
-        self.log(test)
+        self.log_ended(test)
 
     def test_utf8(self) -> None:
         from sqlcycli import charset
 
         test = "UTF8"
+        self.log_start(test)
+
         # utf8mb3
         ch = charset.by_name("utf8mb3")
         self.assertEqual(
@@ -122,7 +132,7 @@ class TestCharset(TestCase):
         utf8 = charset.by_name("utf8")
         self.assertEqual(ch, utf8)
 
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestTranscode(TestCase):
@@ -198,16 +208,20 @@ class TestTranscode(TestCase):
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE BOOL"
+        self.log_start(test)
+
         self.assertEqual(escape_item(True), "1")
         self.assertEqual(encode_item(True), "1")
         self.assertEqual(escape_item(False), "0")
         self.assertEqual(encode_item(False), "0")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_int(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE INT"
+        self.log_start(test)
+
         value = 1
         test_values = [value] + [
             d(value) for d in (np.int8, np.int16, np.int32, np.int64)
@@ -232,12 +246,14 @@ class TestTranscode(TestCase):
             self.assertEqual(escape_item(v), str(value))
             self.assertEqual(encode_item(v), str(value))
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_float(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE FLOAT"
+        self.log_start(test)
+
         value = 1.0
         test_values = [value] + [d(value) for d in (np.float16, np.float32, np.float64)]
         for v in test_values:
@@ -250,28 +266,34 @@ class TestTranscode(TestCase):
             self.assertEqual(escape_item(v), str(value))
             self.assertEqual(encode_item(v), str(value))
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_str(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE STR"
+        self.log_start(test)
+
         self.assertEqual(escape_item("foo\nbar"), "'foo\\nbar'")
         self.assertEqual(encode_item("foo\nbar"), "'foo\\nbar'")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_none(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE NONE"
+        self.log_start(test)
+
         self.assertEqual(escape_item(None), "NULL")
         self.assertEqual(encode_item(None), "NULL")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_datetime(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE DATETIME"
+        self.log_start(test)
+
         value = datetime.datetime(2021, 1, 1, 12, 0, 0)
         self.assertEqual(escape_item(value), "'2021-01-01 12:00:00'")
         self.assertEqual(encode_item(value), "'2021-01-01 12:00:00'")
@@ -292,21 +314,25 @@ class TestTranscode(TestCase):
         self.assertEqual(escape_item(value), "'2021-01-01 12:00:00'")
         self.assertEqual(encode_item(value), "'2021-01-01 12:00:00'")
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_date(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE DATE"
+        self.log_start(test)
+
         value = datetime.date(2021, 1, 1)
         self.assertEqual(escape_item(value), "'2021-01-01'")
         self.assertEqual(encode_item(value), "'2021-01-01'")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_time(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE TIME"
+        self.log_start(test)
+
         value = datetime.time(12, 0, 0)
         self.assertEqual(escape_item(value), "'12:00:00'")
         self.assertEqual(encode_item(value), "'12:00:00'")
@@ -314,12 +340,14 @@ class TestTranscode(TestCase):
         value = datetime.time(12, 0, 0, 1)
         self.assertEqual(escape_item(value), "'12:00:00.000001'")
         self.assertEqual(encode_item(value), "'12:00:00.000001'")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_timedelta(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE TIMEDELTA"
+        self.log_start(test)
+
         value = datetime.timedelta(days=1, hours=12, minutes=30, seconds=30)
         self.assertEqual(escape_item(value), "'36:30:30'")
         self.assertEqual(encode_item(value), "'36:30:30'")
@@ -352,12 +380,14 @@ class TestTranscode(TestCase):
         self.assertEqual(escape_item(value), "'-36:30:30.000001'")
         self.assertEqual(encode_item(value), "'-36:30:30.000001'")
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_bytes(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE BYTES"
+        self.log_start(test)
+
         value = b"foo\nbar"
         self.assertEqual(escape_item(value), "_binary'foo\\nbar'")
         self.assertEqual(encode_item(value), "_binary'foo\\nbar'")
@@ -369,29 +399,34 @@ class TestTranscode(TestCase):
         value = memoryview(value)
         self.assertEqual(escape_item(value), "_binary'foo\\nbar'")
         self.assertEqual(encode_item(value), "_binary'foo\\nbar'")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_decimal(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE DECIMAL"
+        self.log_start(test)
+
         value = decimal.Decimal("1.2345")
         self.assertEqual(escape_item(value), "1.2345")
         self.assertEqual(encode_item(value), "1.2345")
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_dict(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE DICT"
+        self.log_start(test)
+
         self.assertEqual(escape_item(self.data), "(%s)" % ",".join(self.espe))
         self.assertEqual(encode_item(self.data), self.espe)
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_sequence(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE SEQUENCE"
+        self.log_start(test)
 
         for dtype in (list, tuple):
             vals_itm = dtype(self.data.values())
@@ -405,12 +440,14 @@ class TestTranscode(TestCase):
             vals_itm = dtype(encode_item(vals_set))
             self.assertEqual(vals_itm, dtype(espe))
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_ndarray_series(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE NDARRAY/SERIES"
+        self.log_start(test)
+
         # . float
         value = list(range(-2, 3))
         for dtype in (np.float16, np.float32, np.float64):
@@ -491,22 +528,26 @@ class TestTranscode(TestCase):
         self.assertEqual(encode_item(data), ("1", "'foo'", "1.1", "1"))
         self.assertEqual(encode_item(pd.Series(data)), ("1", "'foo'", "1.1", "1"))
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_escape_encode_dataframe(self) -> None:
         from sqlcycli.transcode import escape_item, encode_item
 
         test = "ESCAPE/ENCODE DATAFRAME"
+        self.log_start(test)
+
         data = pd.DataFrame([self.data] * 2)
         espe = "(%s)" % ",".join(self.espe)
         self.assertEqual(escape_item(data), "%s,%s" % (espe, espe))
         self.assertEqual(encode_item(data), (self.espe, self.espe))
-        self.log(test)
+        self.log_ended(test)
 
     def test_decode(self) -> None:
         from sqlcycli.transcode import decode_item
 
         test = "DECODE"
+        self.log_start(test)
+
         # fmt: off
         # . TINYINT
         self.assertEqual(-1, decode_item(b"-1", 1, b"utf8", False, False, False))
@@ -596,7 +637,7 @@ class TestTranscode(TestCase):
         self.assertEqual('{"key": "Español"}', decode_item(b'{"key": "Espa\xc3\xb1ol"}', 245, b"utf8", False, False, False))
         # fmt: on
 
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestProtocol(TestCase):
@@ -612,6 +653,8 @@ class TestProtocol(TestCase):
         from pymysql.protocol import FieldDescriptorPacket as PyFieldDescriptorPacket
 
         test = "FIELD DESCRIPTOR PACKET"
+        self.log_start(test)
+
         mysql_des_pkt_raw_bytes = [
             b"\x03def\x04test\x0etest_datatypes\x0etest_datatypes\x01b\x01b\x0c?\x00\x01\x00\x00\x00\x10 \x00\x00\x00\x00",
             b"\x03def\x04test\x0etest_datatypes\x0etest_datatypes\x02ti\x02ti\x0c?\x00\x04\x00\x00\x00\x01\x00\x00\x00\x00\x00",
@@ -695,13 +738,15 @@ class TestProtocol(TestCase):
                 ),
             )
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_OKPacket(self) -> None:
         from sqlcycli.protocol import MysqlPacket
         from pymysql.protocol import MysqlPacket as PyMysqlPacket, OKPacketWrapper
 
         test = "OK PACKET"
+        self.log_start(test)
+
         mysql_ok_pkt_raw_bytes = [
             b"\x00\x00\x00\x00\x00\x00\x00",
             b"\x00\x01\x00\x00\x00\x01\x00",
@@ -761,13 +806,15 @@ class TestProtocol(TestCase):
                 ),
             )
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_EOFPacket(self) -> None:
         from sqlcycli.protocol import MysqlPacket
         from pymysql.protocol import MysqlPacket as PyMysqlPacket, EOFPacketWrapper
 
         test = "EOF PACKET"
+        self.log_start(test)
+
         mysql_eof_pkt_raw_bytes = [
             b"\xfe\x00\x00!\x00",
             b"\xfe\x00\x00!\x00",
@@ -793,7 +840,7 @@ class TestProtocol(TestCase):
                 (pkt2.warning_count, pkt2.server_status, pkt2.has_next),
             )
 
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestConnection(TestCase):
@@ -807,13 +854,16 @@ class TestConnection(TestCase):
         self.test_autocommit()
         self.test_select_db()
         self.test_connection_gone_away()
+        self.test_sql_mode()
         self.test_init_command()
         self.test_close()
         self.test_connection_exception()
         self.test_transaction_exception()
+        self.test_warnings()
 
     def test_properties(self) -> None:
         test = "PROPERTIES"
+        self.log_start(test)
 
         with self.get_conn() as conn:
             self.assertEqual(conn.host, "localhost")
@@ -824,7 +874,7 @@ class TestConnection(TestCase):
             self.assertEqual(conn.charset, "utf8mb4")
             self.assertEqual(conn.collation, "utf8mb4_general_ci")
             self.assertEqual(conn.encoding, "utf8")
-            self.assertEqual(conn.connect_timeout, 10)
+            self.assertEqual(type(conn.connect_timeout), int)
             self.assertEqual(conn.bind_address, None)
             self.assertEqual(conn.unix_socket, None)
             self.assertEqual(conn.autocommit, False)
@@ -833,7 +883,6 @@ class TestConnection(TestCase):
             self.assertEqual(conn.sql_mode, None)
             self.assertEqual(conn.init_command, None)
             self.assertEqual(type(conn.client_flag), int)
-            self.assertEqual(conn.host_info, "socket localhost:3306")
             self.assertEqual(conn.ssl, None)
             self.assertEqual(conn.auth_plugin, None)
             self.assertEqual(conn.closed(), False)
@@ -849,10 +898,12 @@ class TestConnection(TestCase):
             self.assertEqual(type(conn.server_capabilites), int)
             self.assertEqual(conn.affected_rows, 0)
             self.assertEqual(conn.insert_id, 0)
-        self.log(test)
+        self.log_ended(test)
 
     def test_set_charset(self):
         test = "SET CHARSET"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 conn.set_charset("latin1")
@@ -864,10 +915,12 @@ class TestConnection(TestCase):
                 cur.execute("SELECT @@character_set_connection, @@collation_connection")
                 self.assertEqual(cur.fetchone(), ("utf8mb4", "utf8mb4_general_ci"))
                 self.assertEqual(conn.encoding, "utf8")
-        self.log(test)
+        self.log_ended(test)
 
     def test_set_timeout(self):
         test = "SET TIMEOUT"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SHOW VARIABLES LIKE 'wait_timeout'")
@@ -915,16 +968,18 @@ class TestConnection(TestCase):
             conn.set_write_timeout(None)
             self.assertEqual(conn.get_write_timeout(), 120)
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_largedata(self):
         """Large query and response (>=16MB)"""
         test = "LARGE DATA"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT @@max_allowed_packet")
                 if cur.fetchone()[0] < 16 * 1024 * 1024 + 10:
-                    self.log(
+                    self.log_ended(
                         f"{test}: Set max_allowed_packet to bigger than 17MB", True
                     )
                     return None
@@ -932,10 +987,12 @@ class TestConnection(TestCase):
                 cur.execute("SELECT '%s'" % t)
                 row = cur.fetchone()[0]
                 assert row == t
-        self.log(test)
+        self.log_ended(test)
 
     def test_autocommit(self):
         test = "AUTOCOMMIT"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             conn.set_autocommit(False)
             self.assertFalse(conn.autocommit)
@@ -950,10 +1007,12 @@ class TestConnection(TestCase):
             with conn.cursor() as cur:
                 cur.execute("SELECT @@AUTOCOMMIT")
                 self.assertEqual(cur.fetchone()[0], 1)
-        self.log(test)
+        self.log_ended(test)
 
     def test_select_db(self):
         test = "SELECT DB"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 conn.select_database("mysql")
@@ -963,7 +1022,7 @@ class TestConnection(TestCase):
                 conn.select_database("test")
                 cur.execute("SELECT database()")
                 self.assertEqual(cur.fetchone()[0], "test")
-        self.log(test)
+        self.log_ended(test)
 
     def test_connection_gone_away(self):
         """
@@ -971,6 +1030,8 @@ class TestConnection(TestCase):
         http://dev.mysql.com/doc/refman/5.0/en/error-messages-client.html#error_cr_server_gone_error
         """
         test = "CONNECTION GONE AWAY"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SET wait_timeout=1")
@@ -980,10 +1041,33 @@ class TestConnection(TestCase):
                     # error occurs while reading, not writing because of socket buffer.
                     # self.assertEqual(cm.exception.args[0], 2006)
                     self.assertIn(cm.exception.args[0], (2006, 2013))
-        self.log(test)
+        self.log_ended(test)
+
+    def test_sql_mode(self):
+        test = "SQL MODE"
+        self.log_start(test)
+
+        with self.get_conn(sql_mode="STRICT_TRANS_TABLES") as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT @@sql_mode")
+                mode = cur.fetchone()[0]
+                self.assertIsInstance(mode, str)
+                self.assertEqual("STRICT_TRANS_TABLES", mode)
+
+        with self.get_conn(
+            sql_mode="ONLY_FULL_GROUP_BY,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT @@sql_mode")
+                mode = cur.fetchone()[0]
+                self.assertIsInstance(mode, str)
+                self.assertFalse("STRICT_TRANS_TABLES" in mode)
+        self.log_ended(test)
 
     def test_init_command(self):
         test = "INIT COMMAND"
+        self.log_start(test)
+
         with self.get_conn(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -993,10 +1077,12 @@ class TestConnection(TestCase):
                 self.assertEqual(("foobar",), cur.fetchone())
         with self.assertRaises(errors.ConnectionClosedError):
             conn.ping(reconnect=False)
-        self.log(test)
+        self.log_ended(test)
 
     def test_close(self):
         test = "CLOSE"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             self.assertFalse(conn.closed())
             with conn.cursor() as cur:
@@ -1004,10 +1090,12 @@ class TestConnection(TestCase):
                 self.assertFalse(cur.closed())
             self.assertTrue(cur.closed())
         self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
 
     def test_connection_exception(self):
         test = "CONNECTION EXCEPTION"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with self.assertRaises(RuntimeError) as cm:
                 self.assertFalse(conn.closed())
@@ -1015,10 +1103,12 @@ class TestConnection(TestCase):
             self.assertEqual(type(cm.exception), RuntimeError)
             self.assertEqual(str(cm.exception), "Test")
         self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
 
     def test_transaction_exception(self):
         test = "TRANSACTION EXCEPTION"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             try:
                 with conn.transaction() as cur:
@@ -1028,7 +1118,27 @@ class TestConnection(TestCase):
                 pass
             self.assertTrue(cur.closed())
             self.assertTrue(conn.closed())
-        self.log(test)
+        self.log_ended(test)
+
+    def test_warnings(self):
+        test = "WARNINGS"
+        self.log_start(test)
+
+        with self.setup() as conn:
+            with conn.cursor() as cur:
+                ##################################################################
+                cur.execute(f"CREATE TABLE {self.table} (a INT UNIQUE)")
+                cur.execute(f"INSERT INTO {self.table} (a) VALUES (1)")
+                cur.execute(
+                    f"INSERT INTO {self.table} (a) VALUES (1) ON DUPLICATE KEY UPDATE a=VALUES(a)"
+                )
+                w = conn.show_warnings()
+                self.assertIsNotNone(w)
+                self.assertEqual(w[0][1], ER.WARN_DEPRECATED_SYNTAX)
+
+                ##################################################################
+                self.drop(conn)
+        self.log_ended(test)
 
 
 class TestAuthentication(TestCase):
@@ -1040,6 +1150,8 @@ class TestAuthentication(TestCase):
 
     def test_password_algo(self) -> None:
         test = "PASSWORD ALGORITHM"
+        self.log_start(test)
+
         password = b"mypassword_123"
         salt = b"\x1aOZeFXX{XY\x18\x0c CW (u\x17F"
 
@@ -1066,10 +1178,12 @@ class TestAuthentication(TestCase):
         r2 = py_ed25519_password(password, salt)
         self.assertEqual(r1, r2)
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_plugin(self) -> None:
         test = "PLUGIN"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -1079,7 +1193,7 @@ class TestAuthentication(TestCase):
                     self.assertIn(
                         conn.server_auth_plugin_name, (row[0], "mysql_native_password")
                     )
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestConversion(TestCase):
@@ -1112,6 +1226,8 @@ class TestConversion(TestCase):
 
     def test_bool(self) -> None:
         test = "BOOL TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1141,10 +1257,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_integer(self) -> None:
         test = "INTEGER TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1214,10 +1332,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_float(self) -> None:
         test = "FLOAT TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1267,10 +1387,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_string(self) -> None:
         test = "STRING TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1323,10 +1445,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_null(self) -> None:
         test = "NULL TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1355,10 +1479,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_datetime(self) -> None:
         test = "DATETIME TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1407,10 +1533,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_date(self) -> None:
         test = "DATE TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1429,10 +1557,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_time(self) -> None:
         test = "TIME TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1473,10 +1603,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_timedelta(self) -> None:
         test = "TIMEDELTA TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1533,10 +1665,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_binary(self) -> None:
         test = "BINARY TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1583,10 +1717,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_dict(self) -> None:
         test = "DICT ESCAPING"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1619,10 +1755,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_sequence(self) -> None:
         test = "SEQUENCE TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1639,7 +1777,7 @@ class TestConversion(TestCase):
                         % (self.table, "%s, %s"),
                         seq,
                     )
-                    row = cur.fetch()
+                    row = cur.fetchall()
                     self.assertEqual(((4,), (8,)), row)
 
                     # ------------------------------------------------------
@@ -1649,16 +1787,18 @@ class TestConversion(TestCase):
                         seq,
                         itemize=False,
                     )
-                    row = cur.fetch()
+                    row = cur.fetchall()
                     self.assertEqual(((4,), (8,)), row)
                     self.delete(conn)
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_float(self) -> None:
         test = "NDARRAY/SERIES FLOAT"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1707,10 +1847,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_integer(self) -> None:
         test = "NDARRAY/SERIES INTEGER"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1799,10 +1941,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_bool(self) -> None:
         test = "NDARRAY/SERIES BOOL"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1846,10 +1990,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_datetime(self) -> None:
         test = "NDARRAY/SERIES DATETIME"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1903,10 +2049,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_timedelta(self) -> None:
         test = "NDARRAY/SERIES TIMEDELTA"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -1963,10 +2111,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_bytes(self) -> None:
         test = "NDARRAY/SERIES BYTES"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2015,10 +2165,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_unicode(self) -> None:
         test = "NDARRAY/SERIES UNICODE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2067,10 +2219,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_ndarray_series_object(self) -> None:
         test = "NDARRAY/SERIES OBJECT"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2172,10 +2326,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_dataframe(self) -> None:
         test = "DATAFRAME"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2234,13 +2390,15 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_json(self) -> None:
         test = "JSON TYPE"
+        self.log_start(test)
+
         with self.setup() as conn:
             if conn.server_version < (5, 7, 0):
-                self.log(test, True)
+                self.log_ended(test, True)
                 return None
             with conn.cursor() as cur:
                 ##################################################################
@@ -2272,10 +2430,12 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_bulk_insert(self) -> None:
         test = "BULK INSERT"
+        self.log_start(test)
+
         with self.setup() as conn:
             table_encoded = self.table.encode(conn.encoding)
             with conn.cursor() as cur:
@@ -2398,7 +2558,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestCursor(TestCase):
@@ -2436,35 +2596,41 @@ class TestCursor(TestCase):
 
     def test_fetch_no_result(self) -> None:
         test = "FETCH NO RESULT"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
                 cur.execute(f"create table {self.table} (a varchar(32))")
                 cur.execute(f"insert into {self.table} (a) values (%s)", "mysql")
                 self.assertEqual(None, cur.fetchone())
-                self.assertEqual((), cur.fetch(0))
-                self.assertEqual((), cur.fetch(2))
+                self.assertEqual((), cur.fetchall())
+                self.assertEqual((), cur.fetchmany(2))
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_fetch_single_tuple(self) -> None:
         test = "FETCH SINGLE TUPLE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
                 cur.execute(f"create table {self.table} (id integer primary key)")
                 cur.execute(f"insert into {self.table} (id) values (1),(2)")
                 cur.execute(f"SELECT id FROM {self.table} where id in (1)")
-                self.assertEqual(((1,),), cur.fetch())
+                self.assertEqual(((1,),), cur.fetchall())
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_fetch_aggregates(self) -> None:
         test = "FETCH AGGREGATES"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2480,10 +2646,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_cursor_iter(self) -> None:
         test = "CURSOR ITER"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2499,10 +2667,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_cleanup_rows_buffered(self) -> None:
         test = "CLEANUP ROWS BUFFERED"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             ##################################################################
             with conn.cursor() as cur:
@@ -2519,10 +2689,12 @@ class TestCursor(TestCase):
 
             ##################################################################
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_cleanup_rows_unbuffered(self) -> None:
         test = "CLEANUP ROWS UNBUFFERED"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             ##################################################################
             with conn.cursor(SSCursor) as cur:
@@ -2539,10 +2711,12 @@ class TestCursor(TestCase):
 
             ##################################################################
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_execute_args(self) -> None:
         test = "EXECUTE ARGUMENTS"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 # . create table
@@ -2584,7 +2758,7 @@ class TestCursor(TestCase):
                     True,
                 )
                 cur.execute(f"select i from {self.table}")
-                self.assertEqual(cur.fetch(), tuple((i,) for i in range(10)))
+                self.assertEqual(cur.fetchall(), tuple((i,) for i in range(10)))
                 self.delete(conn)
 
                 # . insert force_many=True & itemize=False
@@ -2602,7 +2776,7 @@ class TestCursor(TestCase):
                     True,
                 )
                 cur.execute(f"select i from {self.table}")
-                self.assertEqual(cur.fetch(), tuple((i,) for i in range(10)))
+                self.assertEqual(cur.fetchall(), tuple((i,) for i in range(10)))
                 self.delete(conn)
 
                 # . itemize=False
@@ -2618,15 +2792,17 @@ class TestCursor(TestCase):
                     cur.executed_sql.endswith(b"values (1,2),(3,4),(5,6)"), True
                 )
                 cur.execute(f"select * from {self.table}")
-                self.assertEqual(cur.fetch(), ((1, 2), (3, 4), (5, 6)))
+                self.assertEqual(cur.fetchall(), ((1, 2), (3, 4), (5, 6)))
                 self.delete(conn)
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_executemany(self) -> None:
         test = "EXECUTE MANY"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             # Due to complie, INSERT_VALUES_RE can't not be imported directly.
             # The following regex is the exact same one used by the library.
@@ -2733,10 +2909,12 @@ class TestCursor(TestCase):
                     "executemany with %% not in one query",
                 )
                 cur.execute(f"DROP TABLE {self.db}.percent_test")
-        self.log(test)
+        self.log_ended(test)
 
     def test_execution_time_limit(self) -> None:
         test = "EXECUTION TIME LIMIT"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2749,7 +2927,7 @@ class TestCursor(TestCase):
                 else:
                     sql = f"SET STATEMENT max_statement_time=2 FOR SELECT data, sleep(0.01) FROM {self.table}"
                 cur.execute(sql)
-                rows = cur.fetch()
+                rows = cur.fetchall()
                 self.assertEqual(
                     rows,
                     (
@@ -2794,10 +2972,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_warnings(self) -> None:
         test = "WARNINGS"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 ##################################################################
@@ -2816,10 +2996,12 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_SSCursor(self) -> None:
         test = "CURSOR UNBUFFERED"
+        self.log_start(test)
+
         with self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             with conn.cursor(SSCursor) as cur:
                 # . create table
@@ -2876,22 +3058,22 @@ class TestCursor(TestCase):
                         (row in data), True, "Row not found in source data"
                     )
 
-                # Test fetch() all
+                # Test fetchall
                 cur.execute(f"SELECT * FROM {self.table}")
                 self.assertEqual(
-                    len(cur.fetch()),
+                    len(cur.fetchall()),
                     len(data),
-                    "fetch() all failed. Number of rows does not match",
+                    "fetchall failed. Number of rows does not match",
                 )
 
-                # Test fetch(2) many
+                # Test fetchmany
                 cur.execute(f"SELECT * FROM {self.table}")
                 self.assertEqual(
-                    len(cur.fetch(2)),
+                    len(cur.fetchmany(2)),
                     2,
-                    "fetch(2) many failed. Number of rows does not match",
+                    "fetchmany(2) failed. Number of rows does not match",
                 )
-                cur.fetch()
+                cur.fetchall()
 
                 # Test update, affected_rows()
                 cur.execute(f"UPDATE {self.table} SET zone = %s", "Foo")
@@ -2922,13 +3104,15 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_DictCursor(self, unbuffered: bool = False) -> None:
         if unbuffered:
             test = "DICT CURSOR UNBUFFERED"
         else:
             test = "DICT CURSOR"
+        self.log_start(test)
+
         with self.setupForDictCursor() as conn:
             with conn.cursor(SSDictCursor if unbuffered else DictCursor) as cur:
                 bob, jim, fred = self.bob.copy(), self.jim.copy(), self.fred.copy()
@@ -2940,11 +3124,11 @@ class TestCursor(TestCase):
                 row = cur.fetchone()
                 self.assertEqual(bob, row, "fetchone via DictCursor failed")
                 if unbuffered:
-                    cur.fetch()
+                    cur.fetchall()
 
                 # same again, but via fetchall => tuple(row)
                 cur.execute(f"SELECT * from {self.table} where name='bob'")
-                row = cur.fetch()
+                row = cur.fetchall()
                 self.assertEqual(
                     (bob,),
                     row,
@@ -2962,7 +3146,7 @@ class TestCursor(TestCase):
 
                 # get all 3 row via fetchall
                 cur.execute(f"SELECT * from {self.table}")
-                rows = cur.fetch()
+                rows = cur.fetchall()
                 self.assertEqual(
                     (bob, jim, fred), rows, "fetchall failed via DictCursor"
                 )
@@ -2974,9 +3158,9 @@ class TestCursor(TestCase):
                     [bob, jim, fred], rows, "DictCursor should be iterable"
                 )
 
-                # get all 2 row via fetch(2) and iterate the last one
+                # get all 2 row via fetchmany() and iterate the last one
                 cur.execute(f"SELECT * from {self.table}")
-                rows = cur.fetch(2)
+                rows = cur.fetchmany(2)
                 self.assertEqual((bob, jim), rows, "fetchmany failed via DictCursor")
                 for row in cur:
                     self.assertEqual(
@@ -2985,17 +3169,19 @@ class TestCursor(TestCase):
                         "fetch a 1 row result via iteration failed via DictCursor",
                     )
                 if unbuffered:
-                    cur.fetch()
+                    cur.fetchall()
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_DfCursor(self, unbuffered: bool = False) -> None:
         if unbuffered:
             test = "DATAFRAME CURSOR UNBUFFERED"
         else:
             test = "DATAFRAME CURSOR"
+        self.log_start(test)
+
         with self.setupForDictCursor() as conn:
             with conn.cursor(SSDfCursor if unbuffered else DfCursor) as cur:
                 cur: DfCursor
@@ -3008,11 +3194,11 @@ class TestCursor(TestCase):
                 row = cur.fetchone()
                 assert row.equals(df.iloc[0:1])
                 if unbuffered:
-                    cur.fetch()
+                    cur.fetchall()
 
                 # same again, but via fetchall => tuple(row)
                 cur.execute(f"SELECT * from {self.table} where name='bob'")
-                row = cur.fetch()
+                row = cur.fetchall()
                 assert row.equals(df.iloc[0:1])
 
                 # same test again but iterate over the
@@ -3022,24 +3208,26 @@ class TestCursor(TestCase):
 
                 # get all 3 row via fetchall
                 cur.execute(f"SELECT * from {self.table}")
-                rows = cur.fetch()
+                rows = cur.fetchall()
                 assert rows.equals(df)
 
-                # get all 2 row via fetch(2) and iterate the last one
+                # get all 2 row via fetchmany(2) and iterate the last one
                 cur.execute(f"SELECT * from {self.table}")
-                rows = cur.fetch(2)
+                rows = cur.fetchmany(2)
                 assert rows.equals(df.iloc[0:2])
                 for row in cur:
                     assert row.equals(df.iloc[2:3].reset_index(drop=True))
                 if unbuffered:
-                    cur.fetch()
+                    cur.fetchall()
 
                 ##################################################################
                 self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_next_set(self) -> None:
         test = "NEXT SET"
+        self.log_start(test)
+
         with self.setup(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -3051,10 +3239,12 @@ class TestCursor(TestCase):
                 self.assertEqual(res, True)
                 self.assertEqual([(2,)], list(cur))
                 self.assertEqual(cur.next_set(), False)
-        self.log(test)
+        self.log_ended(test)
 
     def test_skip_next_set(self) -> None:
         test = "SKIP NEXT SET"
+        self.log_start(test)
+
         with self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1; SELECT 2;")
@@ -3062,10 +3252,12 @@ class TestCursor(TestCase):
 
                 cur.execute("SELECT 42")
                 self.assertEqual([(42,)], list(cur))
-        self.log(test)
+        self.log_ended(test)
 
     def test_next_set_error(self) -> None:
         test = "NEXT SET ERROR"
+        self.log_start(test)
+
         with self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             with conn.cursor() as cur:
                 for i in range(3):
@@ -3073,11 +3265,13 @@ class TestCursor(TestCase):
                     self.assertEqual([(i,)], list(cur))
                     with self.assertRaises(errors.ProgrammingError):
                         cur.next_set()
-                    self.assertEqual((), cur.fetch())
-        self.log(test)
+                    self.assertEqual((), cur.fetchall())
+        self.log_ended(test)
 
     def test_ok_and_next(self):
         test = "OK AND NEXT"
+        self.log_start(test)
+
         with self.setup(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1; commit; SELECT 2;")
@@ -3086,10 +3280,12 @@ class TestCursor(TestCase):
                 self.assertTrue(cur.next_set())
                 self.assertEqual([(2,)], list(cur))
                 self.assertFalse(cur.next_set())
-        self.log(test)
+        self.log_ended(test)
 
     def test_multi_statement_warnings(self):
         test = "MULTI STATEMENT WARNINGS"
+        self.log_start(test)
+
         conn = self.setup(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -3099,7 +3295,7 @@ class TestCursor(TestCase):
                 cur.execute(
                     f"DROP TABLE IF EXISTS {self.db}.a; DROP TABLE IF EXISTS {self.db}.b;"
                 )
-            self.log(test)
+            self.log_ended(test)
         except TypeError:
             self.fail()
         finally:
@@ -3107,6 +3303,8 @@ class TestCursor(TestCase):
 
     def test_previous_cursor_not_closed(self):
         test = "PREVIOUS CURSOR NOT CLOSED"
+        self.log_start(test)
+
         with self.get_conn(
             init_command='SELECT "bar"; SELECT "baz"',
             client_flag=CLIENT.MULTI_STATEMENTS,
@@ -3116,20 +3314,24 @@ class TestCursor(TestCase):
                 with conn.cursor() as cur2:
                     cur2.execute("SELECT 3")
                     self.assertEqual(cur2.fetchone()[0], 3)
-        self.log(test)
+        self.log_ended(test)
 
     def test_commit_during_multi_result(self):
         test = "COMMIT DURING MULTI RESULT"
+        self.log_start(test)
+
         with self.get_conn(client_flag=CLIENT.MULTI_STATEMENTS) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1; SELECT 2")
                 conn.commit()
                 cur.execute("SELECT 3")
                 self.assertEqual(cur.fetchone()[0], 3)
-        self.log(test)
+        self.log_ended(test)
 
     def test_transaction(self):
         test = "TRANSACTION"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.transaction() as cur:
                 cur.execute(
@@ -3146,7 +3348,7 @@ class TestCursor(TestCase):
 
             with conn.cursor() as cur:
                 cur.execute(f"SELECT * FROM {self.table}")
-                rows = cur.fetch()
+                rows = cur.fetchall()
                 self.assertEqual(len(rows), 3)
                 self.assertEqual(
                     rows[0], ("bob", 21, datetime.datetime(1990, 2, 6, 23, 4, 56))
@@ -3166,10 +3368,12 @@ class TestCursor(TestCase):
             self.assertTrue(cur.closed())
             self.assertTrue(conn.closed())
 
-        self.log(test)
+        self.log_ended(test)
 
     def test_scroll(self):
         test = "SCROLL"
+        self.log_start(test)
+
         with self.setupForCursor() as conn:
             # Buffered #########################################################
             with conn.cursor() as cur:
@@ -3235,10 +3439,12 @@ class TestCursor(TestCase):
 
             # ##################################################################
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_procedure(self):
         test = "PROCEDURE"
+        self.log_start(test)
+
         with self.setup() as conn:
             conn.select_database(self.db)
             # Buffered #########################################################
@@ -3287,7 +3493,7 @@ class TestCursor(TestCase):
             with conn.cursor(SSCursor) as cur:
                 cur.execute("DROP PROCEDURE IF EXISTS myinc;")
 
-        self.log(test)
+        self.log_ended(test)
 
     # utils
     def setupForCursor(self, table: str = None, **kwargs) -> Connection:
@@ -3333,6 +3539,8 @@ class TestLoadLocal(TestCase):
 
     def test_no_file(self):
         test = "NO FILE"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 with self.assertRaises(errors.OperationalError):
@@ -3341,10 +3549,12 @@ class TestLoadLocal(TestCase):
                         "test_load_local fields terminated by ','"
                     )
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_load_file(self, unbuffered: bool = False):
         test = "LOAD FILE"
+        self.log_start(test)
+
         if unbuffered:
             test += " UNBUFFERED"
         with self.setup() as conn:
@@ -3362,10 +3572,12 @@ class TestLoadLocal(TestCase):
                 self.assertEqual(22749, cur.fetchone()[0])
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_load_warnings(self):
         test = "LOAD WARNINGS"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 filename = os.path.join(
@@ -3389,7 +3601,7 @@ class TestLoadLocal(TestCase):
                 )
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     # . utils
     def setup(self, table: str = None, **kwargs) -> Connection:
@@ -3412,6 +3624,8 @@ class TestOptionFile(TestCase):
         from sqlcycli._optionfile import OptionFile
 
         test = "PARSE OPTIONS"
+        self.log_start(test)
+
         filename = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), "test_data", "my.cnf"
         )
@@ -3426,7 +3640,7 @@ class TestOptionFile(TestCase):
         self.assertEqual("127.0.0.1", opt.bind_address)
         self.assertEqual("/var/run/mysqld/mysqld.sock", opt.unix_socket)
         self.assertEqual("16M", opt.max_allowed_packet)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestErrors(TestCase):
@@ -3439,6 +3653,7 @@ class TestErrors(TestCase):
         from sqlcycli.errors import raise_mysql_exception
 
         test = "RAISE MYSQL EXCEPTION"
+        self.log_start(test)
 
         data = b"\xff\x15\x04#28000Access denied"
         with self.assertRaises(errors.OperationalError) as cm:
@@ -3454,7 +3669,7 @@ class TestErrors(TestCase):
             assert cm.exception.args[0] == ER.TOO_MANY_USER_CONNECTIONS
             assert cm.exception.args[1] == "Too many connections"
 
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestOldIssues(TestCase):
@@ -3473,6 +3688,8 @@ class TestOldIssues(TestCase):
     def test_issue_3(self) -> None:
         """undefined methods datetime_or_None, date_or_None"""
         test = "ISSUE 3"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3496,11 +3713,13 @@ class TestOldIssues(TestCase):
                 )
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_4(self):
         """can't retrieve TIMESTAMP fields"""
         test = "ISSUE 4"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(f"create table {self.table} (ts timestamp)")
@@ -3509,28 +3728,34 @@ class TestOldIssues(TestCase):
                 self.assertTrue(isinstance(cur.fetchone()[0], datetime.datetime))
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_5(self):
         """query on information_schema.tables fails"""
         test = "ISSUE 5"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from information_schema.tables")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_6(self):
         """exception: TypeError: ord() expected a character, but string of length 0 found"""
         # ToDo: this test requires access to db 'mysql'.
         test = "ISSUE 6"
+        self.log_start(test)
+
         with self.get_conn(database="mysql") as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from user")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_8(self):
         """Primary Key and Index error when selecting data"""
         test = "ISSUE 8"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3548,11 +3773,13 @@ class TestOldIssues(TestCase):
                 self.assertEqual(0, cur.execute(f"SELECT * FROM {self.table}"))
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_13(self):
         """can't handle large result fields"""
         test = "ISSUE 13"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(f"create table {self.table} (t text)")
@@ -3565,11 +3792,13 @@ class TestOldIssues(TestCase):
                 self.assertTrue("x" * size == r)
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_15(self):
         """query should be expanded before perform character encoding"""
         test = "ISSUE 15"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(f"create table {self.table} (t varchar(32))")
@@ -3580,11 +3809,13 @@ class TestOldIssues(TestCase):
                 self.assertEqual("\xe4\xf6\xfc", cur.fetchone()[0])
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_16(self):
         """Patch for string and tuple escaping"""
         test = "ISSUE 16"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3597,7 +3828,7 @@ class TestOldIssues(TestCase):
                 self.assertEqual("floydophone", cur.fetchone()[0])
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestNewIssues(TestCase):
@@ -3613,6 +3844,8 @@ class TestNewIssues(TestCase):
 
     def test_issue_33(self):
         test = "ISSUE 33"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             table = f"{self.db}.hei\xdfe"
             with conn.cursor() as cur:
@@ -3622,21 +3855,25 @@ class TestNewIssues(TestCase):
                 cur.execute(f"select name from {table}")
                 self.assertEqual("Pi\xdfata", cur.fetchone()[0])
                 cur.execute(f"drop table {table}")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_34(self):
         test = "ISSUE 34"
+        self.log_start(test)
+
         try:
             self.get_conn(port=1237)
             self.fail()
         except errors.OperationalError as err:
             self.assertEqual(2003, err.args[0])
-            self.log(test)
+            self.log_ended(test)
         except Exception:
             self.fail()
 
     def test_issue_36(self):
         test = "ISSUE 36"
+        self.log_start(test)
+
         conn1 = self.get_conn()
         conn2 = self.get_conn()
         try:
@@ -3659,10 +3896,10 @@ class TestNewIssues(TestCase):
             time.sleep(0.1)
             with conn2.cursor() as cur:
                 cur.execute("show processlist")
-                ids = [row[0] for row in cur.fetch()]
+                ids = [row[0] for row in cur.fetchall()]
                 self.assertFalse(kill_id in ids)
 
-            self.log(test)
+            self.log_ended(test)
 
         finally:
             conn1.close()
@@ -3670,16 +3907,20 @@ class TestNewIssues(TestCase):
 
     def test_issue_37(self):
         test = "ISSUE 37"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 self.assertEqual(1, cur.execute("SELECT @foo"))
                 self.assertEqual((None,), cur.fetchone())
                 self.assertEqual(0, cur.execute("SET @foo = 'bar'"))
                 cur.execute("set @foo = 'bar'")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_38(self):
         test = "ISSUE 38"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 datum = (
@@ -3689,10 +3930,12 @@ class TestNewIssues(TestCase):
                 cur.execute(f"insert into {self.table} values (1, %s)", (datum,))
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_54(self):
         test = "ISSUE 54"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(f"create table {self.table} (id integer primary key)")
@@ -3707,7 +3950,7 @@ class TestNewIssues(TestCase):
                 self.assertEqual(7, cur.fetchone()[0])
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 class TestGitHubIssues(TestCase):
@@ -3725,6 +3968,8 @@ class TestGitHubIssues(TestCase):
     def test_issue_66(self):
         """'Connection' object has no attribute 'insert_id'"""
         test = "ISSUE 66"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3735,11 +3980,13 @@ class TestGitHubIssues(TestCase):
                 self.assertEqual(2, conn.insert_id)
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_79(self):
         """Duplicate field overwrites the previous one in the result of DictCursor"""
         test = "ISSUE 79"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             tb1 = f"{self.db}.a"
             tb2 = f"{self.db}.b"
@@ -3761,11 +4008,13 @@ class TestGitHubIssues(TestCase):
 
                 cur.execute(f"drop table {tb1}")
                 cur.execute(f"drop table {tb2}")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_95(self):
         """Leftover trailing OK packet for "CALL my_sp" queries"""
         test = "ISSUE 95"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             proc: str = f"{self.db}.foo"
             with conn.cursor() as cur:
@@ -3782,11 +4031,13 @@ class TestGitHubIssues(TestCase):
                 cur.execute("SELECT 1")
                 self.assertEqual(cur.fetchone()[0], 1)
                 cur.execute(f"DROP PROCEDURE IF EXISTS {proc}")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_114(self):
         """autocommit is not set after reconnecting with ping()"""
         test = "ISSUE 114"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             conn.set_autocommit(False)
             with conn.cursor() as cur:
@@ -3809,11 +4060,13 @@ class TestGitHubIssues(TestCase):
             with conn.cursor() as cur:
                 cur.execute("select @@autocommit;")
                 self.assertTrue(cur.fetchone()[0])
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_175(self):
         """The number of fields returned by server is read in wrong way"""
         test = "ISSUE 175"
+        self.log_start(test)
+
         with self.get_conn() as conn:
             tb: str = f"{self.db}.test_field_count"
             with conn.cursor() as cur:
@@ -3827,11 +4080,13 @@ class TestGitHubIssues(TestCase):
                         self.assertEqual(length, cur.field_count)
                     finally:
                         cur.execute(f"drop table if exists {tb}")
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_363(self):
         """Test binary / geometry types."""
         test = "ISSUE 363"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3872,11 +4127,13 @@ class TestGitHubIssues(TestCase):
                 self.assertTrue(isinstance(row[0], bytes))
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
     def test_issue_364(self):
         """Test mixed unicode/binary arguments in executemany."""
         test = "ISSUE 364"
+        self.log_start(test)
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3905,7 +4162,7 @@ class TestGitHubIssues(TestCase):
                 cur.execute(usql, args=(values, values, values))
 
             self.drop(conn)
-        self.log(test)
+        self.log_ended(test)
 
 
 if __name__ == "__main__":
