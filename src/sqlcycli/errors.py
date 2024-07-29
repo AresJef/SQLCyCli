@@ -160,6 +160,11 @@ del _map_error, ER
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def raise_mysql_exception(data: cython.pchar, size: cython.ulonglong) -> cython.bint:
+    """Raise the MySQL exception based on the given data.
+
+    :param data: `<'bytes'>` The MySQL data contains the exception information.
+    :param size: `<'int'>` The size (length) of the data.
+    """
     errno: cython.int = utils.unpack_int16(data, 1)
     # https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html
     # Error packet has optional sqlstate that is 5 bytes and starts with '#'.
@@ -185,6 +190,10 @@ class MySQLIndexError(MySQLError, IndexError):
 
 class MySQLValueError(MySQLError, ValueError):
     """Raised when a value is invalid."""
+
+
+class InvalidMySQLArgsError(MySQLValueError):
+    """Raised when an argument value is invalid."""
 
 
 class MySQLFileNotFoundError(MySQLError, FileNotFoundError):
@@ -283,7 +292,11 @@ class ConnectionFileNotFoundError(ConnectionError, MySQLFileNotFoundError):
     """Raised when a file is not found."""
 
 
-class InvalidConnectionArgsError(ConnectionValueError, ProgrammingError):
+class InvalidConnectionArgsError(
+    InvalidMySQLArgsError,
+    ConnectionValueError,
+    ProgrammingError,
+):
     """Raised when a connection value is invalid."""
 
 
@@ -344,8 +357,16 @@ class InvalidCursorIndexError(CursorIndexError, ProgrammingError):
     """Raised when an index is invalid."""
 
 
-class InvalidCursorArgsError(CursorValueError, ProgrammingError):
+class InvalidCursorArgsError(
+    InvalidMySQLArgsError,
+    CursorValueError,
+    ProgrammingError,
+):
     """Raised when a cursor value is invalid."""
+
+
+class InvalidSQLArgsErorr(InvalidCursorArgsError):
+    """Raised when a SQL argument is invalid."""
 
 
 class CursorNotExecutedError(CursorError, ProgrammingError):
