@@ -26,9 +26,9 @@ UNSIGNED_INT64_COLUMN: cython.uint = 254
 # MySQL Packet --------------------------------------------------------------------------------
 @cython.cclass
 class MysqlPacket:
-    """Representation of the MySQL response packet. Reads in the packet
-    from the network socket, removes packet header and provides an interface
-    for reading/parsing the packet results."""
+    """Represents the MySQL response packet. Reads in the packet
+    from the network socket, removes packet header and provides an
+    interface for reading/parsing the packet results."""
 
     # Raw Data
     _data: bytes
@@ -397,7 +397,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def advance(self, length: cython.ulonglong) -> cython.bint:
-        """(cfunc) Advance the packet cursor position by the given 'length' `<'bool'>`."""
+        """(cfunc) Advance the packet cursor position by the given 'length'."""
         pos: cython.ulonglong = self._pos + length
         if pos > self._size:
             raise errors.MysqlPacketCursorError(
@@ -412,7 +412,7 @@ class MysqlPacket:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def rewind(self, position: cython.ulonglong) -> cython.bint:
-        """(cfunc) Set the packet cursor to the given 'position' `<'bool'>`."""
+        """(cfunc) Set the packet cursor to the given 'position'."""
         if position > self._size:
             raise errors.MysqlPacketCursorError(
                 "'<%s'>\nCan't set packet cursor position to: %s\n"
@@ -443,9 +443,9 @@ class MysqlPacket:
 
 @cython.cclass
 class FieldDescriptorPacket(MysqlPacket):
-    """Representation of the specific MySQL response packet which
-    contains column's metadata in the result. Parsing is done
-    automatically.
+    """Represents the MySQL response packet which 
+    contains column's metadata in the result. Parsing 
+    is done automatically.
     """
 
     # Packet Data
@@ -463,8 +463,29 @@ class FieldDescriptorPacket(MysqlPacket):
     _is_binary: cython.bint
 
     def __init__(self, data: bytes, encoding: bytes) -> None:
-        super().__init__(data, encoding)
-        # Parse
+        """The MySQL response packet which contains column's
+        metadata in the result. Parsing is done automatically.
+
+        :param data `<'bytes'>`: The raw data of the packet.
+        :param encoding `<'bytes'>`: The encoding of the packet data.
+        """
+        # Raw Data
+        self._data = data
+        self._data_c = data
+        self._encoding = encoding
+        self._size = bytes_len(data)
+        self._pos = 0
+        # Packet Data
+        self._affected_rows = 0
+        self._insert_id = 0
+        self._server_status = -1
+        self._warning_count = 0
+        self._has_next = False
+        self._message = None
+        self._filename = None
+        self._plugin_name = None
+        self._salt = None
+        # Parse Field Descriptor
         # fmt: off
         self._catalog = self.read_length_encoded_string()
         self._db = decode_bytes(self.read_length_encoded_string(), self._encoding)
