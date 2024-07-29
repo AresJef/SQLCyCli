@@ -26,14 +26,14 @@ __all__ = ["SSL_ENABLED", "SSL", "is_ssl", "is_ssl_ctx"]
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl(obj: object) -> cython.bint:
-    """Check if is type of 'SSL' `<'bool'>`."""
+    """Check if the 'obj' is an instance of 'SSL' `<'bool'>`."""
     return isinstance(obj, SSL) if SSL_ENABLED_C else False
 
 
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl_ctx(obj: object) -> cython.bint:
-    """Check if is type of 'ssl.SSLContext' `<'bool'>`."""
+    """Check if the 'obj' is an instance of 'ssl.SSLContext' `<'bool'>`."""
     return isinstance(obj, _py_ssl.SSLContext) if SSL_ENABLED_C else False
 
 
@@ -133,7 +133,7 @@ class SSL:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _create_ssl_context(self) -> cython.bint:
-        """(cfunc) Generate the 'SSLContext' `<'bool'>`."""
+        """(cfunc) Generate the 'SSLContext'."""
         # . ca certificate
         context = _py_ssl.create_default_context(
             cafile=self._ca_file, capath=self._ca_path

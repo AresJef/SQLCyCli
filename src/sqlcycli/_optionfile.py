@@ -163,7 +163,7 @@ class OptionFile:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _load_options(self) -> cython.bint:
-        """(cfunc) Load settings from MySQL option file `<'bool'>`."""
+        """(cfunc) Load settings from MySQL option file."""
         # Parse options
         cfg = _Parser()
         cfg.read(self._opt_file)

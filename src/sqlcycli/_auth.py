@@ -51,7 +51,7 @@ SCRAMBLE_LENGTH: cython.int = 20
 # Auth Plugin ---------------------------------------------------------------------------------
 @cython.cclass
 class AuthPlugin:
-    """Represents the auth pluging handler for MySQL."""
+    """Represents the authentication pluging handlers for MySQL."""
 
     _mysql_native_password: type
     _caching_sha2_password: type
@@ -63,11 +63,10 @@ class AuthPlugin:
     _plugins: dict[bytes, type]
 
     def __init__(self, plugins: dict[str | bytes, type] | None = None) -> None:
-        """The auth pluging handler for MySQL.
+        """The authentication pluging handlers for MySQL.
 
-        :param plugins `<'dict'>`: The plugin handlers for MySQL auth, where key
-        is the plugin name <'str/bytes'> and value is the handler Class <'type'>.
-        Defaults to `None`.
+        :param plugins `<'dict'>`: The plugin handlers for MySQL authentication, where key
+        is the plugin name <'str/bytes'> and value is the handler Class <'type'>. Defaults to `None`.
         """
         if plugins is None:
             self._mysql_native_password = None

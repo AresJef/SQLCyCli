@@ -159,7 +159,7 @@ class Charsets:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def add(self, charset: Charset) -> cython.bint:
-        """Add MySQL charset to the collection `<'bool'>`.
+        """Add MySQL charset to the collection.
 
         :param charset: An instance of `<'Charset'>`.
         """
@@ -173,7 +173,7 @@ class Charsets:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_by_id(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by ID `<'bool'>."""
+        """(cfunc) Add MySQL charset by ID."""
         id: object = charset._id
         if dict_contains(self._by_id, id):
             raise errors.CharsetDuplicatedError(
@@ -187,7 +187,7 @@ class Charsets:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_by_name(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by name `<'bool'>."""
+        """(cfunc) Add MySQL charset by name."""
         if not charset._is_default:
             return True  # exit
         name: str = charset._name
@@ -203,7 +203,7 @@ class Charsets:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_by_collation(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by collation `<'bool'>."""
+        """(cfunc) Add MySQL charset by collation."""
         collation: str = charset._collation
         if dict_contains(self._by_collation, collation):
             raise errors.CharsetDuplicatedError(
@@ -217,7 +217,7 @@ class Charsets:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_by_name_n_collation(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by collation `<'bool'>."""
+        """(cfunc) Add MySQL charset by collation."""
         key: str = self._gen_namecoll_key(charset._name, charset._collation)
         if dict_contains(self._by_name_n_collation, key):
             raise errors.CharsetDuplicatedError(
