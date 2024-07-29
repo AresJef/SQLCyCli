@@ -16,9 +16,28 @@ cdef class PoolConnectionManager:
     cdef:
         Pool _pool
         PoolConnection _conn
+        bint _closed
 
 cdef class Pool:
     cdef:
+        # Pool
+        # . counting
+        unsigned int _acqr, _free
+        # . internal
+        unsigned int _min_size, _max_size
+        long long _recycle
+        Py_ssize_t _id
+        object _free_conns
+        set _used_conns
+        object _loop, _condition
+        bint _closing, _closed
+        # . server
+        int _server_protocol_version
+        str _server_info
+        tuple _server_version
+        int _server_version_major
+        str _server_vendor
+        str _server_auth_plugin_name
         # Connection args
         # . basic
         str _host
@@ -46,27 +65,18 @@ cdef class Pool:
         bytes _server_public_key
         # . decode
         bint _use_decimal, _decode_json
-        # . server
-        int _server_protocol_version
-        str _server_info
-        tuple _server_version
-        int _server_version_major
-        str _server_vendor
-        str _server_auth_plugin_name
-        # Pool
-        unsigned int _min_size, _max_size
-        Py_ssize_t _recycle, _id
-        unsigned int _acqr, _free, _used
-        object _free_conn
-        set _used_conn
-        object _loop, _cond
-        bint _closing, _closed
+        
+    # Setup
+    cdef inline bint _setup(self, object min_size, object max_size, object recycle, object loop) except -1
     # Pool
     cpdef unsigned int get_free(self) except -1
     cpdef unsigned int get_used(self) except -1
     cpdef unsigned int get_total(self) except -1
-    cpdef bint set_min_size(self, unsigned int value) except -1
-    cpdef bint set_recycle(self, unsigned int value) except -1
+    cpdef bint set_min_size(self, unsigned int size) except -1
+    cpdef bint set_recycle(self, object size) except -1
+    cdef inline PoolConnection _get_free_conn(self)
+    cdef inline bint _add_free_conn(self, object conn) except -1
+    # Acquire / Fill / Release
     cpdef PoolConnectionManager acquire(self)
     # Close
     cpdef bint terminate(self) except -1
