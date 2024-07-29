@@ -487,7 +487,7 @@ class TestPool(TestCase):
                 pass
 
         with self.assertRaises(errors.InvalidPoolArgsError):
-            async with await self.get_pool(recycle=1.2345) as _:
+            async with await self.get_pool(recycle="3.6345") as _:
                 pass
 
         async with await self.get_pool(recycle=-2) as pool:
