@@ -29,11 +29,11 @@ from orjson import loads, dumps, OPT_SERIALIZE_NUMPY
 from sqlcycli.constants import _FIELD_TYPE
 from sqlcycli import typeref, errors
 
-__all__ = ["escape_item", "encode_item", "decode_item"]
+__all__ = ["escape", "escape_item", "decode"]
 
 # Constants -----------------------------------------------------------------------------------
 # . translate table
-# Used to translate Python string to MySQL literal string.
+# Used to translate Python string to literal string.
 STR_ESCAPE_TABLE: list = [chr(x) for x in range(128)]
 STR_ESCAPE_TABLE[0] = "\\0"
 STR_ESCAPE_TABLE[ord("\\")] = "\\\\"
@@ -42,7 +42,7 @@ STR_ESCAPE_TABLE[ord("\r")] = "\\r"
 STR_ESCAPE_TABLE[ord("\032")] = "\\Z"
 STR_ESCAPE_TABLE[ord('"')] = '\\"'
 STR_ESCAPE_TABLE[ord("'")] = "\\'"
-# Used to translate 'orjson' serialized datetime64 to MySQL datetime format.
+# Used to translate 'orjson' serialized datetime64 to literal datetime format.
 DT64_JSON_TABLE: list = [chr(x) for x in range(128)]
 DT64_JSON_TABLE[ord("T")] = " "
 DT64_JSON_TABLE[ord('"')] = "'"
@@ -91,7 +91,7 @@ FN_MYSQLCLI_STR2LIT: Callable = string_literal
 @cython.inline(True)
 def _orjson_dumps(value: object) -> str:
     """(cfunc) Serialize object using
-    'orjson [https://github.com/ijl/orjson]' into JSON `<'str'>`."""
+    'orjson [https://github.com/ijl/orjson]' into JSON string `<'str'>`."""
     return decode_bytes_utf8(FN_ORJSON_DUMPS(value))  # type: ignore
 
 
@@ -99,7 +99,7 @@ def _orjson_dumps(value: object) -> str:
 @cython.inline(True)
 def _orjson_dumps_numpy(value: object) -> str:
     """(cfunc) Serialize numpy.ndarray using
-    'orjson [https://github.com/ijl/orjson]' into JSON `<'str'>`."""
+    'orjson [https://github.com/ijl/orjson]' into JSON string `<'str'>`."""
     return decode_bytes_utf8(FN_ORJSON_DUMPS(value, option=FN_ORJSON_OPT_NUMPY))  # type: ignore
 
 
@@ -107,30 +107,31 @@ def _orjson_dumps_numpy(value: object) -> str:
 @cython.inline(True)
 def _mysqlclient_literal(value: object) -> str:
     """(cfunc) Escape `<'str'>` or `<'bytes'>` using
-    'mysqlclient [https://github.com/PyMySQL/mysqlclient]' into MySQL `<'str'>`."""
+    'mysqlclient [https://github.com/PyMySQL/mysqlclient]' into literal string `<'str'>`.
+    """
     return decode_bytes_utf8(FN_MYSQLCLI_STR2LIT(value))  # type: ignore
 
 
-# Escaper -------------------------------------------------------------------------------------
+# Escape --------------------------------------------------------------------------------------
 # . Basic types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_bool(value: object) -> str:
-    """(cfunc) Escape boolean value into MySQL string `<'str'>."""
+    """(cfunc) Escape boolean 'value' into literal string `<'str'>."""
     return "1" if value else "0"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_int(value: object) -> str:
-    """(cfunc) Escape integer value into MySQL string `<'str'>."""
+    """(cfunc) Escape integer 'value' into literal string `<'str'>."""
     return str(value)
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_float(value: object) -> str:
-    """(cfunc) Escape float value into MySQL string `<'str'>`."""
+    """(cfunc) Escape float 'value' into literal string `<'str'>`."""
     # For normal native Python float numbers, orjson performs
     # faster than Python built-in `str()` function.
     if isnormal(value):
@@ -143,25 +144,25 @@ def _escape_float(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_float64(value: object) -> str:
-    """(cfunc) Escape numpy.float_ value into MySQL string `<'str'>`."""
+    """(cfunc) Escape numpy.float_ 'value' into literal string `<'str'>`."""
     # For numpy.float64, Python built-in `str()`
     # function performs faster than orjson.
     if isfinite(value):
         return str(value)
-    raise TypeError("float value '%s' can not be used with MySQL." % value)
+    raise TypeError("float value '%s' is invalid." % value)
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_str(value: object) -> str:
-    """(cfunc) Escape string value into MySQL string `<'str'>`."""
+    """(cfunc) Escape string 'value' into literal string `<'str'>`."""
     return _mysqlclient_literal(value)
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_none(_) -> str:
-    """(cfunc) Escape None value into MySQL string `<'str'>`."""
+    """(cfunc) Escape None 'value' into literal string `<'str'>`."""
     return "NULL"
 
 
@@ -169,7 +170,7 @@ def _escape_none(_) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_datetime(value: object) -> str:
-    """(cfunc) Escape datetime value into MySQL string `<'str'>`."""
+    """(cfunc) Escape datetime 'value' into literal string `<'str'>`."""
     microsecond: cython.int = datetime.PyDateTime_DATE_GET_MICROSECOND(value)
     if microsecond == 0:
         return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
@@ -196,7 +197,7 @@ def _escape_datetime(value: object) -> str:
 @cython.inline(True)
 @cython.cdivision(True)
 def _escape_datetime64(value: object) -> str:
-    """(cfunc) Escape numpy.datetime64 value into MySQL string `<'str'>`."""
+    """(cfunc) Escape numpy.datetime64 'value' into literal string `<'str'>`."""
     # Add back epoch seconds
     microseconds: cython.longlong = dt64_to_microseconds(value) + EPOCH_US  # type: ignore
     microseconds = min(max(microseconds, DT_MIN_US), DT_MAX_US)
@@ -223,7 +224,7 @@ def _escape_datetime64(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_struct_time(value: object) -> str:
-    """(cfunc) Escape struct_time value into MySQL string `<'str'>`."""
+    """(cfunc) Escape struct_time 'value' into literal string `<'str'>`."""
     # fmt: off
     return _escape_datetime(datetime.datetime_new(
         value.tm_year, value.tm_mon, value.tm_mday,
@@ -235,7 +236,7 @@ def _escape_struct_time(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_date(value: object) -> str:
-    """(cfunc) Escape date value into MySQL string `<'str'>`."""
+    """(cfunc) Escape date 'value' into literal string `<'str'>`."""
     return "'%04d-%02d-%02d'" % (
         datetime.PyDateTime_GET_YEAR(value),
         datetime.PyDateTime_GET_MONTH(value),
@@ -246,7 +247,7 @@ def _escape_date(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_time(value: object) -> str:
-    """(cfunc) Escape time value into MySQL string `<'str'>`."""
+    """(cfunc) Escape time 'value' into literal string `<'str'>`."""
     microsecond: cython.int = datetime.PyDateTime_TIME_GET_MICROSECOND(value)
     if microsecond == 0:
         return "'%02d:%02d:%02d'" % (
@@ -267,7 +268,7 @@ def _escape_time(value: object) -> str:
 @cython.inline(True)
 @cython.cdivision(True)
 def _escape_timedelta(value: object) -> str:
-    """(cfunc) Escape timedelta value into MySQL string `<'str'>`."""
+    """(cfunc) Escape timedelta 'value' into literal string `<'str'>`."""
     # Get total seconds and microseconds
     seconds: cython.longlong = (
         datetime.PyDateTime_DELTA_GET_SECONDS(value)
@@ -331,7 +332,7 @@ def _escape_timedelta(value: object) -> str:
 @cython.inline(True)
 @cython.cdivision(True)
 def _escape_timedelta64(value: object) -> str:
-    """(cfunc) Escape numpy.timedelta64 value into MySQL string `<'str'>`."""
+    """(cfunc) Escape numpy.timedelta64 'value' into literal string `<'str'>`."""
     us: cython.longlong = td64_to_microseconds(value)  # type: ignore
     negate: cython.bint = us < 0
     us = abs(us)
@@ -357,7 +358,8 @@ def _escape_timedelta64(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_bytes(value: object) -> str:
-    """(cfunc) Escape bytes value into MySQL bytes string `<'str'>`."""
+    """(cfunc) Escape bytes 'value' into literal 
+    ('_binary' prefixed) string `<'str'>`."""
     res: str = decode_bytes_ascii(value)  # type: ignore
     return "_binary'" + res.translate(STR_ESCAPE_TABLE) + "'"
 
@@ -365,7 +367,8 @@ def _escape_bytes(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_bytearray(value: object) -> str:
-    """(cfunc) Escape bytearray value into MySQL bytes string `<'str'>`."""
+    """(cfunc) Escape bytearray 'value' into literal 
+    ('_binary' prefixed) string `<'str'>`."""
     res: str = decode_bytearray_ascii(value)  # type: ignore
     return "_binary'" + res.translate(STR_ESCAPE_TABLE) + "'"
 
@@ -373,7 +376,8 @@ def _escape_bytearray(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_memoryview(value: memoryview) -> str:
-    """(cfunc) Escape memoryview value into MySQL bytes string `<'str'>`."""
+    """(cfunc) Escape memoryview 'value' into literal 
+    ('_binary' prefixed) string `<'str'>`."""
     return _escape_bytes(value.tobytes())
 
 
@@ -381,7 +385,7 @@ def _escape_memoryview(value: memoryview) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_decimal(value: object) -> str:
-    """(cfunc) Escape decimal value into MySQL string `<'str'>`."""
+    """(cfunc) Escape decimal 'value' into literal string `<'str'>`."""
     return str(value)
 
 
@@ -389,8 +393,8 @@ def _escape_decimal(value: object) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_dict(value: dict) -> str:
-    """(cfunc) Escape dict value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value.values()])
+    """(cfunc) Escape dict 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value.values()])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
@@ -398,40 +402,40 @@ def _escape_dict(value: dict) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_list(value: list) -> str:
-    """(cfunc) Escape list value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value])
+    """(cfunc) Escape list 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_tuple(value: tuple) -> str:
-    """(cfunc) Escape tuple value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value])
+    """(cfunc) Escape tuple 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_set(value: set) -> str:
-    """(cfunc) Escape set value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value])
+    """(cfunc) Escape set 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_frozenset(value: frozenset) -> str:
-    """(cfunc) Escape frozenset value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value])
+    """(cfunc) Escape frozenset 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_sequence(value: Iterable) -> str:
-    """(cfunc) Escape sequence value into MySQL string `<'str'>`."""
-    res: str = ",".join([_escape_item_common(i) for i in value])
+    """(cfunc) Escape sequence 'value' into literal string `<'str'>`."""
+    res: str = ",".join([_escape_common(i) for i in value])
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
@@ -439,7 +443,7 @@ def _escape_sequence(value: Iterable) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray(value: np.ndarray) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`."""
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`."""
     # Validate ndarray dimensions & size
     if value.ndim != 1:
         raise ValueError("only supports 1-dimensional <'numpy.ndarray'>.")
@@ -482,78 +486,69 @@ def _escape_ndarray(value: np.ndarray) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of: "O" (object).
     """
-    l = [_escape_item_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
+    l = [_escape_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
     return "(" + ",".join(l) + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of: "f" (float).
     """
     if not is_arr_double_finite(arr, size):  # type: ignore
-        raise TypeError("float value of 'nan' & 'inf' can not be used with MySQL.")
-    # For size < 30, serialize as list is faster.
-    if size < 30:
-        res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    # For larger size, serialize as ndarray is faster.
-    else:
-        res: str = _orjson_dumps_numpy(arr)
+        raise TypeError("float value such as 'nan' & 'inf' is invalid.")
+    # Alternative approach:
+    # str = _orjson_dumps(np.PyArray_ToList(arr))
+    res: str = _orjson_dumps_numpy(arr)
     return replace_bracket(res)  # type: ignore
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of:
     "i" (int) and "u" (uint).
     """
-    # For size < 60, serialize as list is faster.
-    if size < 60:
-        res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    # For larger size, serialize as ndarray is faster.
-    else:
-        res: str = _orjson_dumps_numpy(arr)
+    # Alternative approach:
+    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
+    res: str = _orjson_dumps_numpy(arr)
     return replace_bracket(res)  # type: ignore
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "b" (bool).
     """
-    # For size < 60, serialize as list and Python built-in 'join()' is faster.
-    if size < 60:
-        l = ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(size)]  # type: ignore
-        return "(" + ",".join(l) + ")"
-    # For larger size, serialize as ndarray is faster.
-    else:
-        res: str = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
+    # Alternative approach:
+    # l = ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(size)]
+    # return "(" + ",".join(l) + ")"
+    res: str = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
     return replace_bracket(res)  # type: ignore
 
 
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray with
     dtype of: "M" (datetime64).
     """
     # Notes: This approach is faster than escaping each element individually.
     # 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
-    # so character ['"', "T", "[", "]"] will be replaced to comply with MySQL
+    # so character ['"', "T", "[", "]"] will be replaced to comply with literal
     # datetime format.
     res: str = _orjson_dumps_numpy(arr)
     return res.translate(DT64_JSON_TABLE)
@@ -563,7 +558,7 @@ def _escape_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
 @cython.inline(True)
 @cython.cdivision(True)
 def _escape_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray with
     dtype of: "m" (timedelta64).
@@ -598,7 +593,7 @@ def _escape_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "S" (bytes string).
@@ -610,7 +605,7 @@ def _escape_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
-    """(cfunc) Escape numpy.ndarray value into MySQL string `<'str'>`.
+    """(cfunc) Escape numpy.ndarray 'value' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "S" (bytes string).
@@ -623,7 +618,7 @@ def _escape_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_series(value: Series) -> str:
-    """(cfunc) Escape pandas.Series value into MySQL string `<'str'>`."""
+    """(cfunc) Escape pandas.Series 'value' into literal string `<'str'>`."""
     try:
         arr: np.ndarray = value.values
     except Exception as err:
@@ -635,7 +630,7 @@ def _escape_series(value: Series) -> str:
 @cython.cfunc
 @cython.inline(True)
 def _escape_dataframe(value: DataFrame) -> str:
-    """(cfunc) Escape pandas.DataFrame value into MySQL strings `<'str'>`."""
+    """(cfunc) Escape pandas.DataFrame 'value' into literal string `<'str'>`."""
     # Validate shape
     shape: tuple = value.shape
     width: cython.Py_ssize_t = shape[1]
@@ -647,7 +642,9 @@ def _escape_dataframe(value: DataFrame) -> str:
 
     # Escape DataFrame
     rows: list = []
-    cols: list[list] = [_encode_dataframe_column(col, size) for _, col in value.items()]
+    cols: list[list] = [
+        _escape_item_dataframe_column(col, size) for _, col in value.items()
+    ]
     for i in range(size):
         row: list = []
         for j in range(width):
@@ -659,8 +656,8 @@ def _escape_dataframe(value: DataFrame) -> str:
 # . Escape - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_common(value: object) -> str:
-    """(cfunc) Escape common item value into MySQL string `<'str'>`."""
+def _escape_common(value: object) -> str:
+    """(cfunc) Escape common 'value' into literal string `<'str'>`."""
     # Get data type
     dtype = type(value)
 
@@ -720,13 +717,13 @@ def _escape_item_common(value: object) -> str:
         return _escape_tuple(value)
 
     ##### Uncommon Types #####
-    return _escape_item_uncommon(value, dtype)
+    return _escape_uncommon(value, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_uncommon(value: object, dtype: type) -> str:
-    """(cfunc) Escape uncommon item value into MySQL string `<'str'>`."""
+def _escape_uncommon(value: object, dtype: type) -> str:
+    """(cfunc) Escape uncommon 'value' into literal string `<'str'>`."""
     ##### Uncommon Types #####
     # Basic Types
     # . <'numpy.float_'>
@@ -823,13 +820,13 @@ def _escape_item_uncommon(value: object, dtype: type) -> str:
         return _escape_dataframe(value)
 
     ##### Subclass Types #####
-    return _escape_item_subclass(value, dtype)
+    return _escape_subclass(value, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_subclass(value: object, dtype: type) -> str:
-    """(cfunc) Escape subclass item value into MySQL string `<'str'>`."""
+def _escape_subclass(value: object, dtype: type) -> str:
+    """(cfunc) Escape subclass 'value' into literal string `<'str'>`."""
     ##### Subclass Types #####
     # Basic Types
     # . subclass of <'str'>
@@ -896,109 +893,117 @@ def _escape_item_subclass(value: object, dtype: type) -> str:
 
 
 @cython.ccall
-def escape_item(value: object) -> str:
-    """Escape item value into MySQL string `<'str'>`."""
+def escape(value: object) -> str:
+    """Escape 'value' into literal string `<'str'>`."""
     try:
-        return _escape_item_common(value)
+        return _escape_common(value)
     except Exception as err:
         raise errors.EscapeTypeError(
             "Failed to escape %s: %s" % (type(value), err)
         ) from err
 
 
-# Encoder -------------------------------------------------------------------------------------
+# Escape Item ---------------------------------------------------------------------------------
 # . Mapping types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_dict(value: dict) -> tuple:
-    """(cfunc) Encode dict value into dictionary of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(v) for v in value.values()])
+def _escape_item_dict(value: dict) -> tuple:
+    """(cfunc) Escape items of dict 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(v) for v in value.values()])
 
 
 # . Sequence types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_list(value: list) -> tuple:
-    """(cfunc) Encode list value into tuple of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(i) for i in value])
+def _escape_item_list(value: list) -> tuple:
+    """(cfunc) Escape items of list 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(i) for i in value])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_tuple(value: tuple) -> tuple:
-    """(cfunc) Encode tuple value into tuple of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(i) for i in value])
+def _escape_item_tuple(value: tuple) -> tuple:
+    """(cfunc) Escape items of tuple 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(i) for i in value])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_set(value: set) -> tuple:
-    """(cfunc) Encode set value into tuple of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(i) for i in value])
+def _escape_item_set(value: set) -> tuple:
+    """(cfunc) Escape items of set 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(i) for i in value])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_frozenset(value: frozenset) -> tuple:
-    """(cfunc) Encode set value into tuple of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(i) for i in value])
+def _escape_item_frozenset(value: frozenset) -> tuple:
+    """(cfunc) Escape items of set 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(i) for i in value])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_sequence(value: Iterable) -> tuple:
-    """(cfunc) Encode sequence value into tuple of MySQL strings `<'tuple'>`."""
-    return list_to_tuple([_encode_item_common(i) for i in value])
+def _escape_item_sequence(value: Iterable) -> tuple:
+    """(cfunc) Escape items of sequence 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
+    return list_to_tuple([_escape_item_common(i) for i in value])
 
 
 # . Numpy ndarray - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray(value: np.ndarray) -> tuple:
-    """(cfunc) Encode numpy.ndarray value into tuple of MySQL strings `<'tuple'>`."""
+def _escape_item_ndarray(value: np.ndarray) -> tuple:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
     # Validate ndarray dimensions & size
     if value.ndim != 1:
         raise ValueError("only supports 1-dimensional <'numpy.ndarray'>.")
     size: cython.Py_ssize_t = value.shape[0]
     if size == 0:
         return ()  # exit
-    # Encode ndarray
+    # Escape ndarray
     dtype: cython.char = value.descr.kind
     # . ndarray[object]
     if dtype == NDARRAY_DTYPE_OBJECT:
-        return list_to_tuple(_encode_ndarray_object(value, size))
+        return list_to_tuple(_escape_item_ndarray_object(value, size))
     # . ndarray[float]
     if dtype == NDARRAY_DTYPE_FLOAT:
-        return list_to_tuple(_encode_ndarray_float(value, size))
+        return list_to_tuple(_escape_item_ndarray_float(value, size))
     # . ndarray[int]
     if dtype == NDARRAY_DTYPE_INT:
-        return list_to_tuple(_encode_ndarray_int(value, size))
+        return list_to_tuple(_escape_item_ndarray_int(value, size))
     # . ndarray[uint]
     if dtype == NDARRAY_DTYPE_UINT:
-        return list_to_tuple(_encode_ndarray_int(value, size))
+        return list_to_tuple(_escape_item_ndarray_int(value, size))
     # . ndarray[bool]
     if dtype == NDARRAY_DTYPE_BOOL:
-        return list_to_tuple(_encode_ndarray_bool(value, size))
+        return list_to_tuple(_escape_item_ndarray_bool(value, size))
     # . ndarray[datetime64]
     if dtype == NDARRAY_DTYPE_DT64:
-        return list_to_tuple(_encode_ndarray_dt64(value, size))
+        return list_to_tuple(_escape_item_ndarray_dt64(value, size))
     # . ndarray[timedelta64]
     if dtype == NDARRAY_DTYPE_TD64:
-        return list_to_tuple(_encode_ndarray_td64(value, size))
+        return list_to_tuple(_escape_item_ndarray_td64(value, size))
     # . ndarray[bytes]
     if dtype == NDARRAY_DTYPE_BYTES:
-        return list_to_tuple(_encode_ndarray_bytes(value, size))
+        return list_to_tuple(_escape_item_ndarray_bytes(value, size))
     # . ndarray[str]
     if dtype == NDARRAY_DTYPE_UNICODE:
-        return list_to_tuple(_encode_ndarray_unicode(value, size))
+        return list_to_tuple(_escape_item_ndarray_unicode(value, size))
     # . invalid dtype
     raise TypeError("unsupported <'numpy.ndarray'> dtype [%s]." % value.dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of formatable objects `<'list[str/tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "O" (object).
 
@@ -1006,13 +1011,14 @@ def _encode_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
     This function returns `LIST` instead of `TUPLE` for performance
     reason, please convert it to <'tuple'> for final result.
     """
-    return [_encode_item_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
+    return [_escape_item_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray value into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of:
     "f" (float), "i" (int) and "u" (uint).
@@ -1023,20 +1029,18 @@ def _encode_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
     """
     # Check if any item is not finite.
     if not is_arr_double_finite(arr, size):  # type: ignore
-        raise TypeError("float value of 'nan' & 'inf' can not be used with MySQL.")
-    # For size < 30, serialize as list is faster.
-    if size < 30:
-        res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    # For larger size, serialize as ndarray is faster.
-    else:
-        res: str = _orjson_dumps_numpy(arr)
+        raise TypeError("float value of 'nan' & 'inf' is invalid.")
+    # Alternative approach:
+    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
+    res: str = _orjson_dumps_numpy(arr)
     return str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of:
     "i" (int) and "u" (uint).
@@ -1045,19 +1049,17 @@ def _encode_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
     This function returns `LIST` instead of `TUPLE` for performance
     reason, please convert it to <'tuple'> for final result.
     """
-    # For size < 60, serialize as list is faster.
-    if size < 60:
-        res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    # For larger size, serialize as ndarray is faster.
-    else:
-        res: str = _orjson_dumps_numpy(arr)
+    # Alternative approach:
+    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
+    res: str = _orjson_dumps_numpy(arr)
     return str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of: "b" (bool).
 
@@ -1070,8 +1072,9 @@ def _encode_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of: "M" (datetime64).
 
@@ -1081,8 +1084,8 @@ def _encode_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
     """
     # Notes: This approach is faster than encoding each element individually.
     # 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
-    # so character ['"', "T"] will be replaced to comply with MySQL datetime
-    # format, and then split by "," into sequence of MySQL strings.
+    # so character ['"', "T"] will be replaced to comply with literal datetime
+    # format, and then split by "," into sequence of literal strings.
     res: str = _orjson_dumps_numpy(arr)
     res = str_substr(res, 1, str_len(res) - 1)
     return str_split(res.translate(DT64_JSON_TABLE), ",", -1)
@@ -1090,8 +1093,9 @@ def _encode_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of: "m" (timedelta64).
 
@@ -1128,8 +1132,9 @@ def _encode_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray 'value' into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of: "S" (bytes string).
 
@@ -1142,8 +1147,9 @@ def _encode_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode numpy.ndarray value into `list` of MySQL strings `<'list'>`.
+def _escape_item_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of numpy.ndarray value into
+    list of literal strings `<'list[str]'>`.
 
     This function is specifically for ndarray with dtype of: "S" (bytes string).
 
@@ -1157,20 +1163,22 @@ def _encode_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
 # . Pandas Series - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_series(value: Series) -> tuple:
-    """(cfunc) Encode pandas.Series value into tuple of MySQL strings `<'tuple'>`."""
+def _escape_item_series(value: Series) -> tuple:
+    """(cfunc) Escape items of pandas.Series 'value' into
+    tuple of formatable objects `<'tuple[str/tuple]'>`."""
     try:
         arr: np.ndarray = value.values
     except Exception as err:
         raise TypeError("Expects <'pandas.Series'>, got %s." % type(value)) from err
-    return _encode_ndarray(arr)
+    return _escape_item_ndarray(arr)
 
 
 # . Pandas DataFrame - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_dataframe(value: DataFrame) -> tuple:
-    """(cfunc) Encode pandas.DataFrame value into tuple of MySQL strings `<'tuple'>`."""
+def _escape_item_dataframe(value: DataFrame) -> tuple:
+    """(cfunc) Escape items of pandas.DataFrame 'value' into
+    tuple of tuple `<'tuple[tuple]'>`."""
     # Validate shape
     shape: tuple = value.shape
     width: cython.Py_ssize_t = shape[1]
@@ -1180,9 +1188,11 @@ def _encode_dataframe(value: DataFrame) -> tuple:
     if size == 0:
         return ()  # exit
 
-    # Encode DataFrame
+    # Escape DataFrame
     rows: list = []
-    cols: list[list] = [_encode_dataframe_column(col, size) for _, col in value.items()]
+    cols: list[list] = [
+        _escape_item_dataframe_column(col, size) for _, col in value.items()
+    ]
     for i in range(size):
         row: list = []
         for j in range(width):
@@ -1193,8 +1203,9 @@ def _encode_dataframe(value: DataFrame) -> tuple:
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_dataframe_column(value: Series, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Encode pandas.DataFrame column into list of MySQL strings `<'list'>`.
+def _escape_item_dataframe_column(value: Series, size: cython.Py_ssize_t) -> list:
+    """(cfunc) Escape items of pandas.DataFrame column 'value' into
+    list of formatable objects `<'list[str/tuple]'>`.
 
     ### Notice
     This function returns `LIST` instead of `TUPLE` for performance
@@ -1205,44 +1216,44 @@ def _encode_dataframe_column(value: Series, size: cython.Py_ssize_t) -> list:
         arr: np.ndarray = value.values
     except Exception as err:
         raise TypeError("Expects <'pandas.Series'>, got %s." % type(value)) from err
-    # Encode ndarray
+    # Escape ndarray
     dtype: cython.char = arr.descr.kind
     # . ndarray[object]
     if dtype == NDARRAY_DTYPE_OBJECT:
-        return _encode_ndarray_object(arr, size)
+        return _escape_item_ndarray_object(arr, size)
     # . ndarray[float]
     if dtype == NDARRAY_DTYPE_FLOAT:
-        return _encode_ndarray_float(arr, size)
+        return _escape_item_ndarray_float(arr, size)
     # . ndarray[int]
     if dtype == NDARRAY_DTYPE_INT:
-        return _encode_ndarray_int(arr, size)
+        return _escape_item_ndarray_int(arr, size)
     # . ndarray[uint]
     if dtype == NDARRAY_DTYPE_UINT:
-        return _encode_ndarray_int(arr, size)
+        return _escape_item_ndarray_int(arr, size)
     # . ndarray[bool]
     if dtype == NDARRAY_DTYPE_BOOL:
-        return _encode_ndarray_bool(arr, size)
+        return _escape_item_ndarray_bool(arr, size)
     # . ndarray[datetime64]
     if dtype == NDARRAY_DTYPE_DT64:
-        return _encode_ndarray_dt64(arr, size)
+        return _escape_item_ndarray_dt64(arr, size)
     # . ndarray[timedelta64]
     if dtype == NDARRAY_DTYPE_TD64:
-        return _encode_ndarray_td64(arr, size)
+        return _escape_item_ndarray_td64(arr, size)
     # . ndarray[bytes]
     if dtype == NDARRAY_DTYPE_BYTES:
-        return _encode_ndarray_bytes(arr, size)
+        return _escape_item_ndarray_bytes(arr, size)
     # . ndarray[str]
     if dtype == NDARRAY_DTYPE_UNICODE:
-        return _encode_ndarray_unicode(arr, size)
+        return _escape_item_ndarray_unicode(arr, size)
     # . invalid dtype
     raise TypeError("unsupported <'Series'> dtype [%s]." % value.dtype)
 
 
-# . Encode - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# . Escape - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _encode_item_common(value: object) -> object:
-    """(cfunc) Encode common item value into string
+def _escape_item_common(value: object) -> object:
+    """(cfunc) Escape items of common 'value' into
     formatable object `<'str/tuple'>`."""
     # Get data type
     dtype = type(value)
@@ -1292,24 +1303,24 @@ def _encode_item_common(value: object) -> object:
     # Mapping Types
     # . <'dict'>
     if dtype is dict:
-        return _encode_dict(value)
+        return _escape_item_dict(value)
 
     # Sequence Types
     # . <'list'>
     if dtype is list:
-        return _encode_list(value)
+        return _escape_item_list(value)
     # . <'tuple'>
     if dtype is tuple:
-        return _encode_tuple(value)
+        return _escape_item_tuple(value)
 
     ##### Uncommon Types #####
-    return _encode_item_uncommon(value, dtype)
+    return _escape_item_uncommon(value, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_item_uncommon(value: object, dtype: type) -> object:
-    """(cfunc) Encode uncommon item value into string
+def _escape_item_uncommon(value: object, dtype: type) -> object:
+    """(cfunc) Escape items of uncommon 'value' into
     formatable object `<'str/tuple'>`."""
     ##### Uncommon Types #####
     # Basic Types
@@ -1375,21 +1386,21 @@ def _encode_item_uncommon(value: object, dtype: type) -> object:
     # Sequence Types
     # . <'set'>
     if dtype is set:
-        return _encode_set(value)
+        return _escape_item_set(value)
     # . <'frozenset'>
     if dtype is frozenset:
-        return _encode_frozenset(value)
+        return _escape_item_frozenset(value)
     # . <'range'> & <'dict_keys'> & <'dict_values'>
     if dtype is range or dtype is typeref.DICT_KEYS or dtype is typeref.DICT_VALUES:
-        return _encode_sequence(value)
+        return _escape_item_sequence(value)
 
     # Numpy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
-        return _encode_ndarray(value)
+        return _escape_item_ndarray(value)
     # . <'numpy.record'>
     if dtype is typeref.RECORD:
-        return _encode_sequence(value)
+        return _escape_item_sequence(value)
 
     # Pandas Types
     # . <'pandas.Series'> & <'pandas.DatetimeIndex'> & <'pandas.TimedeltaIndex'>
@@ -1398,22 +1409,22 @@ def _encode_item_uncommon(value: object, dtype: type) -> object:
         or dtype is typeref.DATETIMEINDEX
         or dtype is typeref.TIMEDELTAINDEX
     ):
-        return _encode_series(value)
+        return _escape_item_series(value)
     # . <'cytimes.pddt'>
     if dtype is typeref.PDDT:
-        return _encode_series(value.dt)
+        return _escape_item_series(value.dt)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:
-        return _encode_dataframe(value)
+        return _escape_item_dataframe(value)
 
     ##### Subclass Types #####
-    return _encode_item_subclass(value, dtype)
+    return _escape_item_subclass(value, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _encode_item_subclass(value: object, dtype: type) -> object:
-    """(cfunc) Encode common item value into string
+def _escape_item_subclass(value: object, dtype: type) -> object:
+    """(cfunc) Escape items of subclass 'value' into
     formatable object `<'str/tuple'>`."""
     ##### Subclass Types #####
     # Basic Types
@@ -1460,40 +1471,39 @@ def _encode_item_subclass(value: object, dtype: type) -> object:
     # Mapping Types
     # . subclass of <'dict'>
     if isinstance(value, dict):
-        return _encode_dict(value)
+        return _escape_item_dict(value)
 
     # Sequence Types
     # . subclass of <'list'>
     if isinstance(value, list):
-        return _encode_list(value)
+        return _escape_item_list(value)
     # . subclass of <'tuple'>
     if isinstance(value, tuple):
-        return _encode_tuple(value)
+        return _escape_item_tuple(value)
     # . subclass of <'set'>
     if isinstance(value, set):
-        return _encode_set(value)
+        return _escape_item_set(value)
     # . subclass of <'frozenset'>
     if isinstance(value, frozenset):
-        return _encode_frozenset(value)
+        return _escape_item_frozenset(value)
 
     # Numpy Types
     # . subclass of <'numpy.ndarray'>
     if isinstance(value, np.ndarray):
-        return _encode_ndarray(value)
+        return _escape_item_ndarray(value)
 
     # Invalid Data Type
     raise TypeError("unsupported data type %s" % dtype)
 
 
 @cython.ccall
-def encode_item(value: object) -> object:
-    """(cfunc) Encode common item value into string
-    formatable object `<'str/tuple'>`."""
+def escape_item(value: object) -> object:
+    """Escape items of 'value' into formatable object `<'str/tuple'>`."""
     try:
-        return _encode_item_common(value)
+        return _escape_item_common(value)
     except Exception as err:
         raise errors.EncodeTypeError(
-            "Failed to encode %s: %s" % (type(value), err)
+            "Failed to escape %s: %s" % (type(value), err)
         ) from err
 
 
@@ -1713,7 +1723,7 @@ def _decode_json(
 
 # . Dncode - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.ccall
-def decode_item(
+def decode(
     value: bytes,
     field_type: cython.uint,
     encoding: cython.pchar,

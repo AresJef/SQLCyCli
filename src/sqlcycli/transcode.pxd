@@ -292,13 +292,13 @@ cdef inline long double chars_to_double(char* data):
     """Convert 'data' `<'char*'>` to `<'long double'>`."""
     return strtold(data, NULL)
 
-# Escaper
-cpdef str escape_item(object value)
+# Escape
+cpdef str escape(object value)
 
-# Encoder
-cpdef object encode_item(object value)
+# Escape Item
+cpdef object escape_item(object value)
 
 # Decoder
-cpdef object decode_item(
+cpdef object decode(
     bytes value, unsigned int field_type, char* encoding, 
     bint is_binary, bint use_decimal, bint decode_json)
