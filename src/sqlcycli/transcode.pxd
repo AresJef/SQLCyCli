@@ -293,12 +293,9 @@ cdef inline long double chars_to_double(char* data):
     return strtold(data, NULL)
 
 # Escape
-cpdef str escape(object value)
+cpdef object escape(object value, bint many=?, bint itemize=?)
 
-# Escape Item
-cpdef object escape_item(object value)
-
-# Decoder
+# Decode
 cpdef object decode(
     bytes value, unsigned int field_type, char* encoding, 
     bint is_binary, bint use_decimal, bint decode_json)
