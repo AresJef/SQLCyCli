@@ -160,31 +160,12 @@ class TestTranscode(TestCase):
         "dec_p": decimal.Decimal("1.1"),
         "dec_0": decimal.Decimal("0.0"),
         "dec_n": decimal.Decimal("-1.1"),
+        "dict": {"a": 1, "b": 2, "c": 3},
+        "list": [1, 2, 3],
+        "tuple": ("1", "2", "3"),
+        "set": {1, 2, 3},
+        "fset": frozenset({"1", "2", "3"}),
     }
-    espe: tuple[str] = (
-        "0",
-        "1",
-        "10",
-        "0",
-        "-10",
-        "1.1",
-        "0.0",
-        "-1.1",
-        "'中国\\n\\r\\Z\\\"\\'s'",
-        "NULL",
-        "'1970-01-02 03:04:05'",
-        "'1970-01-02 03:04:05.000006'",
-        "'1970-01-02 03:04:05.000006'",
-        "'1970-01-01'",
-        "'01:02:03'",
-        "'01:02:03.000004'",
-        "'-24:00:01.000001'",
-        "'1970-01-01 00:00:00'",
-        "_binary'apple\\n\\r\\Z\\\"\\'s'",
-        "1.1",
-        "0.0",
-        "-1.1",
-    )
 
     def test_all(self) -> None:
         self.test_escape_encode_bool()
@@ -205,21 +186,23 @@ class TestTranscode(TestCase):
         self.test_decode()
 
     def test_escape_encode_bool(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE BOOL"
+        test = "ESCAPE BOOL"
         self.log_start(test)
 
-        self.assertEqual(escape_item(True), "1")
-        self.assertEqual(encode_item(True), "1")
-        self.assertEqual(escape_item(False), "0")
-        self.assertEqual(encode_item(False), "0")
+        self.assertEqual(escape(True, True, True), "1")
+        self.assertEqual(escape(False, True, True), "0")
+        self.assertEqual(escape(True, False, True), "1")
+        self.assertEqual(escape(False, False, True), "0")
+        self.assertEqual(escape(True, False, False), "1")
+        self.assertEqual(escape(False, False, False), "0")
         self.log_ended(test)
 
     def test_escape_encode_int(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE INT"
+        test = "ESCAPE INT"
         self.log_start(test)
 
         value = 1
@@ -227,414 +210,500 @@ class TestTranscode(TestCase):
             d(value) for d in (np.int8, np.int16, np.int32, np.int64)
         ]
         for v in test_values:
-            self.assertEqual(escape_item(v), str(value))
-            self.assertEqual(encode_item(v), str(value))
+            self.assertEqual(escape(v, True, True), str(value))
+            self.assertEqual(escape(v, False, True), str(value))
+            self.assertEqual(escape(v, False, False), str(value))
 
         value = -1
         test_values = [value] + [
             d(value) for d in (np.int8, np.int16, np.int32, np.int64)
         ]
         for v in test_values:
-            self.assertEqual(escape_item(v), str(value))
-            self.assertEqual(encode_item(v), str(value))
+            self.assertEqual(escape(v, True, True), str(value))
+            self.assertEqual(escape(v, False, True), str(value))
+            self.assertEqual(escape(v, False, False), str(value))
 
         value = 0
         test_values = [value] + [
             d(value) for d in (np.uint8, np.uint16, np.uint32, np.uint64)
         ]
         for v in test_values:
-            self.assertEqual(escape_item(v), str(value))
-            self.assertEqual(encode_item(v), str(value))
+            self.assertEqual(escape(v, True, True), str(value))
+            self.assertEqual(escape(v, False, True), str(value))
+            self.assertEqual(escape(v, False, False), str(value))
 
         self.log_ended(test)
 
     def test_escape_encode_float(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE FLOAT"
+        test = "ESCAPE FLOAT"
         self.log_start(test)
 
         value = 1.0
         test_values = [value] + [d(value) for d in (np.float16, np.float32, np.float64)]
         for v in test_values:
-            self.assertEqual(escape_item(v), str(value))
-            self.assertEqual(encode_item(v), str(value))
+            self.assertEqual(escape(v, True, True), str(value))
+            self.assertEqual(escape(v, False, True), str(value))
+            self.assertEqual(escape(v, False, False), str(value))
 
         value = -1.0
         test_values = [value] + [d(value) for d in (np.float16, np.float32, np.float64)]
         for v in test_values:
-            self.assertEqual(escape_item(v), str(value))
-            self.assertEqual(encode_item(v), str(value))
+            self.assertEqual(escape(v, True, True), str(value))
+            self.assertEqual(escape(v, False, True), str(value))
+            self.assertEqual(escape(v, False, False), str(value))
 
         self.log_ended(test)
 
     def test_escape_encode_str(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE STR"
+        test = "ESCAPE STR"
         self.log_start(test)
 
-        self.assertEqual(escape_item("foo\nbar"), "'foo\\nbar'")
-        self.assertEqual(encode_item("foo\nbar"), "'foo\\nbar'")
+        self.assertEqual(escape("foo\nbar", True, True), "'foo\\nbar'")
+        self.assertEqual(escape("foo\nbar", False, True), "'foo\\nbar'")
+        self.assertEqual(escape("foo\nbar", False, False), "'foo\\nbar'")
+
         self.log_ended(test)
 
     def test_escape_encode_none(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE NONE"
+        test = "ESCAPE NONE"
         self.log_start(test)
 
-        self.assertEqual(escape_item(None), "NULL")
-        self.assertEqual(encode_item(None), "NULL")
+        self.assertEqual(escape(None, True, True), "NULL")
+        self.assertEqual(escape(None, False, True), "NULL")
+        self.assertEqual(escape(None, False, False), "NULL")
+
         self.log_ended(test)
 
     def test_escape_encode_datetime(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE DATETIME"
+        test = "ESCAPE DATETIME"
         self.log_start(test)
 
         value = datetime.datetime(2021, 1, 1, 12, 0, 0)
-        self.assertEqual(escape_item(value), "'2021-01-01 12:00:00'")
-        self.assertEqual(encode_item(value), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01 12:00:00'")
 
         value = np.datetime64(value)
-        self.assertEqual(escape_item(value), "'2021-01-01 12:00:00'")
-        self.assertEqual(encode_item(value), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01 12:00:00'")
 
         value = datetime.datetime(2021, 1, 1, 12, 0, 0, 1)
-        self.assertEqual(escape_item(value), "'2021-01-01 12:00:00.000001'")
-        self.assertEqual(encode_item(value), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01 12:00:00.000001'")
 
         value = np.datetime64(value)
-        self.assertEqual(escape_item(value), "'2021-01-01 12:00:00.000001'")
-        self.assertEqual(encode_item(value), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01 12:00:00.000001'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01 12:00:00.000001'")
 
         value = time.struct_time((2021, 1, 1, 12, 0, 0, 0, 1, 0))
-        self.assertEqual(escape_item(value), "'2021-01-01 12:00:00'")
-        self.assertEqual(encode_item(value), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01 12:00:00'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01 12:00:00'")
 
         self.log_ended(test)
 
     def test_escape_encode_date(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE DATE"
+        test = "ESCAPE DATE"
         self.log_start(test)
 
         value = datetime.date(2021, 1, 1)
-        self.assertEqual(escape_item(value), "'2021-01-01'")
-        self.assertEqual(encode_item(value), "'2021-01-01'")
+        self.assertEqual(escape(value, True, True), "'2021-01-01'")
+        self.assertEqual(escape(value, False, True), "'2021-01-01'")
+        self.assertEqual(escape(value, False, False), "'2021-01-01'")
+
         self.log_ended(test)
 
     def test_escape_encode_time(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE TIME"
+        test = "ESCAPE TIME"
         self.log_start(test)
 
         value = datetime.time(12, 0, 0)
-        self.assertEqual(escape_item(value), "'12:00:00'")
-        self.assertEqual(encode_item(value), "'12:00:00'")
+        self.assertEqual(escape(value, True, True), "'12:00:00'")
+        self.assertEqual(escape(value, False, True), "'12:00:00'")
+        self.assertEqual(escape(value, False, False), "'12:00:00'")
 
         value = datetime.time(12, 0, 0, 1)
-        self.assertEqual(escape_item(value), "'12:00:00.000001'")
-        self.assertEqual(encode_item(value), "'12:00:00.000001'")
+        self.assertEqual(escape(value, True, True), "'12:00:00.000001'")
+        self.assertEqual(escape(value, False, True), "'12:00:00.000001'")
+        self.assertEqual(escape(value, False, False), "'12:00:00.000001'")
+
         self.log_ended(test)
 
     def test_escape_encode_timedelta(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE TIMEDELTA"
+        test = "ESCAPE TIMEDELTA"
         self.log_start(test)
 
         value = datetime.timedelta(days=1, hours=12, minutes=30, seconds=30)
-        self.assertEqual(escape_item(value), "'36:30:30'")
-        self.assertEqual(encode_item(value), "'36:30:30'")
+        self.assertEqual(escape(value, True, True), "'36:30:30'")
+        self.assertEqual(escape(value, False, True), "'36:30:30'")
+        self.assertEqual(escape(value, False, False), "'36:30:30'")
 
         value = datetime.timedelta(
             days=1, hours=12, minutes=30, seconds=30, microseconds=1
         )
-        self.assertEqual(escape_item(value), "'36:30:30.000001'")
-        self.assertEqual(encode_item(value), "'36:30:30.000001'")
+        self.assertEqual(escape(value, True, True), "'36:30:30.000001'")
+        self.assertEqual(escape(value, False, True), "'36:30:30.000001'")
+        self.assertEqual(escape(value, False, False), "'36:30:30.000001'")
 
         value = np.timedelta64(value)
-        self.assertEqual(escape_item(value), "'36:30:30.000001'")
-        self.assertEqual(encode_item(value), "'36:30:30.000001'")
+        self.assertEqual(escape(value, True, True), "'36:30:30.000001'")
+        self.assertEqual(escape(value, False, True), "'36:30:30.000001'")
+        self.assertEqual(escape(value, False, False), "'36:30:30.000001'")
 
         value = -datetime.timedelta(days=1, hours=12, minutes=30, seconds=30)
-        self.assertEqual(escape_item(value), "'-36:30:30'")
-        self.assertEqual(encode_item(value), "'-36:30:30'")
+        self.assertEqual(escape(value, True, True), "'-36:30:30'")
+        self.assertEqual(escape(value, False, True), "'-36:30:30'")
+        self.assertEqual(escape(value, False, False), "'-36:30:30'")
 
         value = np.timedelta64(value)
-        self.assertEqual(escape_item(value), "'-36:30:30'")
-        self.assertEqual(encode_item(value), "'-36:30:30'")
+        self.assertEqual(escape(value, True, True), "'-36:30:30'")
+        self.assertEqual(escape(value, False, True), "'-36:30:30'")
+        self.assertEqual(escape(value, False, False), "'-36:30:30'")
 
         value = -datetime.timedelta(
             days=1, hours=12, minutes=30, seconds=30, microseconds=1
         )
-        self.assertEqual(escape_item(value), "'-36:30:30.000001'")
-        self.assertEqual(encode_item(value), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, True, True), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, False, True), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, False, False), "'-36:30:30.000001'")
 
         value = np.timedelta64(value)
-        self.assertEqual(escape_item(value), "'-36:30:30.000001'")
-        self.assertEqual(encode_item(value), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, True, True), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, False, True), "'-36:30:30.000001'")
+        self.assertEqual(escape(value, False, False), "'-36:30:30.000001'")
 
         self.log_ended(test)
 
     def test_escape_encode_bytes(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE BYTES"
+        test = "ESCAPE BYTES"
         self.log_start(test)
 
         value = b"foo\nbar"
-        self.assertEqual(escape_item(value), "_binary'foo\\nbar'")
-        self.assertEqual(encode_item(value), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, True, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, False), "_binary'foo\\nbar'")
 
         value = bytearray(value)
-        self.assertEqual(escape_item(value), "_binary'foo\\nbar'")
-        self.assertEqual(encode_item(value), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, True, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, False), "_binary'foo\\nbar'")
 
         value = memoryview(value)
-        self.assertEqual(escape_item(value), "_binary'foo\\nbar'")
-        self.assertEqual(encode_item(value), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, True, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, True), "_binary'foo\\nbar'")
+        self.assertEqual(escape(value, False, False), "_binary'foo\\nbar'")
+
         self.log_ended(test)
 
     def test_escape_encode_decimal(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE DECIMAL"
+        test = "ESCAPE DECIMAL"
         self.log_start(test)
 
         value = decimal.Decimal("1.2345")
-        self.assertEqual(escape_item(value), "1.2345")
-        self.assertEqual(encode_item(value), "1.2345")
+        self.assertEqual(escape(value, True, True), "1.2345")
+        self.assertEqual(escape(value, False, True), "1.2345")
+        self.assertEqual(escape(value, False, False), "1.2345")
+
         self.log_ended(test)
 
     def test_escape_encode_dict(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE DICT"
+        test = "ESCAPE DICT"
         self.log_start(test)
 
-        self.assertEqual(escape_item(self.data), "(%s)" % ",".join(self.espe))
-        self.assertEqual(encode_item(self.data), self.espe)
+        val_item = escape(self.data, False, True)
+        self.assertEqual(val_item, escape(self.data, True, True))
+        val_lstr = escape(self.data, False, False)
+        self.assertEqual(val_lstr, "(%s)" % ",".join(val_item))
+
         self.log_ended(test)
 
     def test_escape_encode_sequence(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE SEQUENCE"
+        test = "ESCAPE SEQUENCE"
         self.log_start(test)
 
+        # List & Tuple
+        data = {
+            k: v
+            for k, v in self.data.items()
+            if k not in ("dict", "list", "tuple", "set", "fset")
+        }
         for dtype in (list, tuple):
-            vals_itm = dtype(self.data.values())
-            self.assertEqual(escape_item(vals_itm), "(%s)" % ",".join(self.espe))
-            self.assertEqual(encode_item(vals_itm), self.espe)
+            seq = dtype(data.values())
+            val_item = escape(seq, False, True)
+            self.assertTrue(type(val_item) is tuple)
+            val_many = escape(seq, True, True)
+            self.assertTrue(type(val_many) is list)
+            self.assertEqual(val_item, tuple(val_many))
+
+            seq = dtype(self.data.values())
+            val_item = escape(seq, False, True)
+            self.assertTrue(type(val_item) is tuple)
+            self.assertEqual({type(i) for i in val_item}, {str})
+
+            val_many = escape(seq, True, True)
+            self.assertTrue(type(val_many) is list)
+            self.assertTrue({type(i) for i in val_many}, {str, tuple})
 
         data = (True, 1, 0, -1, 1.1, -1.1)
-        espe = ("0", "1", "-1.1", "-1", "1.1")
         for dtype in (set, frozenset):
-            vals_set = dtype(data)
-            vals_itm = dtype(encode_item(vals_set))
-            self.assertEqual(vals_itm, dtype(espe))
+            seq = dtype(data)
+            val_item = escape(seq, False, True)
+            self.assertEqual(val_item, escape(seq, True, True))
+            val_astr = escape(seq, False, False)
+            self.assertEqual(val_astr, "(%s)" % ",".join(val_item))
 
         self.log_ended(test)
 
     def test_escape_encode_ndarray_series(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE NDARRAY/SERIES"
+        test = "ESCAPE NDARRAY/SERIES"
         self.log_start(test)
 
         # . float
         value = list(range(-2, 3))
         for dtype in (np.float16, np.float32, np.float64):
+            # ndarray
             data = np.array(value, dtype=dtype)
-            self.assertEqual(escape_item(data), "(-2.0,-1.0,0.0,1.0,2.0)")
-            self.assertEqual(escape_item(pd.Series(data)), "(-2.0,-1.0,0.0,1.0,2.0)")
-            self.assertEqual(encode_item(data), ("-2.0", "-1.0", "0.0", "1.0", "2.0"))
-            self.assertEqual(
-                encode_item(pd.Series(data)), ("-2.0", "-1.0", "0.0", "1.0", "2.0")
-            )
+            comp = tuple(escape(i, False, False) for i in data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+            # Series
+            data = pd.Series(data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . integer
         for dtype in (np.int8, np.int16, np.int32, np.int64):
             data = np.array(value, dtype=dtype)
-            self.assertEqual(escape_item(data), "(-2,-1,0,1,2)")
-            self.assertEqual(escape_item(pd.Series(data)), "(-2,-1,0,1,2)")
-            self.assertEqual(encode_item(data), ("-2", "-1", "0", "1", "2"))
-            self.assertEqual(encode_item(pd.Series(data)), ("-2", "-1", "0", "1", "2"))
+            comp = tuple(escape(i, False, False) for i in data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+            # Series
+            data = pd.Series(data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . unsigned integer
         value = list(range(0, 5))
         for dtype in (np.uint8, np.uint16, np.uint32, np.uint64):
             data = np.array(value, dtype=dtype)
-            self.assertEqual(escape_item(data), "(0,1,2,3,4)")
-            self.assertEqual(escape_item(pd.Series(data)), "(0,1,2,3,4)")
-            self.assertEqual(encode_item(data), ("0", "1", "2", "3", "4"))
-            self.assertEqual(encode_item(pd.Series(data)), ("0", "1", "2", "3", "4"))
+            comp = tuple(escape(i, False, False) for i in data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+            # Series
+            data = pd.Series(data)
+            self.assertEqual(escape(data, True, True), comp)
+            self.assertEqual(escape(data, False, True), comp)
+            self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . bool
         data = np.array([True, False], dtype=np.bool_)
-        self.assertEqual(escape_item(data), "(1,0)")
-        self.assertEqual(escape_item(pd.Series(data)), "(1,0)")
-        self.assertEqual(encode_item(data), ("1", "0"))
-        self.assertEqual(encode_item(pd.Series(data)), ("1", "0"))
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . datetime64
         data = np.array([1, 2], dtype="datetime64[s]")
-        self.assertEqual(
-            escape_item(data), "('1970-01-01 00:00:01','1970-01-01 00:00:02')"
-        )
-        self.assertEqual(
-            escape_item(pd.Series(data)),
-            "('1970-01-01 00:00:01','1970-01-01 00:00:02')",
-        )
-        self.assertEqual(
-            encode_item(data), ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'")
-        )
-        self.assertEqual(
-            encode_item(pd.Series(data)),
-            ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'"),
-        )
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . timedelta64
         data = np.array([1, 2], dtype="timedelta64[s]")
-        self.assertEqual(escape_item(data), "('00:00:01','00:00:02')")
-        self.assertEqual(escape_item(pd.Series(data)), "('00:00:01','00:00:02')")
-        self.assertEqual(encode_item(data), ("'00:00:01'", "'00:00:02'"))
-        self.assertEqual(encode_item(pd.Series(data)), ("'00:00:01'", "'00:00:02'"))
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . bytes
         data = np.array([b"foo", b"bar"], dtype="S")
-        self.assertEqual(escape_item(data), "(_binary'foo',_binary'bar')")
-        self.assertEqual(escape_item(pd.Series(data)), "(_binary'foo',_binary'bar')")
-        self.assertEqual(encode_item(data), ("_binary'foo'", "_binary'bar'"))
-        self.assertEqual(encode_item(pd.Series(data)), ("_binary'foo'", "_binary'bar'"))
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . unicode
         data = np.array(["foo", "bar"], dtype="U")
-        self.assertEqual(escape_item(data), "('foo','bar')")
-        self.assertEqual(escape_item(pd.Series(data)), "('foo','bar')")
-        self.assertEqual(encode_item(data), ("'foo'", "'bar'"))
-        self.assertEqual(encode_item(pd.Series(data)), ("'foo'", "'bar'"))
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         # . object
         data = np.array([1, "foo", 1.1, True], dtype="O")
-        self.assertEqual(escape_item(data), "(1,'foo',1.1,1)")
-        self.assertEqual(escape_item(pd.Series(data)), "(1,'foo',1.1,1)")
-        self.assertEqual(encode_item(data), ("1", "'foo'", "1.1", "1"))
-        self.assertEqual(encode_item(pd.Series(data)), ("1", "'foo'", "1.1", "1"))
+        comp = tuple(escape(i, False, False) for i in data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
+        data = pd.Series(data)
+        self.assertEqual(escape(data, True, True), comp)
+        self.assertEqual(escape(data, False, True), comp)
+        self.assertEqual(escape(data, False, False), "(%s)" % ",".join(comp))
 
         self.log_ended(test)
 
     def test_escape_encode_dataframe(self) -> None:
-        from sqlcycli.transcode import escape_item, encode_item
+        from sqlcycli.transcode import escape
 
-        test = "ESCAPE/ENCODE DATAFRAME"
+        test = "ESCAPE DATAFRAME"
         self.log_start(test)
 
         data = pd.DataFrame([self.data] * 2)
-        espe = "(%s)" % ",".join(self.espe)
-        self.assertEqual(escape_item(data), "%s,%s" % (espe, espe))
-        self.assertEqual(encode_item(data), (self.espe, self.espe))
+        val_item = escape(data, False, True)
+        self.assertEqual(val_item, escape(data, True, True))
+        val_astr = escape(data, False, False)
+        self.assertEqual(
+            val_astr, "%s" % ",".join("(%s)" % ",".join(i) for i in val_item)
+        )
+
         self.log_ended(test)
 
     def test_decode(self) -> None:
-        from sqlcycli.transcode import decode_item
+        from sqlcycli.transcode import decode
 
         test = "DECODE"
         self.log_start(test)
 
         # fmt: off
         # . TINYINT
-        self.assertEqual(-1, decode_item(b"-1", 1, b"utf8", False, False, False))
+        self.assertEqual(-1, decode(b"-1", 1, b"utf8", False, False, False))
         # . SMALLINT
-        self.assertEqual(2345, decode_item(b"2345", 2, b"utf8", False, False, False))
+        self.assertEqual(2345, decode(b"2345", 2, b"utf8", False, False, False))
         # . MEDIUMINT
-        self.assertEqual(-456789, decode_item(b"-456789", 9, b"utf8", False, False, False))
+        self.assertEqual(-456789, decode(b"-456789", 9, b"utf8", False, False, False))
         # . INT
-        self.assertEqual(1234567890, decode_item(b"1234567890", 3, b"utf8", False, False, False))
+        self.assertEqual(1234567890, decode(b"1234567890", 3, b"utf8", False, False, False))
         # . BIGINT
         self.assertEqual(-9223372036854775807,
-            decode_item(b"-9223372036854775807", 8, b"utf8", False, False, False))
+            decode(b"-9223372036854775807", 8, b"utf8", False, False, False))
         self.assertEqual(18446744073709551615,
-            decode_item(b"18446744073709551615", 8, b"utf8", False, False, False))
+            decode(b"18446744073709551615", 8, b"utf8", False, False, False))
         # . YEAR
-        self.assertEqual(1970, decode_item(b"1970", 13, b"utf8", False, False, False))
+        self.assertEqual(1970, decode(b"1970", 13, b"utf8", False, False, False))
         # . FLOAT
-        self.assertEqual(5.7, decode_item(b"5.7", 4, b"utf8", False, False, False))
+        self.assertEqual(5.7, decode(b"5.7", 4, b"utf8", False, False, False))
         # . DOUBLE
-        self.assertEqual(-6.7, decode_item(b"-6.7", 5, b"utf8", False, False, False))
+        self.assertEqual(-6.7, decode(b"-6.7", 5, b"utf8", False, False, False))
         # . DECIMAL
-        self.assertEqual(-7.7, decode_item(b"-7.7", 0, b"utf8", False, False, False))
+        self.assertEqual(-7.7, decode(b"-7.7", 0, b"utf8", False, False, False))
         self.assertEqual(decimal.Decimal("-8.7"), 
-            decode_item(b"-8.7", 246, b"utf8", False, True, False))
+            decode(b"-8.7", 246, b"utf8", False, True, False))
         # . DATETIME
         self.assertEqual(datetime.datetime(2014, 5, 15, 7, 45, 57),
-            decode_item(b"2014-05-15 07:45:57", 12, b"utf8", False, False, False))
+            decode(b"2014-05-15 07:45:57", 12, b"utf8", False, False, False))
         self.assertEqual(datetime.datetime(2014, 5, 15, 7, 45, 57, 1000),
-            decode_item(b"2014-05-15 07:45:57.001", 12, b"utf8", False, False, False))
+            decode(b"2014-05-15 07:45:57.001", 12, b"utf8", False, False, False))
         # . TIMESTAMP
         self.assertEqual(datetime.datetime(2014, 5, 15, 7, 45, 57),
-            decode_item(b"2014-05-15 07:45:57", 7, b"utf8", False, False, True))
+            decode(b"2014-05-15 07:45:57", 7, b"utf8", False, False, True))
         self.assertEqual(datetime.datetime(2014, 5, 15, 7, 45, 57, 1000),
-            decode_item(b"2014-05-15 07:45:57.001", 7, b"utf8", False, False, True))
+            decode(b"2014-05-15 07:45:57.001", 7, b"utf8", False, False, True))
         # . DATE
         self.assertEqual(datetime.date(1988, 2, 2),
-            decode_item(b"1988-02-02", 10, b"utf8", False, False, False))
+            decode(b"1988-02-02", 10, b"utf8", False, False, False))
         self.assertEqual(datetime.date(1988, 2, 2),
-            decode_item(b"1988-02-02", 14, b"utf8", False, False, True))
+            decode(b"1988-02-02", 14, b"utf8", False, False, True))
         # . TIME
         self.assertEqual(datetime.timedelta(days=6, seconds=79206),
-            decode_item(b'166:00:06', 11, b"utf8", False, False, False))
+            decode(b'166:00:06', 11, b"utf8", False, False, False))
         self.assertEqual(-datetime.timedelta(days=6, seconds=79206),
-            decode_item(b'-166:00:06', 11, b"utf8", False, False, False))
+            decode(b'-166:00:06', 11, b"utf8", False, False, False))
         self.assertEqual(datetime.timedelta(seconds=59520, microseconds=1000),
-            decode_item(b'16:32:00.001', 11, b"utf8", False, False, False))
+            decode(b'16:32:00.001', 11, b"utf8", False, False, False))
         self.assertEqual(-datetime.timedelta(seconds=59520, microseconds=1000),
-            decode_item(b'-16:32:00.001', 11, b"utf8", False, False, False))
+            decode(b'-16:32:00.001', 11, b"utf8", False, False, False))
         # . CHAR
-        self.assertEqual("char", decode_item(b"char", 254, b"utf8", False, False, False))
+        self.assertEqual("char", decode(b"char", 254, b"utf8", False, False, False))
         # . VARCHAR
-        self.assertEqual("varchar", decode_item(b"varchar", 253, b"utf8", False, False, False))
-        self.assertEqual("varchar", decode_item(b"varchar", 15, b"utf8", False, False, False))
+        self.assertEqual("varchar", decode(b"varchar", 253, b"utf8", False, False, False))
+        self.assertEqual("varchar", decode(b"varchar", 15, b"utf8", False, False, False))
         # . TINYTEXT
-        self.assertEqual("tinytext", decode_item(b"tinytext", 249, b"utf8", False, False, False))
+        self.assertEqual("tinytext", decode(b"tinytext", 249, b"utf8", False, False, False))
         # . TEXT
-        self.assertEqual("text", decode_item(b"text", 252, b"utf8", False, False, False))
+        self.assertEqual("text", decode(b"text", 252, b"utf8", False, False, False))
         # . MEDIUMTEXT
-        self.assertEqual("mediumtext", decode_item(b"mediumtext", 250, b"utf8", False, False, False))
+        self.assertEqual("mediumtext", decode(b"mediumtext", 250, b"utf8", False, False, False))
         # . LONGTEXT
-        self.assertEqual("longtext", decode_item(b"longtext", 251, b"utf8", False, False, False))
+        self.assertEqual("longtext", decode(b"longtext", 251, b"utf8", False, False, False))
         # . BINARY
-        self.assertEqual(b"binary", decode_item(b"binary", 254, b"utf8", True, False, False))
+        self.assertEqual(b"binary", decode(b"binary", 254, b"utf8", True, False, False))
         # . VARBINARY
-        self.assertEqual(b"varbinary", decode_item(b"varbinary", 253, b"utf8", True, False, False))
-        self.assertEqual(b"varbinary", decode_item(b"varbinary", 15, b"utf8", True, False, False))
+        self.assertEqual(b"varbinary", decode(b"varbinary", 253, b"utf8", True, False, False))
+        self.assertEqual(b"varbinary", decode(b"varbinary", 15, b"utf8", True, False, False))
         # . TINYBLOB
-        self.assertEqual(b"tinyblob", decode_item(b"tinyblob", 249, b"utf8", True, False, False))
+        self.assertEqual(b"tinyblob", decode(b"tinyblob", 249, b"utf8", True, False, False))
         # . BLOB
-        self.assertEqual(b"blob", decode_item(b"blob", 252, b"utf8", True, False, False))
+        self.assertEqual(b"blob", decode(b"blob", 252, b"utf8", True, False, False))
         # . MEDIUMBLOB
-        self.assertEqual(b"mediumblob", decode_item(b"mediumblob", 250, b"utf8", True, False, False))
+        self.assertEqual(b"mediumblob", decode(b"mediumblob", 250, b"utf8", True, False, False))
         # . LONGBLOB
-        self.assertEqual(b"longblob", decode_item(b"longblob", 251, b"utf8", True, False, False))
+        self.assertEqual(b"longblob", decode(b"longblob", 251, b"utf8", True, False, False))
         # . BIT
-        self.assertEqual(b"\x01", decode_item(b"\x01", 16, b"utf8", True, False, False))
+        self.assertEqual(b"\x01", decode(b"\x01", 16, b"utf8", True, False, False))
         # . ENUM
-        self.assertEqual("red", decode_item(b"red", 247, b"utf8", False, False, False))
+        self.assertEqual("red", decode(b"red", 247, b"utf8", False, False, False))
         # . SET
-        self.assertEqual({"red", "green"}, decode_item(b"red,green", 248, b"utf8", False, False, False))
+        self.assertEqual({"red", "green"}, decode(b"red,green", 248, b"utf8", False, False, False))
         # . JSON
-        self.assertEqual({"key1": "value1", "key2": 2}, decode_item(b'{"key1": "value1", "key2": 2}', 245, b"utf8", False, False, True))
-        self.assertEqual('{"key1": "value1", "key2": 2}', decode_item(b'{"key1": "value1", "key2": 2}', 245, b"utf8", False, False, False))
-        self.assertEqual({"key": "中国"}, decode_item(b'{"key": "\xe4\xb8\xad\xe5\x9b\xbd"}', 245, b"utf8", False, False, True))
-        self.assertEqual('{"key": "中国"}', decode_item(b'{"key": "\xe4\xb8\xad\xe5\x9b\xbd"}', 245, b"utf8", False, False, False))
-        self.assertEqual({"key": "Español"}, decode_item(b'{"key": "Espa\xc3\xb1ol"}', 245, b"utf8", False, False, True))
-        self.assertEqual('{"key": "Español"}', decode_item(b'{"key": "Espa\xc3\xb1ol"}', 245, b"utf8", False, False, False))
+        self.assertEqual({"key1": "value1", "key2": 2}, decode(b'{"key1": "value1", "key2": 2}', 245, b"utf8", False, False, True))
+        self.assertEqual('{"key1": "value1", "key2": 2}', decode(b'{"key1": "value1", "key2": 2}', 245, b"utf8", False, False, False))
+        self.assertEqual({"key": "中国"}, decode(b'{"key": "\xe4\xb8\xad\xe5\x9b\xbd"}', 245, b"utf8", False, False, True))
+        self.assertEqual('{"key": "中国"}', decode(b'{"key": "\xe4\xb8\xad\xe5\x9b\xbd"}', 245, b"utf8", False, False, False))
+        self.assertEqual({"key": "Español"}, decode(b'{"key": "Espa\xc3\xb1ol"}', 245, b"utf8", False, False, True))
+        self.assertEqual('{"key": "Español"}', decode(b'{"key": "Espa\xc3\xb1ol"}', 245, b"utf8", False, False, False))
         # fmt: on
 
         self.log_ended(test)
@@ -2409,7 +2478,7 @@ class TestConversion(TestCase):
                 # . insert values
                 test_value = '{"hello": "こんにちは"}'
                 cur.execute(
-                    f"INSERT INTO {self.table} " "(id, `json`) values (42, %s)",
+                    f"INSERT INTO {self.table} (id, `json`) values (42, %s)",
                     test_value,
                 )
                 # . decode_json = False
@@ -2464,7 +2533,7 @@ class TestConversion(TestCase):
                     "varchar",
                 )
                 test_value_bulk = [test_value, test_value, test_value]
-                cur.execute(
+                cur.executemany(
                     "insert into %s (%s) values (%s)"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -2491,7 +2560,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . as v
-                cur.execute(
+                cur.executemany(
                     "insert into %s (%s) values (%s) as v"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -2514,7 +2583,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . on duplicate
-                cur.execute(
+                cur.executemany(
                     "insert into %s (%s) values (%s) on duplicate key update a = values(a)"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -2536,7 +2605,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . as v on duplicate
-                cur.execute(
+                cur.executemany(
                     "insert into %s (%s) values (%s) as v on duplicate key update a = v.a"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -2568,6 +2637,8 @@ class TestCursor(TestCase):
     fred = {"name": "fred", "age": 100, "DOB": datetime.datetime(1911, 9, 12, 1, 1, 1)}
 
     def test_all(self) -> None:
+        self.test_properties()
+        self.test_mogrify()
         self.test_fetch_no_result()
         self.test_fetch_single_tuple()
         self.test_fetch_aggregates()
@@ -2593,6 +2664,85 @@ class TestCursor(TestCase):
         self.test_transaction()
         self.test_scroll()
         self.test_procedure()
+
+    def test_properties(self) -> None:
+        from sqlcycli.protocol import FieldDescriptorPacket
+
+        test = "PROPERTIES"
+        self.log_start(test)
+
+        with self.setup() as conn:
+            with conn.cursor() as cur:
+                ##################################################################
+                cur.execute(
+                    f"create table {self.table} (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, value INT)"
+                )
+                cur.execute(f"insert into {self.table} (value) values (1),(2)")
+                self.assertTrue(cur.executed_sql.startswith(b"insert into"))
+                self.assertEqual(cur.field_count, 0)
+                self.assertIsNone(cur.fields)
+                self.assertEqual(cur.insert_id, 1)
+                self.assertEqual(cur.affected_rows, 2)
+                self.assertEqual(cur.rownumber, 0)
+                self.assertEqual(cur.warning_count, 0)
+                self.assertEqual(cur.rowcount, 2)
+                self.assertIsNone(cur.description)
+
+                cur.execute(f"SELECT value FROM {self.table} where value in (1)")
+                self.assertTrue(cur.executed_sql.startswith(b"SELECT value FROM"))
+                self.assertEqual(cur.field_count, 1)
+                self.assertEqual(type(cur.fields[0]), FieldDescriptorPacket)
+                self.assertEqual(cur.insert_id, 0)
+                self.assertEqual(cur.affected_rows, 1)
+                self.assertEqual(cur.rownumber, 0)
+                self.assertEqual(cur.warning_count, 0)
+                self.assertEqual(cur.rowcount, 1)
+                self.assertEqual(len(cur.description[0]), 7)
+                cur.fetchall()
+                self.assertEqual(cur.rownumber, 1)
+
+                ##################################################################
+                self.drop(conn)
+        self.log_ended(test)
+
+    def test_mogrify(self) -> None:
+        test = "MOGRIFY"
+        self.log_start(test)
+        
+        with self.setup() as conn:
+            with conn.cursor() as cur:
+                # No args
+                sql = "SELECT * FROM foo"
+                self.assertEqual(cur.mogrify(sql), sql)
+                # one arg
+                sql = "SELECT * FROM foo WHERE bar = %s"
+                self.assertEqual(
+                    cur.mogrify(sql, 42), "SELECT * FROM foo WHERE bar = 42"
+                )
+                # one row
+                sql = "INSERT INTO foo (bar) VALUES (%s, %s)"
+                self.assertEqual(
+                    cur.mogrify(sql, (42, 43)), "INSERT INTO foo (bar) VALUES (42, 43)"
+                )
+                # multi-rows
+                sql = "INSERT INTO foo (bar) VALUES (%s, %s)"
+                self.assertEqual(
+                    cur.mogrify(sql, [(42, 43), (44, 45)], many=True),
+                    "INSERT INTO foo (bar) VALUES (42, 43)",
+                )
+                sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
+                self.assertEqual(
+                    cur.mogrify(sql, ([(1, 2, 3), 42], [(4, 5, 6), 42]), many=True),
+                    "SELECT * FROM foo WHERE bar IN (1,2,3) AND foo = 42",
+                )
+
+                sql = "SELECT * FROM foo"
+                self.assertEqual(cur.mogrify(sql, (), many=True), sql)
+                with self.assertRaises(errors.InvalidSQLArgsErorr):
+                    sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
+                    print(cur.mogrify(sql, (), many=True))
+
+        self.log_ended(test)
 
     def test_fetch_no_result(self) -> None:
         test = "FETCH NO RESULT"
@@ -2635,10 +2785,8 @@ class TestCursor(TestCase):
             with conn.cursor() as cur:
                 ##################################################################
                 cur.execute(f"create table {self.table} (id integer primary key)")
-                cur.execute(
-                    f"insert into {self.table} (id) values (%s)",
-                    range(10),
-                    force_many=True,
+                cur.executemany(
+                    f"insert into {self.table} (id) values (%s)", tuple(range(10))
                 )
                 cur.execute(f"SELECT sum(id) FROM {self.table}")
                 row = cur.fetchone()
@@ -2741,15 +2889,14 @@ class TestCursor(TestCase):
                 self.assertEqual(cur.fetchone(), (1, 2))
                 self.delete(conn)
 
-                # . insert force_many=True
+                # . insert many
                 # . argument range(10) should be escaped into
                 # . tuple of str ('0', '1', ..., '9') but instead of being
                 # . formatted into the sql as one row, it should be formatted
                 # . as multiple rows values.
-                cur.execute(
+                cur.executemany(
                     f"insert into {self.table} (i) values (%s)",
-                    range(10),
-                    force_many=True,
+                    list(range(10)),
                 )
                 self.assertEqual(
                     cur.executed_sql.endswith(
@@ -2761,12 +2908,12 @@ class TestCursor(TestCase):
                 self.assertEqual(cur.fetchall(), tuple((i,) for i in range(10)))
                 self.delete(conn)
 
-                # . insert force_many=True & itemize=False
-                # . force_many should automatically set itemize to True.
+                # . insert many
+                # . many should automatically set itemize to True.
                 cur.execute(
                     f"insert into {self.table} (i) values (%s)",
-                    range(10),
-                    force_many=True,
+                    list(range(10)),
+                    many=True,
                     itemize=False,
                 )
                 self.assertEqual(
@@ -2879,10 +3026,8 @@ class TestCursor(TestCase):
             #  values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
             # list args
             with conn.cursor() as cur:
-                cur.execute(
-                    f"insert into {self.table} (data) values (%s)",
-                    range(10),
-                    force_many=True,
+                cur.executemany(
+                    f"insert into {self.table} (data) values (%s)", list(range(10))
                 )
                 self.assertTrue(
                     cur.executed_sql.endswith(b",(7),(8),(9)"),
@@ -2903,7 +3048,7 @@ class TestCursor(TestCase):
                     f"INSERT INTO {self.db}.percent_test (`A%%`, `B%%`) VALUES (%s, %s)"
                 )
                 self.assertIsNotNone(INSERT_VALUES_RE.match(sql))
-                cur.execute(sql, [(3, 4), (5, 6)])
+                cur.executemany(sql, [(3, 4), (5, 6)])
                 self.assertTrue(
                     cur.executed_sql.endswith(b"(3, 4),(5, 6)"),
                     "executemany with %% not in one query",
@@ -3050,7 +3195,7 @@ class TestCursor(TestCase):
 
                     # Test cursor.row_number
                     self.assertEqual(
-                        cur.row_number, index, "cursor.row_number != %s" % (str(index))
+                        cur.rownumber, index, "cursor.row_number != %s" % (str(index))
                     )
 
                     # Test row came out the same as it went in
@@ -3085,7 +3230,7 @@ class TestCursor(TestCase):
                 )
 
                 # Test executemany
-                cur.execute(f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data)
+                cur.executemany(f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data)
                 self.assertEqual(
                     cur.affected_rows,
                     len(data),
@@ -3096,11 +3241,11 @@ class TestCursor(TestCase):
                 # Test multiple datasets
                 cur.execute("SELECT 1; SELECT 2; SELECT 3")
                 self.assertListEqual(list(cur), [(1,)])
-                self.assertTrue(cur.next_set())
+                self.assertTrue(cur.nextset())
                 self.assertListEqual(list(cur), [(2,)])
-                self.assertTrue(cur.next_set())
+                self.assertTrue(cur.nextset())
                 self.assertListEqual(list(cur), [(3,)])
-                self.assertFalse(cur.next_set())
+                self.assertFalse(cur.nextset())
 
                 ##################################################################
                 self.drop(conn)
@@ -3235,10 +3380,10 @@ class TestCursor(TestCase):
             with conn.cursor() as cur:
                 cur.execute("SELECT 1; SELECT 2;")
                 self.assertEqual([(1,)], list(cur))
-                res = cur.next_set()
+                res = cur.nextset()
                 self.assertEqual(res, True)
                 self.assertEqual([(2,)], list(cur))
-                self.assertEqual(cur.next_set(), False)
+                self.assertEqual(cur.nextset(), False)
         self.log_ended(test)
 
     def test_skip_next_set(self) -> None:
@@ -3264,7 +3409,7 @@ class TestCursor(TestCase):
                     cur.execute("SELECT %s; xyzzy;", (i,))
                     self.assertEqual([(i,)], list(cur))
                     with self.assertRaises(errors.ProgrammingError):
-                        cur.next_set()
+                        cur.nextset()
                     self.assertEqual((), cur.fetchall())
         self.log_ended(test)
 
@@ -3276,10 +3421,10 @@ class TestCursor(TestCase):
             with conn.cursor() as cur:
                 cur.execute("SELECT 1; commit; SELECT 2;")
                 self.assertEqual([(1,)], list(cur))
-                self.assertTrue(cur.next_set())
-                self.assertTrue(cur.next_set())
+                self.assertTrue(cur.nextset())
+                self.assertTrue(cur.nextset())
                 self.assertEqual([(2,)], list(cur))
-                self.assertFalse(cur.next_set())
+                self.assertFalse(cur.nextset())
         self.log_ended(test)
 
     def test_multi_statement_warnings(self):
@@ -3337,7 +3482,7 @@ class TestCursor(TestCase):
                 cur.execute(
                     f"create table {self.table} (name char(20), age int, DOB datetime)"
                 )
-                cur.execute(
+                cur.executemany(
                     f"insert into {self.table} values (%s, %s, %s)",
                     [
                         ("bob", 21, "1990-02-06 23:04:56"),
@@ -3435,7 +3580,7 @@ class TestCursor(TestCase):
                     cur.scroll(0, "absolute")
                 cur.scroll(10)
                 self.assertEqual(cur.fetchone(), None)
-                self.assertEqual(cur.row_number, 5)
+                self.assertEqual(cur.rownumber, 5)
 
             # ##################################################################
             self.drop(conn)
@@ -3501,10 +3646,9 @@ class TestCursor(TestCase):
         tb = self.tb if table is None else table
         with conn.cursor() as cur:
             cur.execute(f"create table {self.db}.{tb} (data varchar(10))")
-            cur.execute(
+            cur.executemany(
                 f"insert into {self.db}.{tb} values (%s)",
                 ["row%d" % i for i in range(1, 6)],
-                force_many=True,
             )
         conn.commit()
         return conn
@@ -3516,7 +3660,7 @@ class TestCursor(TestCase):
             cur.execute(
                 f"create table {self.db}.{tb} (name char(20), age int, DOB datetime)"
             )
-            cur.execute(
+            cur.executemany(
                 f"insert into {self.db}.{tb} values (%s, %s, %s)",
                 [
                     ("bob", 21, "1990-02-06 23:04:56"),
@@ -4153,13 +4297,13 @@ class TestGitHubIssues(TestCase):
                 cur.execute(usql, values)
 
                 # test multi insert and select
-                cur.execute(sql, args=(values, values, values))
+                cur.executemany(sql, args=(values, values, values))
                 cur.execute(f"select * from {self.table}")
                 for row in cur:
                     self.assertEqual(row, values)
 
                 # test multi insert with unicode query
-                cur.execute(usql, args=(values, values, values))
+                cur.executemany(usql, args=(values, values, values))
 
             self.drop(conn)
         self.log_ended(test)

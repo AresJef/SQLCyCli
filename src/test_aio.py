@@ -138,6 +138,9 @@ class TestConnection(TestCase):
             self.assertEqual(conn.insert_id, 0)
         self.log_ended(test)
 
+    
+
+
     async def test_set_charset(self):
         test = "SET CHARACTER SET"
         self.log_start(test)
@@ -1679,7 +1682,7 @@ class TestConversion(TestCase):
                     "varchar",
                 )
                 test_value_bulk = [test_value, test_value, test_value]
-                await cur.execute(
+                await cur.executemany(
                     "insert into %s (%s) values (%s)"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -1706,7 +1709,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . as v
-                await cur.execute(
+                await cur.executemany(
                     "insert into %s (%s) values (%s) as v"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -1729,7 +1732,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . on duplicate
-                await cur.execute(
+                await cur.executemany(
                     "insert into %s (%s) values (%s) on duplicate key update a = values(a)"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -1751,7 +1754,7 @@ class TestConversion(TestCase):
 
                 ##################################################################
                 # . as v on duplicate
-                await cur.execute(
+                await cur.executemany(
                     "insert into %s (%s) values (%s) as v on duplicate key update a = v.a"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
                     test_value_bulk,
@@ -1783,6 +1786,8 @@ class TestCursor(TestCase):
     fred = {"name": "fred", "age": 100, "DOB": datetime.datetime(1911, 9, 12, 1, 1, 1)}
 
     async def test_all(self) -> None:
+        await self.test_properties()
+        await self.test_mogrify()
         await self.test_fetch_no_result()
         await self.test_fetch_single_tuple()
         await self.test_fetch_aggregates()
@@ -1809,6 +1814,85 @@ class TestCursor(TestCase):
         await self.test_scroll()
         await self.test_procedure()
         await self.test_execute_cancel()
+
+    async def test_properties(self) -> None:
+        from sqlcycli.protocol import FieldDescriptorPacket
+
+        test = "PROPERTIES"
+        self.log_start(test)
+
+        async with await self.setup() as conn:
+            async with conn.cursor() as cur:
+                ##################################################################
+                await cur.execute(
+                    f"create table {self.table} (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, value INT)"
+                )
+                await cur.execute(f"insert into {self.table} (value) values (1),(2)")
+                self.assertTrue(cur.executed_sql.startswith(b"insert into"))
+                self.assertEqual(cur.field_count, 0)
+                self.assertIsNone(cur.fields)
+                self.assertEqual(cur.insert_id, 1)
+                self.assertEqual(cur.affected_rows, 2)
+                self.assertEqual(cur.rownumber, 0)
+                self.assertEqual(cur.warning_count, 0)
+                self.assertEqual(cur.rowcount, 2)
+                self.assertIsNone(cur.description)
+
+                await cur.execute(f"SELECT value FROM {self.table} where value in (1)")
+                self.assertTrue(cur.executed_sql.startswith(b"SELECT value FROM"))
+                self.assertEqual(cur.field_count, 1)
+                self.assertEqual(type(cur.fields[0]), FieldDescriptorPacket)
+                self.assertEqual(cur.insert_id, 0)
+                self.assertEqual(cur.affected_rows, 1)
+                self.assertEqual(cur.rownumber, 0)
+                self.assertEqual(cur.warning_count, 0)
+                self.assertEqual(cur.rowcount, 1)
+                self.assertEqual(len(cur.description[0]), 7)
+                await cur.fetchall()
+                self.assertEqual(cur.rownumber, 1)
+
+                ##################################################################
+                await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_mogrify(self) -> None:
+        test = "MOGRIFY"
+        self.log_start(test)
+
+        async with await self.setup() as conn:
+            async with conn.cursor() as cur:
+                # No args
+                sql = "SELECT * FROM foo"
+                self.assertEqual(cur.mogrify(sql), sql)
+                # one arg
+                sql = "SELECT * FROM foo WHERE bar = %s"
+                self.assertEqual(
+                    cur.mogrify(sql, 42), "SELECT * FROM foo WHERE bar = 42"
+                )
+                # one row
+                sql = "INSERT INTO foo (bar) VALUES (%s, %s)"
+                self.assertEqual(
+                    cur.mogrify(sql, (42, 43)), "INSERT INTO foo (bar) VALUES (42, 43)"
+                )
+                # multi-rows
+                sql = "INSERT INTO foo (bar) VALUES (%s, %s)"
+                self.assertEqual(
+                    cur.mogrify(sql, [(42, 43), (44, 45)], many=True),
+                    "INSERT INTO foo (bar) VALUES (42, 43)",
+                )
+                sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
+                self.assertEqual(
+                    cur.mogrify(sql, ([(1, 2, 3), 42], [(4, 5, 6), 42]), many=True),
+                    "SELECT * FROM foo WHERE bar IN (1,2,3) AND foo = 42",
+                )
+
+                sql = "SELECT * FROM foo"
+                self.assertEqual(cur.mogrify(sql, (), many=True), sql)
+                with self.assertRaises(errors.InvalidSQLArgsErorr):
+                    sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
+                    print(cur.mogrify(sql, (), many=True))
+
+        self.log_ended(test)
 
     async def test_fetch_no_result(self) -> None:
         test = "FETCH NO RESULT"
@@ -1851,10 +1935,8 @@ class TestCursor(TestCase):
             async with conn.cursor() as cur:
                 ##################################################################
                 await cur.execute(f"create table {self.table} (id integer primary key)")
-                await cur.execute(
-                    f"insert into {self.table} (id) values (%s)",
-                    range(10),
-                    force_many=True,
+                await cur.executemany(
+                    f"insert into {self.table} (id) values (%s)", tuple(range(10))
                 )
                 await cur.execute(f"SELECT sum(id) FROM {self.table}")
                 row = await cur.fetchone()
@@ -1967,15 +2049,13 @@ class TestCursor(TestCase):
                 self.assertEqual(await cur.fetchone(), (1, 2))
                 await self.delete(conn)
 
-                # . insert force_many=True
+                # . insert many
                 # . argument range(10) should be escaped into
                 # . tuple of str ('0', '1', ..., '9') but instead of being
                 # . formatted into the sql as one row, it should be formatted
                 # . as multiple rows values.
-                await cur.execute(
-                    f"insert into {self.table} (i) values (%s)",
-                    range(10),
-                    force_many=True,
+                await cur.executemany(
+                    f"insert into {self.table} (i) values (%s)", list(range(10))
                 )
                 self.assertEqual(
                     cur.executed_sql.endswith(
@@ -1987,12 +2067,12 @@ class TestCursor(TestCase):
                 self.assertEqual(await cur.fetchall(), tuple((i,) for i in range(10)))
                 await self.delete(conn)
 
-                # . insert force_many=True & itemize=False
-                # . force_many should automatically set itemize to True.
+                # . insert many
+                # . many should automatically set itemize to True.
                 await cur.execute(
                     f"insert into {self.table} (i) values (%s)",
-                    range(10),
-                    force_many=True,
+                    list(range(10)),
+                    many=True,
                     itemize=False,
                 )
                 self.assertEqual(
@@ -2105,10 +2185,8 @@ class TestCursor(TestCase):
             #  values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
             # list args
             async with conn.cursor() as cur:
-                await cur.execute(
-                    f"insert into {self.table} (data) values (%s)",
-                    range(10),
-                    force_many=True,
+                await cur.executemany(
+                    f"insert into {self.table} (data) values (%s)", list(range(10))
                 )
                 self.assertTrue(
                     cur.executed_sql.endswith(b",(7),(8),(9)"),
@@ -2129,7 +2207,7 @@ class TestCursor(TestCase):
                     f"INSERT INTO {self.db}.percent_test (`A%%`, `B%%`) VALUES (%s, %s)"
                 )
                 self.assertIsNotNone(INSERT_VALUES_RE.match(sql))
-                await cur.execute(sql, [(3, 4), (5, 6)])
+                await cur.executemany(sql, [(3, 4), (5, 6)])
                 self.assertTrue(
                     cur.executed_sql.endswith(b"(3, 4),(5, 6)"),
                     "executemany with %% not in one query",
@@ -2278,7 +2356,7 @@ class TestCursor(TestCase):
 
                     # Test cursor.row_number
                     self.assertEqual(
-                        cur.row_number, index, "cursor.row_number != %s" % (str(index))
+                        cur.rownumber, index, "cursor.row_number != %s" % (str(index))
                     )
 
                     # Test row came out the same as it went in
@@ -2313,7 +2391,7 @@ class TestCursor(TestCase):
                 )
 
                 # Test executemany
-                await cur.execute(f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data)
+                await cur.executemany(f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data)
                 self.assertEqual(
                     cur.affected_rows,
                     len(data),
@@ -2324,11 +2402,11 @@ class TestCursor(TestCase):
                 # Test multiple datasets
                 await cur.execute("SELECT 1; SELECT 2; SELECT 3")
                 self.assertListEqual(list(await cur), [(1,)])
-                await cur.next_set()
+                await cur.nextset()
                 self.assertListEqual(list(await cur), [(2,)])
-                await cur.next_set()
+                await cur.nextset()
                 self.assertListEqual(list(await cur), [(3,)])
-                await cur.next_set()
+                await cur.nextset()
 
                 ##################################################################
                 await self.drop(conn)
@@ -2465,10 +2543,10 @@ class TestCursor(TestCase):
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1; SELECT 2;")
                 self.assertEqual([(1,)], list(await cur))
-                res = await cur.next_set()
+                res = await cur.nextset()
                 self.assertEqual(res, True)
                 self.assertEqual([(2,)], list(await cur))
-                self.assertEqual(await cur.next_set(), False)
+                self.assertEqual(await cur.nextset(), False)
         self.log_ended(test)
 
     async def test_skip_next_set(self) -> None:
@@ -2494,7 +2572,7 @@ class TestCursor(TestCase):
                     await cur.execute("SELECT %s; xyzzy;", (i,))
                     self.assertEqual([(i,)], list(await cur))
                     with self.assertRaises(errors.ProgrammingError):
-                        await cur.next_set()
+                        await cur.nextset()
                     self.assertEqual((), await cur.fetchall())
         self.log_ended(test)
 
@@ -2506,10 +2584,10 @@ class TestCursor(TestCase):
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1; commit; SELECT 2;")
                 self.assertEqual([(1,)], list(await cur))
-                self.assertTrue(await cur.next_set())
-                self.assertTrue(await cur.next_set())
+                self.assertTrue(await cur.nextset())
+                self.assertTrue(await cur.nextset())
                 self.assertEqual([(2,)], list(await cur))
-                self.assertFalse(await cur.next_set())
+                self.assertFalse(await cur.nextset())
         self.log_ended(test)
 
     async def test_multi_statement_warnings(self):
@@ -2567,7 +2645,7 @@ class TestCursor(TestCase):
                 await cur.execute(
                     f"create table {self.table} (name char(20), age int, DOB datetime)"
                 )
-                await cur.execute(
+                await cur.executemany(
                     f"insert into {self.table} values (%s, %s, %s)",
                     [
                         ("bob", 21, "1990-02-06 23:04:56"),
@@ -2665,7 +2743,7 @@ class TestCursor(TestCase):
                     await cur.scroll(0, "absolute")
                 await cur.scroll(10)
                 self.assertEqual(await cur.fetchone(), None)
-                self.assertEqual(cur.row_number, 5)
+                self.assertEqual(cur.rownumber, 5)
 
             # ##################################################################
             await self.drop(conn)
@@ -2757,10 +2835,9 @@ class TestCursor(TestCase):
         tb = self.tb if table is None else table
         async with conn.cursor() as cur:
             await cur.execute(f"create table {self.db}.{tb} (data varchar(10))")
-            await cur.execute(
+            await cur.executemany(
                 f"insert into {self.db}.{tb} values (%s)",
                 ["row%d" % i for i in range(1, 6)],
-                force_many=True,
             )
         await conn.commit()
         return conn
@@ -2772,7 +2849,7 @@ class TestCursor(TestCase):
             await cur.execute(
                 f"create table {self.db}.{tb} (name char(20), age int, DOB datetime)"
             )
-            await cur.execute(
+            await cur.executemany(
                 f"insert into {self.db}.{tb} values (%s, %s, %s)",
                 [
                     ("bob", 21, "1990-02-06 23:04:56"),
@@ -3361,13 +3438,13 @@ class TestGitHubIssues(TestCase):
                 await cur.execute(usql, values)
 
                 # test multi insert and select
-                await cur.execute(sql, args=(values, values, values))
+                await cur.executemany(sql, args=(values, values, values))
                 await cur.execute(f"select * from {self.table}")
                 async for row in cur:
                     self.assertEqual(row, values)
 
                 # test multi insert with unicode query
-                await cur.execute(usql, args=(values, values, values))
+                await cur.executemany(usql, args=(values, values, values))
 
             await self.drop(conn)
         self.log_ended(test)
