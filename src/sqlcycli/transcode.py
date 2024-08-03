@@ -1710,7 +1710,7 @@ def escape(
           time, timedelta, struct_time, bytes, bytearray, memoryview,
           Decimal, dict, list, tuple, set, frozenset.
         - Library numpy: np.int_, np.uint, np.float_, np.bool_, np.bytes_,
-          np.datetime64, np.timedelta64, np.ndarray.
+          np.str_, np.datetime64, np.timedelta64, np.ndarray.
         - Library pandas: pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
           pd.TimedeltaIndex, pd.Series, pd.DataFrame.
 
