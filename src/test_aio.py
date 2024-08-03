@@ -98,6 +98,7 @@ class TestConnection(TestCase):
         await self.test_connection_exception()
         await self.test_transaction_exception()
         await self.test_warnings()
+        await self.test_connect_function()
 
     async def test_properties(self) -> None:
         test = "PROPERTIES"
@@ -137,9 +138,6 @@ class TestConnection(TestCase):
             self.assertEqual(conn.affected_rows, 0)
             self.assertEqual(conn.insert_id, 0)
         self.log_ended(test)
-
-    
-
 
     async def test_set_charset(self):
         test = "SET CHARACTER SET"
@@ -383,6 +381,30 @@ class TestConnection(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_connect_function(self):
+        from sqlcycli._connect import connect
+
+        test = "CONNECT FUNCTION"
+        self.log_start(test)
+
+        async with connect(
+            host=self.host,
+            user=self.user,
+            password=self.password,
+            unix_socket=self.unix_socket,
+            local_infile=True,
+        ) as conn:
+            self.assertEqual(conn.host, self.host)
+            self.assertEqual(conn.user, self.user)
+            self.assertEqual(conn.password, self.password)
+            self.assertEqual(conn.unix_socket, self.unix_socket)
+            self.assertEqual(conn.local_infile, True)
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 1")
+                self.assertEqual(await cur.fetchone(), (1,))
+
         self.log_ended(test)
 
 
@@ -1788,6 +1810,7 @@ class TestCursor(TestCase):
     async def test_all(self) -> None:
         await self.test_properties()
         await self.test_mogrify()
+        await self.test_acquire_directly()
         await self.test_fetch_no_result()
         await self.test_fetch_single_tuple()
         await self.test_fetch_aggregates()
@@ -1853,6 +1876,25 @@ class TestCursor(TestCase):
 
                 ##################################################################
                 await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_acquire_directly(self) -> None:
+        test = "ACQUIRE DIRECTLY"
+        self.log_start(test)
+
+        async with await self.setup() as conn:
+            ##################################################################
+            try:
+                cur = await conn.cursor()
+                await cur.execute(f"create table {self.table} (id integer primary key)")
+                await cur.execute(f"insert into {self.table} (id) values (1),(2)")
+                await cur.execute(f"SELECT id FROM {self.table} where id in (1)")
+                self.assertEqual(((1,),), await cur.fetchall())
+            finally:
+                await cur.close()
+
+            ##################################################################
+            await self.drop(conn)
         self.log_ended(test)
 
     async def test_mogrify(self) -> None:
@@ -2391,7 +2433,9 @@ class TestCursor(TestCase):
                 )
 
                 # Test executemany
-                await cur.executemany(f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data)
+                await cur.executemany(
+                    f"INSERT INTO {self.table} VALUES (%s, %s, %s)", data
+                )
                 self.assertEqual(
                     cur.affected_rows,
                     len(data),

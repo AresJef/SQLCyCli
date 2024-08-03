@@ -929,6 +929,7 @@ class TestConnection(TestCase):
         self.test_connection_exception()
         self.test_transaction_exception()
         self.test_warnings()
+        self.test_connect_function()
 
     def test_properties(self) -> None:
         test = "PROPERTIES"
@@ -1207,6 +1208,30 @@ class TestConnection(TestCase):
 
                 ##################################################################
                 self.drop(conn)
+        self.log_ended(test)
+
+    def test_connect_function(self):
+        from sqlcycli._connect import connect
+
+        test = "CONNECT FUNCTION"
+        self.log_start(test)
+
+        with connect(
+            host=self.host,
+            user=self.user,
+            password=self.password,
+            unix_socket=self.unix_socket,
+            local_infile=True,
+        ) as conn:
+            self.assertEqual(conn.host, self.host)
+            self.assertEqual(conn.user, self.user)
+            self.assertEqual(conn.password, self.password)
+            self.assertEqual(conn.unix_socket, self.unix_socket)
+            self.assertEqual(conn.local_infile, True)
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                self.assertEqual(cur.fetchone(), (1,))
+
         self.log_ended(test)
 
 
@@ -2639,6 +2664,7 @@ class TestCursor(TestCase):
     def test_all(self) -> None:
         self.test_properties()
         self.test_mogrify()
+        self.test_acquire_directly()
         self.test_fetch_no_result()
         self.test_fetch_single_tuple()
         self.test_fetch_aggregates()
@@ -2708,7 +2734,7 @@ class TestCursor(TestCase):
     def test_mogrify(self) -> None:
         test = "MOGRIFY"
         self.log_start(test)
-        
+
         with self.setup() as conn:
             with conn.cursor() as cur:
                 # No args
@@ -2742,6 +2768,24 @@ class TestCursor(TestCase):
                     sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
                     print(cur.mogrify(sql, (), many=True))
 
+        self.log_ended(test)
+
+    def test_acquire_directly(self) -> None:
+        test = "ACQUIRE DIRECTLY"
+        self.log_start(test)
+
+        with self.setup() as conn:
+            ##################################################################
+            try:
+                cur = conn.cursor()
+                cur.execute(f"create table {self.table} (id integer primary key)")
+                cur.execute(f"insert into {self.table} (id) values (1),(2)")
+                cur.execute(f"SELECT id FROM {self.table} where id in (1)")
+                self.assertEqual(((1,),), cur.fetchall())
+            finally:
+                cur.close()
+            ##################################################################
+            self.drop(conn)
         self.log_ended(test)
 
     def test_fetch_no_result(self) -> None:

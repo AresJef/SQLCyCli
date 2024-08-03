@@ -82,6 +82,7 @@ else:
         folder_extension("constants", "_FIELD_TYPE.py", False),
         folder_extension("constants", "_SERVER_STATUS.py", False),
         extension("_auth.py", True, "-Wno-unreachable-code"),
+        extension("_connect.py", False, "-Wno-unreachable-code"),
         extension("_optionfile.py", False, "-Wno-unreachable-code"),
         extension("_ssl.py", False, "-Wno-unreachable-code"),
         extension("charset.py", False, "-Wno-unreachable-code"),

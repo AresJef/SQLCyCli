@@ -2491,6 +2491,7 @@ class TestCursor(TestCase):
     async def test_all(self) -> None:
         await self.test_properties()
         await self.test_mogrify()
+        await self.test_acquire_directly()
         await self.test_fetch_no_result()
         await self.test_fetch_single_tuple()
         await self.test_fetch_aggregates()
@@ -2562,6 +2563,30 @@ class TestCursor(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_acquire_directly(self) -> None:
+        test = "ACQUIRE DIRECTLY"
+        self.log_start(test)
+
+        async with await self.get_pool() as pool:
+            async with pool.acquire() as conn:
+                await self.setup(conn)
+                ##################################################################
+                try:
+                    cur = await conn.cursor()
+                    await cur.execute(f"create table {self.table} (a varchar(32))")
+                    await cur.execute(
+                        f"insert into {self.table} (a) values (%s)", "mysql"
+                    )
+                    self.assertEqual(None, await cur.fetchone())
+                    self.assertEqual((), await cur.fetchall())
+                    self.assertEqual((), await cur.fetchmany(2))
+                finally:
+                    await cur.close()
+
+                ##################################################################
+                await self.drop(conn)
         self.log_ended(test)
 
     async def test_mogrify(self) -> None:
