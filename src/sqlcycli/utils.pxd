@@ -8,7 +8,7 @@ from cpython.unicode cimport PyUnicode_GET_LENGTH as str_len
 from cpython.unicode cimport PyUnicode_ReadChar as read_char
 from cpython.unicode cimport PyUnicode_Substring as str_substr
 from cpython.unicode cimport PyUnicode_AsEncodedString as str_encode
-from sqlcycli.transcode cimport escape_item
+from sqlcycli.transcode cimport escape
 from sqlcycli._ssl cimport is_ssl, is_ssl_ctx
 from sqlcycli.charset cimport Charset, _charsets
 from sqlcycli import errors
@@ -478,7 +478,7 @@ cdef inline str validate_sql_mode(object sql_mode):
         return None
     # Argument is a string
     if isinstance(sql_mode, str):
-        return escape_item(sql_mode) if str_len(sql_mode) > 0 else None
+        return escape(sql_mode) if str_len(sql_mode) > 0 else None
     # Invalid data type
     raise errors.InvalidConnectionArgsError(
         "Invalid 'sql_mode' argument: %r, expects <'str'> instead of %s." 
