@@ -54,13 +54,16 @@ def folder_extension(
 # Build Extensions
 if platform.system() == "Windows":
     extensions = [
+        # fmt: off
         folder_extension("aio", "connection.py", True),
         folder_extension("aio", "pool.py", True),
+        # fmt: on
         folder_extension("constants", "_CLIENT.py", False),
         folder_extension("constants", "_COMMAND.py", False),
         folder_extension("constants", "_FIELD_TYPE.py", False),
         folder_extension("constants", "_SERVER_STATUS.py", False),
         extension("_auth.py", True),
+        extension("_connect.py", False),
         extension("_optionfile.py", False),
         extension("_ssl.py", False),
         extension("charset.py", False),
