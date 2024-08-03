@@ -9,7 +9,7 @@ from cython.cimports.cpython.dict import PyDict_GetItem as dict_getitem  # type:
 from cython.cimports.cpython.dict import PyDict_Contains as dict_contains  # type: ignore
 
 # Python imports
-from typing import Iterator
+from typing import Iterator, Any
 from sqlcycli import errors
 
 __all__ = [
@@ -235,7 +235,7 @@ class Charsets:
 
     # Access Charset ---------------------------------------------------------------
     @cython.ccall
-    def by_id(self, id: object) -> Charset:
+    def by_id(self, id: int | Any) -> Charset:
         """Get MySQL charset by id `<'Charset'>`.
 
         :param id: `<'int'>` The ID of the charset.
@@ -318,7 +318,7 @@ def all_charsets() -> Charsets:
 
 
 @cython.ccall
-def by_id(id: object) -> Charset:
+def by_id(id: int | Any) -> Charset:
     """Get MySQL charset by id `<'Charset'>`.
 
     :param id: `<'int'>` The ID of the charset.
