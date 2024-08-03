@@ -19,7 +19,7 @@ from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS  # type: ignore
 from cython.cimports.sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket  # type: ignore
-from cython.cimports.sqlcycli.transcode import escape_item, encode_item, decode_item, decode_bytes, decode_bytes_utf8  # type: ignore
+from cython.cimports.sqlcycli.transcode import escape, decode, decode_bytes, decode_bytes_utf8  # type: ignore
 from cython.cimports.sqlcycli import connection as sync_conn, _auth, typeref, utils  # type: ignore
 
 # Python imports
@@ -35,8 +35,8 @@ from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
+from sqlcycli.transcode import escape, decode
 from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
-from sqlcycli.transcode import escape_item, encode_item, decode_item
 from sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS, CR, ER
 from sqlcycli import connection as sync_conn, _auth, typeref, utils, errors
 
@@ -58,6 +58,8 @@ __all__ = [
 # Result --------------------------------------------------------------------------------------
 @cython.cclass
 class MysqlResult:
+    """Represents the result of a query execution."""
+
     # Connection
     _conn: BaseConnection
     _local_file: BufferedReader
@@ -78,6 +80,10 @@ class MysqlResult:
     unbuffered_active: cython.bint
 
     def __init__(self, conn: BaseConnection) -> None:
+        """The result of a query execution.
+
+        :param conn: `<'BaseConnection'>` The connection that executed the query.
+        """
         # Connection
         self._conn = conn
         self._local_file = None
@@ -97,6 +103,11 @@ class MysqlResult:
         self.unbuffered_active = False
 
     async def read(self) -> None:
+        """Read the packet data.
+
+        After read, packet data is accessable through class
+        c-attributes, such as: 'affected_rows', 'fields', etc.
+        """
         try:
             pkt: MysqlPacket = await self._conn._read_packet()
             if pkt.read_ok_packet():
@@ -109,10 +120,9 @@ class MysqlResult:
             self._conn = None
 
     async def init_unbuffered_query(self) -> None:
-        """
-        :raise OperationalError: If the connection to the server is lost.
-        :raise InternalError:
-        """
+        """Initiate unbuffered query mode.
+
+        #### Used in unbuffered mode."""
         self.unbuffered_active = True
         try:
             pkt: MysqlPacket = await self._conn._read_packet()
@@ -138,6 +148,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_ok_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read OKPacket data. Used when the packet
+        is known to be OKPacket `<'bool'>`."""
         self.affected_rows = pkt._affected_rows
         self.insert_id = pkt._insert_id
         self.server_status = pkt._server_status
@@ -147,6 +159,9 @@ class MysqlResult:
         return True
 
     async def _read_load_local_packet(self, pkt: MysqlPacket) -> None:
+        """(internal) Read LoadLocalPacket data. Used when the
+        packet is known to be LoadLocalPacket."""
+
         def opener() -> None:
             try:
                 self._local_file = open(pkt._filename, "rb")
@@ -183,10 +198,7 @@ class MysqlResult:
                             break
                         self._conn._write_packet(chunk)
             except asyncio.CancelledError:
-                self._conn._close_reason = (
-                    "Connection closed: cancelled during execution."
-                )
-                self._conn.force_close()
+                self._conn._close_with_reason("cancelled during execution.")
                 raise
             finally:
                 if self._local_file is not None:
@@ -210,6 +222,8 @@ class MysqlResult:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_eof_packet(self, pkt: MysqlPacket) -> cython.bint:
+        """(cfunc) Read EOFPacket data. Used when the packet
+        is known to be EOFPacket `<'bool'>`."""
         # TODO: Support CLIENT.DEPRECATE_EOF
         # 1) Add DEPRECATE_EOF to CAPABILITIES
         # 2) Mask CAPABILITIES with server_capabilities
@@ -220,6 +234,8 @@ class MysqlResult:
         return True
 
     async def _read_result_packet(self, pkt: MysqlPacket) -> None:
+        """(internal) Read ResultPacket data. Used in buffered mode
+        and the packet is known to be ResultPacket."""
         # Fields
         await self._read_result_packet_fields(pkt)
         # Rows
@@ -237,6 +253,7 @@ class MysqlResult:
         self.rows = list_to_tuple(rows)
 
     async def _read_result_packet_fields(self, pkt: MysqlPacket) -> None:
+        """(internal) Read all the FieldDescriptor packets of the query."""
         self.field_count = pkt.read_length_encoded_integer()
         self.fields = list_to_tuple(
             [
@@ -245,11 +262,13 @@ class MysqlResult:
             ]
         )
         eof_packet: MysqlPacket = await self._conn._read_packet()
-        assert eof_packet.is_eof_packet(), "Protocol error, expecting EOF"
+        if not eof_packet.is_eof_packet():
+            raise AssertionError("Protocol error, expecting EOF")
 
     @cython.cfunc
     @cython.inline(True)
     def _read_result_packet_row(self, pkt: MysqlPacket) -> tuple:
+        """(cfunc) Read and decode one row of data from the query `<'tuple'>`."""
         # Settings
         encoding: cython.pchar = self._conn._encoding_c
         use_decimal: cython.bint = self._use_decimal
@@ -264,7 +283,7 @@ class MysqlResult:
                 # No more columns in this row
                 break
             if value is not None:
-                data = decode_item(
+                data = decode(
                     value,
                     field._type_code,
                     encoding,
@@ -279,6 +298,10 @@ class MysqlResult:
         return list_to_tuple(row)
 
     async def _read_result_packet_row_unbuffered(self) -> tuple:
+        """(internal) Read and decode one row of data
+        from unbuffered query `<'tuple/None'>`
+
+        #### Used in unbuffered mode."""
         # Check if in an active query
         if not self.unbuffered_active:
             return None
@@ -297,35 +320,56 @@ class MysqlResult:
         return row
 
     async def _drain_result_packet_unbuffered(self) -> None:
+        """(internal) Drain all the remaining unbuffered data `<'bool'>`.
+
+        #### Used in unbuffered mode."""
         # After much reading on the protocol, it appears that there is,
         # in fact, no way to stop from sending all the data after
         # executing a query, so we just spin, and wait for an EOF packet.
         while self.unbuffered_active:
             try:
                 pkt: MysqlPacket = await self._conn._read_packet()
+            # If the query timed out we can simply ignore this error
             except errors.OperationalTimeoutError:
-                # if the query timed out we can simply ignore this error
                 self.unbuffered_active = False
                 self._conn = None
                 return None
+            # Release connection before raising the error
+            except:  # noqa:
+                self.unbuffered_active = False
+                self._conn = None
+                raise
+            # Exist when receieved EOFPacket
             if pkt.read_eof_packet():
                 self._read_eof_packet(pkt)
                 self.unbuffered_active = False
                 self._conn = None  # release reference to kill cyclic reference.
+
+    def __del__(self) -> None:
+        if self.unbuffered_active:
+            self._conn = None
 
 
 # Cursor --------------------------------------------------------------------------------------
 # . buffered
 @cython.cclass
 class Cursor:
+    """Represents the `async` cursor (BUFFERED)
+    to interact with the database.
+
+    Fetches data in <'tuple'> or <'tuple[tuple]'>.
+    """
+
     _unbuffered: cython.bint  # Determines whether is SSCursor
     _conn: BaseConnection
     _encoding_c: cython.pchar
     _executed_sql: bytes
+    _arraysize: cython.ulonglong
     _result: MysqlResult
     _field_count: cython.ulonglong
     _fields: tuple[FieldDescriptorPacket]
     _rows: tuple[tuple]
+    _columns: tuple[str]
     _affected_rows: cython.ulonglong
     _row_idx: cython.ulonglong
     _row_size: cython.ulonglong
@@ -333,20 +377,32 @@ class Cursor:
     _warning_count: cython.uint
 
     def __init__(self, conn: BaseConnection) -> None:
-        self._init_setup(conn, False)
+        """The `async` cursor (BUFFERED) to interact with the database.
 
+        :param conn: `<'BaseConnection'>` The connection of the cursor .
+        """
+        self._setup(conn, False)
+
+    # Setup -----------------------------------------------------------------------------------
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _init_setup(
+    def _setup(
         self,
         conn: BaseConnection,
         unbuffered: cython.bint,
     ) -> cython.bint:
+        """(cfunc) Setup the cursor.
+
+        :param conn: `<'BaseConnection'>` The connection of the cursor.
+        :param unbuffered: `<'bool'>` Whether to setup as unbuffered cursor (SSCurosr).
+        """
         self._unbuffered = unbuffered  # Determines whether is SSCursor
         self._conn = conn
         self._encoding_c = conn._encoding_c
         self._executed_sql = None
+        self._arraysize = 1
+        self._columns = None
         self._clear_result()
         return True
 
@@ -355,105 +411,235 @@ class Cursor:
     def executed_sql(self) -> bytes | None:
         """The last 'sql' executed by the cursor `<'bytes/None'>`.
 
-        Notice the 'sql' is in <'bytes'> type, with all arguments (if any)
-        escaped and encoded in the proper format for the server.
+        Notice the 'sql' is in <'bytes'> type, with all
+        arguments (if any) escaped.
+
+        Returns `None` for operations that do not return rows
+        or if the cursor has not had an operation invoked via
+        the 'cur.execute*()' method yet.
         """
         return self._executed_sql
 
     @property
     def field_count(self) -> int:
+        """Total number of fields (columns) of the query result `<'int'>`."""
         return self._field_count
 
     @property
     def fields(self) -> tuple[FieldDescriptorPacket]:
+        """The field (column) descriptors of the query
+        result `<'tuple[FieldDescriptorPacket]'>`.
+
+        Each item in the tuple is a FieldDescriptorPacket object,
+        which contains column's metadata of the result.
+
+        Returns `None` for operations that do not return rows
+        or if the cursor has not had an operation invoked via
+        the 'cur.execute*()' method yet.
+        """
         return self._fields
 
     @property
     def insert_id(self) -> int:
+        """The LAST INSERT ID of the query result `<'int'>`."""
         return self._insert_id
 
     @property
     def affected_rows(self) -> int:
+        """The number of rows that the last 'cur.execute*()'
+        produced (for DQL statements like SELECT) or affected
+        (for DML statements like UPDATE or INSERT) `<'int'>`.
+
+        For UNBUFFERED cursor, the value is either 0 or 18446744073709551615.
+        """
         return self._affected_rows
 
     @property
-    def row_number(self) -> int:
+    def warning_count(self) -> int:
+        """Total warnings from the query `<'int'>`."""
+        self._verify_executed()
+        return self._warning_count
+
+    @property
+    def lastrowid(self) -> int:
+        """The LAST INSERT ID of the query result `<'int'>`.
+
+        #### Compliance with PEP-0249, alias for 'insert_id'.
+        """
+        return self._insert_id
+
+    @property
+    def rowcount(self) -> int:
+        """The number of rows that the last 'cur.execute*()'
+        produced (for DQL statements like SELECT) or affected
+        (for DML statements like UPDATE or INSERT) `<'int'>`.
+
+        For UNBUFFERED cursor, the value is either 0 or 18446744073709551615.
+
+        #### Compliance with PEP-0249, alias for 'affected_rows'.
+        """
+        return self.affected_rows
+
+    @property
+    def rownumber(self) -> int:
+        """The 0-based row number (index) of the
+        cursor for the query result `<'int'>`.
+
+        #### Compliance with PEP-0249.
+        """
         return self._row_idx
 
     @property
-    def warning_count(self) -> int:
-        return self._warning_count
+    def description(self) -> tuple[tuple] | None:
+        """Returns a tuple of of 7-item tuples. Each of these
+        tuple contains information describing one result column:
+        - name
+        - type_code
+        - display_size
+        - internal_size
+        - precision
+        - scale
+        - null_ok
+
+        Returns `None` for operations that do not return rows
+        or if the cursor has not had an operation invoked via
+        the 'cur.execute*()' method yet.
+
+        #### Compliance with PEP-0249.
+        """
+        if self._fields is None:
+            return None
+        return list_to_tuple([f.description() for f in self._fields])
+
+    @property
+    def arraysize(self) -> int:
+        """The default number of rows to fetch at a time
+        with 'cur.fetchmany()'. Defaults to `1` `<'int'>`.
+
+        #### Compliance with PEP-0249.
+        """
+        return self._arraysize
+
+    @arraysize.setter
+    def arraysize(self, value: int) -> None:
+        try:
+            self._arraysize = int(value)
+        except Exception as err:
+            raise errors.InvalidCursorArgsError(
+                "Invalid 'arraysize' value, expects positive "
+                "integer, instead of %r." % value
+            ) from err
+        if self._arraysize == 0:
+            self._arraysize = 1
 
     # Write -----------------------------------------------------------------------------------
     async def execute(
         self,
         sql: str,
         args: object = None,
-        force_many: cython.bint = False,
+        many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> int:
-        """Execute a query.
+        """Prepare and execute a query, returns the affected/selected rows `<'int'>`.
 
-        :param query: Query to execute.
-        :type query: str
+        :param sql: `<'str'>` The query SQL to execute.
+        :param args: `<'object'>` Arguments to bound to the SQL. Defaults to `None`. Supports:
+            - Python native: int, float, bool, str, None, datetime, date,
+              time, timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset.
+            - Library numpy: np.int_, np.uint, np.float_, np.bool_, np.bytes_,
+              np.datetime64, np.timedelta64, np.ndarray.
+            - Library pandas: pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+              pd.TimedeltaIndex, pd.Series, pd.DataFrame.
 
-        :param args: Parameters used with query. (optional)
-        :type args: tuple, list or dict
+        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
+            - When 'many=True' (itemize is ignored), this method behaves similar to
+              'aiomysql.Cursor.executemany()'.
+                * 1. 'list' and 'tuple' will be escaped into list of str or tuple[str],
+                  depends on type of the sequence items. Each item represents one row
+                  of the 'args' `<'list[str/tuple[str]]'>`.
+                * 2. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
+                  represents one row of the 'args' `<'list[tuple[str]]'>`.
+                * 3. All other sequences or mappings 'args' will be escaped into tuple
+                  of literal strings `<'tuple[str]'>`.
+                * 4. Single 'args' will be escaped into one literal string `<'str'>`.
+            - When 'many=False', the argument 'itemize' determines how to escape the 'args'.
 
-        :return: Number of affected rows.
-        :rtype: int
+        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+            - When 'many=False' & 'itemize=True' (default), this method behaves
+              similar to 'aiomysql.Cursor.execute()'.
+                * 1. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
+                  represents one row of the 'args' `<'list[tuple[str]]'>`.
+                * 2. All sequences or mappings 'args' will be escaped into tuple of
+                  literal strings `<'tuple[str]'>`. This includes 'list', 'tuple',
+                  'set', 'frozenset', 'dict', 'np.ndarray', 'pd.Series', etc.
+                * 3. Single 'args' will be escaped into one literal string `<'str'>`.
+            - When 'itemize=False', regardless of 'args' type, it will be escaped into
+              one single literal string `<'str'>`.
 
-        If args is a list or tuple, %s can be used as a placeholder in the query.
-        If args is a dict, %(name)s can be used as a placeholder in the query.
-        """
+        ### Escape 'args'
+        - For 'args' escaped into <'str'>, it represents a single literal string.
+          The 'sql' should only have one '%s' placeholder.
+        - For 'args' escaped into <'tuple'>, it represents a single row of literal
+          strings. The 'sql' should have '%s' placeholders equal to the tuple length.
+        - For 'args' escaped into <'list'>, it represents multiple rows of literal
+          strings. The 'sql' should have '%s' placeholders equal to the item count
+          in each row.
+        - For more examples about escape 'args', please refer to 'conn.escape()'.
 
-        """Run several data against one query.
+        ### Example (many=False, itemize=True) [DEFAULT]
+        >>> cur.execute("INSERT INTO table (name, age) VALUES (%s, %s)", ("John", 25))
+            # executed as:
+            "INSERT INTO table (name, age) VALUES ('John', 25)"
 
-        :param query: Query to execute.
-        :type query: str
+        ### Example (many=True)
+        >>> cur.execute("INSERT INTO table (name) VALUES (%s)", ("John", "Doe"), many=True)
+            # executed as:
+            "INSERT INTO table (name) VALUES ('John')"
+            "INSERT INTO table (name) VALUES ('Doe')"
+            # This is for demonstration only, INSERT/REPLACE
+            # statement will be optimized to execute in bulk.
 
-        :param args: Sequence of sequences or mappings. It is used as parameter.
-        :type args: tuple or list
-
-        :return: Number of rows affected, if any.
-        :rtype: int or None
-
-        This method improves performance on multiple-row INSERT and
-        REPLACE. Otherwise it is equivalent to looping over args with
-        execute().
+        ### Example (many=False, itemize=False)
+        >>> cur.execute("INSERT INTO table (name, age) VALUES %s", ("John", 25), itemize=False)
+            # executed as:
+            "INSERT INTO table (name, age) VALUES ('John', 25)"
         """
         # Single query: no args
         if args is None:
             return await self._query_str(sql)
+        args = escape(args, many, itemize)
 
-        # Escape args
-        if force_many:
-            itemize = True
-        args = self.escape_args(args, itemize)
-
-        # Single query: one arg
-        if not itemize or type(args) is str:
+        # Single row query: one arg
+        if not many and not itemize:
+            # When 'many=False' & 'itemize=False', the 'args' must be
+            # a single literal string, and the 'sql' should only have
+            # one '%s' placeholder.
+            return await self._query_str(self._format(sql, args))
+        dtype = type(args)
+        if dtype is str:
+            # The 'args' is a single literal string, and the 'sql'
+            # should only have one '%s' placeholder.
             return await self._query_str(self._format(sql, args))
 
-        # Single query: empty args
-        _args: tuple = args
-        if tuple_len(_args) == 0:
-            return await self._query_str(self._format(sql, ()))
+        # Single row query: one row
+        if dtype is tuple:
+            # The 'args' is a tuple of literal strings, and the 'sql'
+            # should have '%s' placeholders eqaul to tuple length.
+            return await self._query_str(self._format(sql, args))
 
-        # Single query: one row
-        if not force_many and type(_args[0]) is str:
-            return await self._query_str(self._format(sql, _args))
-
-        # Many-query: row by row
+        # Multi-rows query
+        # The 'args' now on can only be a list of str/tuple[str], and
+        # the 'sql' should have '%s' placeholders eqaul list item length.
         rows: cython.ulonglong = 0
         m = sync_conn.INSERT_VALUES_RE.match(sql)
+        # . bulk INSERT/REPLACE not matched: execute row by row
         if m is None:
-            for arg in _args:
+            for arg in args:
                 rows += await self._query_str(self._format(sql, arg))
             self._affected_rows = rows
             return rows
-
-        # Bulk INSERT/REPLACE
+        # . bulk INSERT/REPLACE: execute rows under max length
         self._verify_connected()
         conn: BaseConnection = self._conn
         # . split query
@@ -473,7 +659,7 @@ class Cursor:
         else:
             suffix: bytes = b""
         # . execute query
-        args_iter = iter(_args)
+        args_iter = iter(args)
         val: bytes = conn.encode_sql(self._format(values, next(args_iter)))
         val_len: cython.uint = bytes_len(val)
         stmt: bytearray = bytearray(prefix)
@@ -495,16 +681,36 @@ class Cursor:
         self._affected_rows = rows
         return rows
 
-    async def callproc(self, procname: str, args: tuple | list) -> tuple:
+    async def executemany(self, sql: str, args: object = None) -> int:
+        """Prepare and execute multi-row 'args' against a query,
+        returns the affected/selected rows `<'int'>`.
+
+        :param sql: `<'str'>` The query SQL to execute.
+        :param args: `<'object'>` Sequences or mappings to bound to the SQL. Defaults to `None`.
+
+        #### Compliance with PEP-0249.
+        - Equivalent to 'cur.execute(sql, args, many=True)'.
+        - For more information, please refer to 'cur.execute()' method.
+
+        ### Example
+        >>> cur.executemany(
+                "INSERT INTO table (name, age) VALUES (%s %s)",
+                (["John", 25], ["Doe", 26])
+            )
+            # executed as:
+            "INSERT INTO table (name) VALUES ('John', 25)"
+            "INSERT INTO table (name) VALUES ('Doe', 26)"
+            # This is for demonstration only, INSERT/REPLACE
+            # statement will be optimized to execute in bulk.
+        """
+        return await self.execute(sql, args, True, True)
+
+    async def callproc(self, procname: str, args: tuple | list) -> object:
         """Execute stored procedure procname with args.
 
-        :param procname: Name of procedure to execute on server.
-        :type procname: str
-
-        :param args: Sequence of parameters to use with procedure.
-        :type args: tuple or list
-
-        Returns the original args.
+        :param procname: `<'str'>` Name of procedure to execute on server.
+        :param args: `<'list/tuple'>` Sequence of parameters to use with procedure.
+        :return: <'list/tuple'> The original arguments.
 
         Compatibility warning: PEP-249 specifies that any modified
         parameters must be returned. This is currently impossible
@@ -516,12 +722,12 @@ class Cursor:
         is the parameter above and n is the position of the parameter
         (from zero). Once all result sets generated by the procedure
         have been fetched, you can issue a SELECT @_procname_0, ...
-        query using .execute() to get any OUT or INOUT values.
+        query using 'cur.execute*()' to get any OUT or INOUT values.
 
         Compatibility warning: The act of calling a stored procedure
         itself creates an empty result set. This appears after any
         result sets generated by the procedure. This is non-standard
-        behavior with respect to the DB-API. Be sure to use next_set()
+        behavior with respect to the DB-API. Be sure to use 'cur.nextset()'
         to advance through all result sets; otherwise you may get
         disconnected.
         """
@@ -529,8 +735,8 @@ class Cursor:
         if args is None:
             _args: tuple = ()
         else:
-            items = encode_item(args)
-            if not isinstance(items, tuple):
+            items = escape(args, False, True)
+            if type(items) is not tuple:
                 raise errors.InvalidCursorArgsError(
                     "Invalid 'args' for 'callproc()' method, "
                     "expects <'tuple/list'> instead of %s." % type(args)
@@ -545,7 +751,7 @@ class Cursor:
                 [self._format(fmt, (idx, arg)) for idx, arg in enumerate(_args)]
             )
             await self._query_str(sql)
-            await self.next_set()
+            await self.nextset()
 
         # Call procedures
         # fmt: off
@@ -555,33 +761,84 @@ class Cursor:
         )
         # fmt: on
         await self._query_str(sql)
-        return _args
+        return args
 
     @cython.ccall
     def mogrify(
         self,
         sql: str,
         args: object = None,
+        many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> str:
+        """Bound the 'args' to the 'sql' and returns the `exact*` string that
+        will be sent to the database by calling the execute*() method `<'str'>`.
+
+        :param sql: `<'str'>` The query SQL to mogrify.
+        :param args: `<'object'>` Arguments to bound to the SQL. Defaults to `None`.
+        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
+        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+
+        ### Arguments 'many' & 'itemize'
+        - When 'many=False' & 'itemize=True' (default), this method behaves
+          similar to 'aiomysql.Cursor.mogrify()'.
+        - When 'many=True' & 'args' is multi-row data, only the 'first' row
+          [item] of the args will be bound to the sql for cleaner illustration
+          `[excat*]`.
+        - For more information about these two arguments, please refer to
+          'conn.escape()' method.
+
+        ### Example (many=False, itemize=True) [DEFAULT]
+        >>> cur.mogrify("INSERT INTO table (name, age) VALUES (%s, %s)", ("John", 25))
+        >>> "INSERT INTO table (name, age) VALUES ('John', 25)"
+
+        ### Example (many=True)
+        >>> cur.mogrify("INSERT INTO table (name) VALUES (%s)", ("John", "Doe"), many=True)
+        >>> "INSERT INTO table (name) VALUES ('John')"
+            # Only the first row "John" will be bound to the sql.
+
+        ### Example (many=False, itemize=False)
+        >>> cur.mogrify("INSERT INTO table (name, age) VALUES %s", ("John", 25), itemize=False)
+        >>> "INSERT INTO table (name, age) VALUES ('John', 25)"
+        """
+        # Query without args
         if args is None:
             return sql
-        return self._format(sql, self.escape_args(args, itemize))
+        args = escape(args, many, itemize)
 
-    @cython.ccall
-    def escape_args(self, args: object, itemize: cython.bint = True) -> object:
-        """Escape object into string `<'str/tuple'>`."""
-        return encode_item(args) if itemize else escape_item(args)
+        # Single row query: one arg
+        if not many and not itemize:
+            # When 'many=False' & 'itemize=False', the 'args' must be
+            # a single literal string, and the 'sql' should only have
+            # one '%s' placeholder.
+            return self._format(sql, args)
+        dtype = type(args)
+        if dtype is str:
+            # The 'args' is a single literal string, and the 'sql'
+            # should only have one '%s' placeholder.
+            return self._format(sql, args)
 
-    @cython.ccall
-    def encode_sql(self, sql: str) -> bytes:
-        return utils.encode_str(sql, self._encoding_c)
+        # Single row query: one row
+        if dtype is tuple:
+            # The 'args' is a tuple of literal strings, and the 'sql'
+            # should have '%s' placeholders eqaul to tuple length.
+            return self._format(sql, args)
+
+        # Multi-row query
+        # The 'args' now on can only be a list of str/tuple[str], and
+        # the 'sql' should have '%s' placeholders eqaul list item length.
+        if len(args) == 0:
+            return self._format(sql, ())
+        # . format only the 1st row
+        return self._format(sql, args[0])
 
     async def _query_str(self, sql: str) -> int:
-        return await self._query_bytes(self.encode_sql(sql))
+        """(internal) Execute a <'str'> query `<'int'>`."""
+        return await self._query_bytes(utils.encode_str(sql, self._encoding_c))
 
     async def _query_bytes(self, sql: bytes) -> int:
-        while await self.next_set():
+        """(internal) Execute an encoded <'bytes'> query `<'int'>`."""
+        while await self.nextset():
             pass
         self._verify_connected()
         self._clear_result()
@@ -594,24 +851,38 @@ class Cursor:
     @cython.cfunc
     @cython.inline(True)
     def _format(self, sql: str, args: object) -> str:
+        """(cfunc) Format the query with the arguments `<'str'>`.
+
+        :param sql: `<'str'>` The query to format.
+        :param args: `<'str/tuple'>` Arguments to bound to the SQL.
+        :raises `<'InvalidSQLArgsErorr'>`: If any error occurs.
+        """
         try:
             return sql % args
         except Exception as err:
-            raise errors.InvalidCursorArgsError(
-                "Failed to format query:\n'%s'"
-                "\nWith arguments: %s\n %s"
-                "\nError: %s" % (sql, type(args), args, err)
+            raise errors.InvalidSQLArgsErorr(
+                "Failed to format SQL:\n'%s'\n"
+                "With arguments: %s\n%r\n"
+                "Error: %s" % (sql, type(args), args, err)
             ) from err
 
     # Read ------------------------------------------------------------------------------------
     # . fetchone
     async def fetchone(self) -> tuple | None:
-        return await self._fetchone_row()
+        """Fetch the next row of the query result set.
+        Returns a single `tuple`, or `None` when no more
+        data is available `<'tuple/None'>`.
+        """
+        return await self._fetchone_tuple()
 
-    async def _fetchone_row(self) -> tuple:
-        # Verify executed
+    async def _fetchone_tuple(self) -> tuple | None:
+        """(internal) Fetch the next row of the query result set.
+        Returns a single `tuple`, or `None` when no more data
+        is available `<'tuple/None'>`.
+
+        #### Used by Cursor & SSCursor.
+        """
         self._verify_executed()
-
         # Buffered
         if not self._unbuffered:
             # No more rows
@@ -623,117 +894,249 @@ class Cursor:
 
         # Unbuffered
         else:
-            row = await self._next_row()
+            row = await self._next_row_unbuffered()
             if row is None:
                 self._warning_count = self._result.warning_count
                 return None  # exit: no rows
             return row  # exit: one row
 
-    async def _fetchone_dict(self) -> dict:
-        # Fetch row
-        row = await self._fetchone_row()
-        if row is None:
-            return None
-        # No fields
-        cols = self.columns()
-        if cols is None:
-            return None  # eixt: not column names
-        # Generate dict
-        return {cols[i]: row[i] for i in range(self._field_count)}
+    async def _fetchone_dict(self) -> dict | None:
+        """(internal) Fetch the next row of the query result set.
+        Returns a `dict`, or `None` when no more data is
+        available `<'dict/None'>`.
 
-    async def _fetchone_df(self) -> object:
-        # Fetch row
-        row = await self._fetchone_row()
+        #### Used by DictCursor & SSDictCursor.
+        """
+        # Fetch & validate
+        row = await self._fetchone_tuple()
         if row is None:
-            return None
-        # No fields
+            return None  # exit: no more rows
         cols = self.columns()
         if cols is None:
-            return None
-        # Generate DataFrame
+            return None  # eixt: no columns
+        # Generate
+        return self._convert_row_to_dict(row, cols, self._field_count)
+
+    async def _fetchone_df(self) -> DataFrame | None:
+        """(internal) Fetch the next row of the query result set.
+        Returns a `DataFrame`, or `None` when no more data is
+        available `<'DataFrame/None'>`.
+
+        #### Used by DfCursor & SSDfCursor.
+        """
+        # Fetch & validate
+        row = await self._fetchone_tuple()
+        if row is None:
+            return None  # exit: no more rows
+        cols = self.columns()
+        if cols is None:
+            return None  # eixt: no columns
+        # Generate
         return typeref.DATAFRAME([row], columns=cols)
 
-    async def fetch(self, size: int = 0) -> tuple[tuple]:
-        return await self._fetch_row(size)
+    # . fetchmany
+    async def fetchmany(self, size: int = 1) -> tuple[tuple]:
+        """Fetch the next set of rows of the query result.
+        Returns `tuple of tuples`, or an empty `tuple`
+        when no more rows are available. `<'tuple[tuple]'>`.
 
-    async def _fetch_row(self, size: cython.ulonglong = 0) -> tuple[tuple]:
-        # Verify executed
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+        """
+        return await self._fetchmany_tuple(size)
+
+    async def _fetchmany_tuple(self, size: cython.ulonglong) -> tuple[tuple]:
+        """(internal) Fetch the next set of rows of the query result.
+        Returns `tuple of tuples`, or an empty `tuple` when no more
+        rows are available. `<'tuple[tuple]'>`.
+
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+
+        #### Used by Cursor & SSCursor.
+        """
         self._verify_executed()
-
+        if size == 0:
+            size = self._arraysize
         # Buffered
         if not self._unbuffered:
             # No more rows
             if not self._has_more_rows():
                 return ()  # exit: no rows
-            # . fetch all
-            row_size: cython.ulonglong = self._row_size  # row size already calcuated
-            if size == 0:
-                if self._row_idx == 0:
-                    self._row_idx = row_size
-                    return self._rows  # exit: all rows
-                end: cython.ulonglong = row_size
-            # . fetch many
-            else:
-                end: cython.ulonglong = min(self._row_idx + size, row_size)
+            # Fetch multi-rows
+            end: cython.ulonglong = min(self._row_idx + size, self._row_size)
             idx: cython.ulonglong = self._row_idx
             self._row_idx = end
             return tuple_slice(self._rows, idx, end)  # exit: multi-rows
 
         # Unbuffered
         else:
+            # Fetch multi-rows
             rows: list = []
-            # . fetch all
-            if size == 0:
-                while True:
-                    row = await self._next_row()
-                    if row is None:
-                        self._warning_count = self._result.warning_count
-                        break
-                    else:
-                        rows.append(row)
-            # . fetch many
-            else:
-                for _ in range(size):
-                    row = await self._next_row()
-                    if row is None:
-                        self._warning_count = self._result.warning_count
-                        break
-                    else:
-                        rows.append(row)
+            for _ in range(size):
+                row = await self._next_row_unbuffered()
+                if row is None:
+                    self._warning_count = self._result.warning_count
+                    break
+                else:
+                    rows.append(row)
             return list_to_tuple(rows)  # exit: multi-rows
 
-    async def _fetch_dict(self, size: cython.ulonglong = 0) -> tuple[dict]:
-        # Fetch rows
-        rows = await self._fetch_row(size)
+    async def _fetchmany_dict(self, size: cython.ulonglong) -> tuple[dict]:
+        """(internal) Fetch the next set of rows of the query result.
+        Returns `tuple of dicts`, or an empty `tuple` when no more
+        rows are available. `<'tuple[dict]'>`.
+
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+
+        #### Used by DictCursor & SSDictCursor.
+        """
+        # Fetch & validate
+        rows: tuple = await self._fetchmany_tuple(size)
         if not rows:
             return ()  # exit: no more rows
-        # No fields
         cols = self.columns()
         if cols is None:
-            return ()  # eixt: not column names
-        # Generate tuple[dict]
+            return ()  # eixt: no columns
+        # Generate
         field_count: cython.ulonglong = self._field_count
         return list_to_tuple(
-            [{cols[i]: r[i] for i in range(field_count)} for r in rows]
+            [self._convert_row_to_dict(row, cols, field_count) for row in rows]
         )
 
-    async def _fetch_df(self, size: cython.ulonglong = 0) -> object:
-        # Fetch rows
-        rows = await self._fetch_row(size)
-        if not rows:
-            return None  # exit: no more rows
-        # No fields
+    async def _fetchmany_df(self, size: cython.ulonglong) -> DataFrame:
+        """(internal) Fetch the next set of rows of the query result.
+        Returns a `DataFrame`, or an empty `DataFrame` when no more
+        rows are available. `<'DataFrame'>`.
+
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+
+        #### Used by DfCursor & SSDfCursor.
+        """
+        # Fetch & validate
+        rows = await self._fetchmany_tuple(size)
         cols = self.columns()
+        if not rows:  # exit: no more rows
+            if cols is None:
+                return typeref.DATAFRAME()
+            return typeref.DATAFRAME(columns=cols)
         if cols is None:
-            return None  # eixt: not column names
-        # Generate DataFrame
+            return typeref.DATAFRAME()  # eixt: no columns
+        # Generate
         return typeref.DATAFRAME(rows, columns=cols)
 
+    # . fetchall
+    async def fetchall(self) -> tuple[tuple]:
+        """Fetch all (remaining) rows of the query result.
+        Returns `tuple of tuples`, or an empty `tuple` when
+        no more rows are available. `<'tuple[tuple]'>`.
+        """
+        return await self._fetchall_tuple()
+
+    async def _fetchall_tuple(self) -> tuple[tuple]:
+        """(internal) Fetch all (remaining) rows of the query result.
+        Returns `tuple of tuples`, or an empty `tuple` when no more
+        rows are available. `<'tuple[tuple]'>`.
+
+        #### Used by Cursor & SSCursor.
+        """
+        self._verify_executed()
+        # Buffered
+        if not self._unbuffered:
+            # No more rows
+            if not self._has_more_rows():
+                return ()  # exit: no rows
+            # Fetch all rows
+            row_size: cython.ulonglong = self._row_size  # row size already calcuated
+            if self._row_idx == 0:
+                self._row_idx = row_size
+                return self._rows  # exit: all rows
+            end: cython.ulonglong = row_size
+            idx: cython.ulonglong = self._row_idx
+            self._row_idx = end
+            return tuple_slice(self._rows, idx, end)  # exit: remain rows
+
+        # Unbuffered
+        else:
+            # Fetch all rows
+            rows: list = []
+            while True:
+                row = await self._next_row_unbuffered()
+                if row is None:
+                    self._warning_count = self._result.warning_count
+                    break
+                else:
+                    rows.append(row)
+            return list_to_tuple(rows)  # exit: remain rows
+
+    async def _fetchall_dict(self) -> tuple[dict]:
+        """(internal) Fetch all (remaining) rows of the query result.
+        Returns `tuple of dicts`, or an empty `tuple` when no more
+        rows are available. `<'tuple[dict]'>`.
+
+        #### Used by DictCursor & SSDictCursor.
+        """
+        # Fetch & validate
+        rows: tuple = await self._fetchall_tuple()
+        if not rows:
+            return ()  # exit: no more rows
+        cols = self.columns()
+        if cols is None:
+            return ()  # eixt: no columns
+        # Generate
+        field_count: cython.ulonglong = self._field_count
+        return list_to_tuple(
+            [self._convert_row_to_dict(row, cols, field_count) for row in rows]
+        )
+
+    async def _fetchall_df(self) -> DataFrame:
+        """(internal) Fetch all (remaining) rows of the query result.
+        Returns a `DataFrame`, or an empty `DataFrame` when no more
+        rows are available. `<'DataFrame'>`.
+
+        #### Used by DfCursor & SSDfCursor.
+        """
+        # Fetch & validate
+        rows = await self._fetchall_tuple()
+        cols = self.columns()
+        if not rows:  # exit: no more rows
+            if cols is None:
+                return typeref.DATAFRAME()
+            return typeref.DATAFRAME(columns=cols)
+        if cols is None:
+            return typeref.DATAFRAME()  # eixt: no columns
+        # Generate
+        return typeref.DATAFRAME(rows, columns=cols)
+
+    # . fetch: converter
+    @cython.cfunc
+    @cython.inline(True)
+    def _convert_row_to_dict(
+        self,
+        row: tuple,
+        cols: tuple,
+        field_count: cython.ulonglong,
+    ) -> dict:
+        """(cfunc) Convert one row (tuple) into a dictionary `<'dict'>`."""
+        return {cols[i]: row[i] for i in range(field_count)}
+
+    # . rest
     async def scroll(
         self,
         value: cython.longlong,
         mode: Literal["relative", "absolute"] = "relative",
     ) -> None:
+        """Scroll the cursor to a new position of the query result.
+
+        :param value: `<'int'>` The value for the cursor position.
+        :param mode: `<'str'>` The mode of the cursor movement. Defaults to `'relative'`.
+            - 'relative': The 'value' is taken as an offset to the current position.
+            - 'absolute': The 'value' is taken as the absolute target position.
+
+        :raises `<'InvalidCursorIndexError'>`: If the new position if out of range.
+        """
         # Validate
         self._verify_executed()
 
@@ -787,24 +1190,32 @@ class Cursor:
         else:
             raise errors.InvalidCursorArgsError("Inavlid scroll mode %r." % mode)
         for _ in range(val):
-            if (await self._next_row()) is None:
+            if (await self._next_row_unbuffered()) is None:
                 break
-        return True
 
-    async def next_set(self) -> None:
-        """Get the next set of query result."""
+    async def nextset(self) -> bool:
+        """Go to the next set of result, discarding any remaining
+        rows from the current set. Returns boolean to indicate if
+        next set exists `<'bool'>`."""
         self._verify_connected()
         conn: BaseConnection = self._conn
-        if self._result is None or self._result is not conn._result:
-            return False
-        if not self._result.has_next:
+        curr_result: MysqlResult = self._result
+        if (
+            curr_result is None
+            or curr_result is not conn._result
+            or not curr_result.has_next
+        ):
+            # . reset columns from previous result
+            if self._columns is not None:
+                self._columns = None
             return False
         self._clear_result()
         await conn.next_result(self._unbuffered)
         self._read_result()
         return True
 
-    async def _next_row(self) -> tuple:
+    async def _next_row_unbuffered(self) -> tuple | None:
+        """(internal) Get the next unbuffered row `<'tuple/None'>`"""
         row = await self._result._read_result_packet_row_unbuffered()
         if row is not None:
             self._row_idx += 1
@@ -812,24 +1223,33 @@ class Cursor:
 
     @cython.ccall
     def columns(self) -> tuple[str]:
-        """Get the 'column' names for each fields of the sql query result `<'tuple/None'>`."""
-        # Sql returns no fields
-        if self._field_count == 0:
-            return None
-        # Construct columns
-        cols: list = []
-        field: FieldDescriptorPacket
-        for field in self._fields:
-            col: str = field._column
-            if col in cols:
-                col = field._table + "." + col
-            cols.append(col)
-        return list_to_tuple(cols)
+        """Get the 'column' names for each fields of the
+        query result `<'tuple/None'>`.
+
+        Returns `None` for operations that do not return rows
+        or if the cursor has not had an operation invoked via
+        the 'cur.execute*()' method yet.
+        """
+        if self._columns is None:
+            # Sql returns no fields
+            if self._field_count == 0:
+                return None
+            # Construct columns
+            cols: list = []
+            field: FieldDescriptorPacket
+            for field in self._fields:
+                col: str = field._column
+                if col in cols:
+                    col = field._table + "." + col
+                cols.append(col)
+            self._columns = list_to_tuple(cols)
+        return self._columns
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _read_result(self) -> cython.bint:
+        """(cfunc) Read query result."""
         result: MysqlResult = self._conn._result
         self._result = result
         self._field_count = result.field_count
@@ -844,6 +1264,7 @@ class Cursor:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _clear_result(self) -> cython.bint:
+        """(cfunc) Clear the previous result."""
         self._result = None
         self._field_count = 0
         self._fields = None
@@ -858,6 +1279,7 @@ class Cursor:
     @cython.cfunc
     @cython.inline(True)
     def _get_row_size(self) -> cython.ulonglong:
+        """(cfunc) Get total number of rows of the result `<'int'>`."""
         if self._row_size == 0:
             if self._rows is None:
                 return 0
@@ -868,9 +1290,10 @@ class Cursor:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _has_more_rows(self) -> cython.bint:
+        """(cfunc) Whether has more rows in the result `<'bool'>`."""
         row_size: cython.ulonglong = self._get_row_size()
-        if row_size == 0 or self._row_idx >= row_size:
-            return False  # exit: no more rows
+        if self._row_idx >= row_size or row_size == 0:
+            return False
         else:
             return True
 
@@ -878,22 +1301,40 @@ class Cursor:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _verify_executed(self) -> cython.bint:
+        """(cfunc) Verify if the cursor has already executed a query.
+
+        :raises `<'CursorNotExecutedError'>`: If cursor has not had an
+        operation invoked via the 'cur.execute*()' method yet.
+        """
         if self._executed_sql is None:
-            raise errors.CursorNotExecutedError(0, "Please execute a 'sql' first.")
+            raise errors.CursorNotExecutedError(
+                0, "Please execute a query with the cursor first."
+            )
         return True
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _verify_connected(self) -> cython.bint:
-        "(cfunc) Verify if the connection is connected."
+        """(cfunc) Verify if the cursor is connected (attacted to connection).
+
+        :raises `<'CursorClosedError'>`: If the cursor has already been closed.
+        """
         if self.closed():
             raise errors.CursorClosedError(0, "Cursor is closed.")
         return True
 
+    # Compliance ------------------------------------------------------------------------------
+    def setinputsizes(self, *args):
+        """Does nothing, Compliance with PEP-0249."""
+
+    def setoutputsizes(self, *args):
+        """Does nothing, Compliance with PEP-0249."""
+
     # Close -----------------------------------------------------------------------------------
     async def close(self) -> None:
-        """Closing a cursor just exhausts all remaining data."""
+        """Close the cursor, remaining data (if any)
+        will be exhausted automatically."""
         if self.closed():
             return None
         try:
@@ -903,7 +1344,7 @@ class Cursor:
                 and self._result is self._conn._result
             ):
                 await self._result._drain_result_packet_unbuffered()
-            while await self.next_set():
+            while await self.nextset():
                 pass
         finally:
             self._conn = None
@@ -912,6 +1353,11 @@ class Cursor:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def force_close(self) -> cython.bint:
+        """Force close the cursor.
+
+        This method is designed to be used in sync environment,
+        and will `NOT` exhaust any remaining data (if any).
+        """
         if not self.closed():
             self._conn = None
             self._clear_result()
@@ -920,12 +1366,12 @@ class Cursor:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def closed(self) -> cython.bint:
-        """The cursor status, whether is closed `<'bool'>`."""
+        """Whether the cursor is closed `<'bool'>`."""
         return self._conn is None
 
     # Special methods -------------------------------------------------------------------------
-    def __await__(self) -> Generator[Any, Any, tuple[Any]]:
-        return self._fetch_row().__await__()
+    def __await__(self) -> Generator[Any, Any, tuple[tuple]]:
+        return self._fetchall_tuple().__await__()
 
     async def __aenter__(self) -> Cursor:
         return self
@@ -937,7 +1383,7 @@ class Cursor:
         return self
 
     async def __anext__(self) -> tuple:
-        row = await self._fetchone_row()
+        row = await self._fetchone_tuple()
         if row is None:
             raise StopAsyncIteration
         return row
@@ -948,17 +1394,40 @@ class Cursor:
 
 @cython.cclass
 class DictCursor(Cursor):
+    """Represents the `async` cursor (BUFFERED)
+    to interact with the database.
+
+    Fetches data in <'dict'> or <'tuple[dict]'>.
+    """
+
     # . fetchone
     async def fetchone(self) -> dict | None:
+        """Fetch the next row of the query result set.
+        Returns a `dict`, or `None` when no more data
+        is available `<'dict/None'>`."""
         return await self._fetchone_dict()
 
-    # . fetch (all, many)
-    async def fetch(self, size: int = 0) -> tuple[dict]:
-        return await self._fetch_dict(size)
+    # . fetchmanny
+    async def fetchmany(self, size: int = 1) -> tuple[dict]:
+        """Fetch the next set of rows of the query result.
+        Returns `tuple of dicts`, or an empty `tuple` when
+        no more rows are available. `<'tuple[dict]'>`.
+
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+        """
+        return await self._fetchmany_dict(size)
+
+    # . fetchall
+    async def fetchall(self) -> tuple[dict]:
+        """Fetch all (remaining) rows of the query result.
+        Returns `tuple of dicts`, or an empty `tuple` when
+        no more rows are available. `<'tuple[dict]'>`."""
+        return await self._fetchall_dict()
 
     # Special methods -------------------------------------------------------------------------
     def __await__(self) -> Generator[Any, Any, tuple[dict]]:
-        return self._fetch_dict().__await__()
+        return self._fetchall_dict().__await__()
 
     async def __aenter__(self) -> DictCursor:
         return self
@@ -975,17 +1444,40 @@ class DictCursor(Cursor):
 
 @cython.cclass
 class DfCursor(Cursor):
+    """Represents the `async` cursor (BUFFERED)
+    to interact with the database.
+
+    Fetches data in <'DataFrame'>.
+    """
+
     # . fetchone
     async def fetchone(self) -> DataFrame | None:
+        """Fetch the next row of the query result set.
+        Returns a `DataFrame`, or `None` when no more
+        data is available `<'DataFrame/None'>`."""
         return await self._fetchone_df()
 
-    # . fetch (all, many)
-    async def fetch(self, size: int = 0) -> DataFrame | None:
-        return await self._fetch_df(size)
+    # . fetchmanny
+    async def fetchmany(self, size: int = 1) -> DataFrame:
+        """Fetch the next set of rows of the query result.
+        Returns a `DataFrame`, or an empty `DataFrame` when
+        no more rows are available. `<'DataFrame'>`.
+
+        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+            - When 'size=0', defaults to 'cur.arraysize'.
+        """
+        return await self._fetchmany_df(size)
+
+    # . fetchall
+    async def fetchall(self) -> DataFrame:
+        """Fetch all (remaining) rows of the query result.
+        Returns a `DataFrame`, or an empty `DataFrame` when
+        no more rows are available. `<'DataFrame'>`."""
+        return await self._fetchall_df()
 
     # Special methods -------------------------------------------------------------------------
     def __await__(self) -> Generator[Any, Any, DataFrame]:
-        return self._fetch_df().__await__()
+        return self._fetchall_df().__await__()
 
     async def __aenter__(self) -> DfCursor:
         return self
@@ -1003,146 +1495,168 @@ class DfCursor(Cursor):
 # . unbuffered
 @cython.cclass
 class SSCursor(Cursor):
+    """Represents the `async` cursor (UNBUFFERED)
+    to interact with the database.
+
+    Fetches data in <'tuple'> or <'tuple[tuple]'>.
+    """
+
     def __init__(self, conn: BaseConnection) -> None:
-        self._init_setup(conn, True)
+        """The `async` cursor (UNBUFFERED) to interact with the database.
+
+        :param conn: `<'BaseConnection'>` The connection of the cursor .
+        """
+        self._setup(conn, True)
 
 
 @cython.cclass
 class SSDictCursor(DictCursor):
+    """Represents the `async` cursor (UNBUFFERED)
+    to interact with the database.
+
+    Fetches data in <'dict'> or <'tuple[dict]'>.
+    """
+
     def __init__(self, conn: BaseConnection) -> None:
-        self._init_setup(conn, True)
+        """The `async` cursor (UNBUFFERED) to interact with the database.
+
+        :param conn: `<'BaseConnection'>` The connection of the cursor .
+        """
+        self._setup(conn, True)
 
 
 @cython.cclass
 class SSDfCursor(DfCursor):
+    """Represents the `async` cursor (UNBUFFERED)
+    to interact with the database.
+
+    Fetches data in <'DataFrame'>.
+    """
+
     def __init__(self, conn: BaseConnection) -> None:
-        self._init_setup(conn, True)
+        """The `async` cursor (UNBUFFERED) to interact with the database.
+
+        :param conn: `<'BaseConnection'>` The connection of the cursor .
+        """
+        self._setup(conn, True)
 
 
 # Connection ----------------------------------------------------------------------------------
 @cython.cclass
 class CursorManager:
-    "The Context Manager for Cursor."
+    """The Context Manager for the `async` Cursor."""
 
     _conn: BaseConnection
     _cur_type: type[Cursor]
     _cur: Cursor
+    _closed: cython.bint
 
     def __init__(self, conn: BaseConnection, cursor: type[Cursor]) -> None:
-        """The Context Manager for Cursor.
+        """The Context Manager for the `async` Cursor.
 
-        :param conn `<'BaseConnection'>`: The Connection that acquires the cursor.
+        :param conn `<'BaseConnection'>`: The Connection for the cursor.
         :param cursor `<'type[Cursor]'>`: The Cursor type (class) to use.
         """
         self._conn = conn
         self._cur_type = cursor
         self._cur = None
+        self._closed = False
 
-    async def _close(self) -> None:
-        """Close the cursor and cleanup the manager `<'bool'>`.
-        This method raises no error."""
-        if self._cur is not None:
-            try:
-                await self._cur.close()
-            except:  # noqa
-                pass
-            self._cur = None
-        self._conn = None
-        self._cur_type = None
-
-    def __await__(self) -> Generator[Any, Any, Cursor]:
-        return self._generator().__await__()
-
-    async def _generator(self) -> Cursor:
-        cur = None
+    async def _acquire(self) -> Cursor:
+        """(internal) Acquire the connection cursor `<'Cursor'>`."""
         try:
             await self._conn.connect()
-            cur = self._cur_type(self._conn)
-            return cur
-        except BaseException as err:
-            if cur is not None:
+            return self._cur_type(self._conn)
+        except:  # noqa
+            await self._close()
+            raise
+
+    async def _close(self) -> None:
+        """(internal) Close the cursor and cleanup the context manager.
+
+        #### This method does not raise any error.
+        """
+        if not self._closed:
+            if self._cur is not None:
                 try:
                     await self._cur.close()
                 except:  # noqa
                     pass
-            err.add_note(
-                "-> <'%s'> Failed to acquire cursor: %s"
-                % (self.__class__.__name__, err)
-            )
+                self._cur = None
+            self._cur_type = None
+            self._conn = None
+            self._closed = True
+
+    def __await__(self) -> Generator[Any, Any, Cursor]:
+        return self._acquire().__await__()
 
     async def __aenter__(self) -> Cursor:
-        try:
-            await self._conn.connect()
-            self._cur = self._cur_type(self._conn)
-            return self._cur
-        except BaseException as err:
-            await self._close()
-            err.add_note(
-                "-> <'%s'> Failed to acquire cursor: %s"
-                % (self.__class__.__name__, err)
-            )
-            raise err
+        self._cur = await self._acquire()
+        return self._cur
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._close()
 
     def __del__(self):
-        if self._cur is not None:
-            try:
-                self._cur.force_close()
-            except:  # noqa
-                pass
-            self._cur = None
-        self._conn = None
-        self._cur_type = None
+        if not self._closed:
+            if self._cur is not None:
+                try:
+                    self._cur.force_close()
+                except:  # noqa
+                    pass
+                self._cur = None
+            self._cur_type = None
+            self._conn = None
 
 
 @cython.cclass
 class TransactionManager(CursorManager):
-    """The Context Manager for Cursor in transaction mode.
+    """The Context Manager for the `async` Cursor in `TRANSACTION` mode.
 
-    By acquiring cursor through this manager, the following will happen:
-    - 1. Use the connection to `START` a transaction.
-    - 2. Return the `TransactionManager` that wraps the cursor.
-    - 3a. If catches ANY exceptions during the transaction, execute `ROLLBACK`
-    - 3b. If the transaction executed successfully, execute `COMMIT`.
+    By acquiring cursor through this context manager, the following happens:
+    - 1. Use the connection to `BEGIN` a transaction.
+    - 2. Returns the cursor of the connection.
+    - 3a. If catches ANY exceptions during the transaction, close the connection.
+    - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
     """
 
     def __init__(self, conn: BaseConnection, cursor: type[Cursor]) -> None:
-        """The Context Manager for Cursor in transaction mode.
+        """The Context Manager for the `async` Cursor in `TRANSACTION` mode.
 
-        :param conn `<'BaseConnection'>`: The Connection that starts the transaction.
-        :param cursor `<'type[Cursor]'>`: The Cursor type (class) to use for the transaction.
+        By acquiring cursor through this context manager, the following happens:
+        - 1. Use the connection to `BEGIN` a transaction.
+        - 2. Returns the cursor of the connection.
+        - 3a. If catches ANY exceptions during the transaction, close the connection.
+        - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
+
+        :param conn `<'BaseConnection'>`: The Connection to start the transaction.
+        :param cursor `<'type[Cursor]'>`: The Cursor type (class) to use.
         """
         self._conn = conn
         self._cur_type = cursor
         self._cur = None
-
-    async def _close_connection(self) -> None:
-        if self._conn is not None and self._conn.get_transaction_status():
-            await self._conn.close()
+        self._closed = False
 
     async def __aenter__(self) -> Cursor:
+        self._cur = await self._acquire()
         try:
-            await self._conn.connect()
-            self._cur = self._cur_type(self._conn)
             await self._conn.begin()
-            return self._cur
         except BaseException as err:
             await self._close()
             err.add_note(
-                "-> <'%s'> Failed to start transaction: %s"
+                "-> <'%s'> Failed to START TRANSACTION: %s"
                 % (self.__class__.__name__, err)
             )
             raise err
+        return self._cur
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         # Encounter error
         if exc_val is not None:
-            await self._close_connection()
+            await self._conn.close()
             await self._close()
             exc_val.add_note(
-                "-> <'%s'> Failed to commit transaction: %s"
+                "-> <'%s'> Failed to COMMIT TRANSACTION: %s"
                 % (self.__class__.__name__, exc_val)
             )
             raise exc_val
@@ -1150,19 +1664,30 @@ class TransactionManager(CursorManager):
         # Try commit transaction
         try:
             await self._conn.commit()
+            await self._close()
+            # exit: commit successfully
         except BaseException as err:
-            await self._close_connection()
+            # fail to commit
+            await self._conn.close()
             await self._close()
             err.add_note(
-                "-> <'%s'> Failed to commit transaction: %s"
+                "-> <'%s'> Failed to COMMIT TRANSACTION: %s"
                 % (self.__class__.__name__, err)
             )
             raise err
-        await self._close()
 
 
 @cython.cclass
 class BaseConnection:
+    """Represents the `async` socket connection to the server.
+
+    This class serves as the base connection class. It does not perform
+    argument validations during initialization. Such validations are
+    delegated to the subclass `<'aio.Connection'>`.
+
+    #### Please do `NOT` create an instance of this class directly.
+    """
+
     # Basic
     _host: str
     _port: object  # uint
@@ -1175,11 +1700,15 @@ class BaseConnection:
     _charset_id: cython.uint
     _encoding: bytes
     _encoding_c: cython.pchar
+    _charset_changed: cython.bint
     # Timeouts
     _connect_timeout: object  # uint
     _read_timeout: object  # uint | None
+    _read_timeout_changed: cython.bint
     _write_timeout: object  # uint | None
+    _write_timeout_changed: cython.bint
     _wait_timeout: object  # uint | None
+    _wait_timeout_changed: cython.bint
     # Client
     _bind_address: str
     _unix_socket: str
@@ -1206,7 +1735,7 @@ class BaseConnection:
     _server_version: tuple[int]
     _server_version_major: cython.int
     _server_vendor: str
-    _server_thred_id: cython.longlong
+    _server_thread_id: cython.longlong
     _server_salt: bytes
     _server_status: cython.int
     _server_capabilities: cython.longlong
@@ -1214,7 +1743,6 @@ class BaseConnection:
     # . client
     _last_used_time: cython.double
     _secure: cython.bint
-    _host_info: str
     _close_reason: str
     # . query
     _result: MysqlResult
@@ -1225,7 +1753,6 @@ class BaseConnection:
     # . loop
     _loop: AbstractEventLoop
 
-    # Init ------------------------------------------------------------------------------------
     def __init__(
         self,
         host: str,
@@ -1240,21 +1767,58 @@ class BaseConnection:
         wait_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
-        autocommit_mode: cython.int,
-        local_infile: cython.bint,
-        max_allowed_packet: cython.uint,
+        autocommit_mode: int,
+        local_infile: bool,
+        max_allowed_packet: int,
         sql_mode: str | None,
         init_command: str | None,
         cursor: type[Cursor],
-        client_flag: cython.uint,
+        client_flag: int,
         program_name: str | None,
         ssl_ctx: object | None,
         auth_plugin: AuthPlugin | None,
         server_public_key: bytes | None,
-        use_decimal: cython.bint,
-        decode_json: cython.bint,
+        use_decimal: bool,
+        decode_json: bool,
         loop: AbstractEventLoop,
     ):
+        """The `async` socket connection to the server.
+
+        This class serves as the base connection class. It does not perform
+        argument validations during initialization. Such validations are
+        delegated to the subclass `<'aio.Connection'>`.
+
+        #### Please do `NOT` create an instance of this class directly.
+
+        :param host: `<'str'>` The host of the server.
+        :param port: `<'int'>` The port of the server.
+        :param user: `<'bytes/None'>` The username to login as.
+        :param password: `<'bytes'>` The password for login authentication.
+        :param database: `<'bytes/None'>` The default database to use by the connection.
+        :param charset: `<'Charset'>` The charset for the connection.
+        :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection.
+        :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. `None` mean to use GLOBAL settings.
+        :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. `None` mean to use GLOBAL settings.
+        :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. `None` mean to use GLOBAL settings.
+        :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address.
+        :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP.
+        :param autocommit_mode: `<'int'>` The autocommit mode for the connection. -1: Default, 0: OFF, 1: ON.
+        :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command.
+        :param max_allowed_packet: `<'int'>` The max size of packet sent to server in bytes.
+        :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection.
+        :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established.
+        :param cursor: `<'type[Cursor]'>` The default cursor type (class) to use.
+        :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'.
+        :param program_name: `<'str/None'>` The program name for the connection.
+        :param ssl_ctx: `<ssl.SSLContext/None>` The SSL context for the connection.
+        :param auth_plugin: `<'AuthPlugin/None'>` The authentication plugin handlers.
+        :param server_public_key: `<'bytes/None'>` The public key for the server authentication.
+        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>.
+        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string.
+        :param loop: `<'AbstractEventLoop'>` The event loop for the connection.
+        """
+        # . internal
+        self._setup_internal()
         # . basic
         self._host = host
         self._port = port
@@ -1262,7 +1826,7 @@ class BaseConnection:
         self._password = password
         self._database = database
         # . charset
-        self._init_charset(charset)
+        self._setup_charset(charset)
         # . timeouts
         self._connect_timeout = connect_timeout
         self._read_timeout = read_timeout
@@ -1277,8 +1841,8 @@ class BaseConnection:
         self._sql_mode = sql_mode
         self._init_command = init_command
         self._cursor = cursor
-        self._init_client_flag(client_flag)
-        self._init_connect_attrs(program_name)
+        self._setup_client_flag(client_flag)
+        self._setup_connect_attrs(program_name)
         # . ssl
         self._ssl_ctx = ssl_ctx
         # . auth
@@ -1287,16 +1851,15 @@ class BaseConnection:
         # . decode
         self._use_decimal = use_decimal
         self._decode_json = decode_json
-        # . internal
-        self._init_internal()
         # . loop
         self._loop = loop
 
+    # Setup -----------------------------------------------------------------------------------
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _init_charset(self, charset: Charset) -> cython.bint:
-        """(cfunc) Initialize the charactor set `<'bool'>`."""
+    def _setup_charset(self, charset: Charset) -> cython.bint:
+        """(cfunc) Setup charset & collation."""
         self._charset_id = charset._id
         self._charset = charset._name
         self._collation = charset._collation
@@ -1307,8 +1870,8 @@ class BaseConnection:
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _init_client_flag(self, client_flag: cython.uint) -> cython.bint:
-        """(cfunc) Initialize the 'client_flag' `<'bool'>`"""
+    def _setup_client_flag(self, client_flag: cython.uint) -> cython.bint:
+        """(cfunc) Setup the 'client_flag'."""
         if self._local_infile:
             client_flag |= _CLIENT.LOCAL_FILES
         if self._ssl_ctx is not None:
@@ -1322,8 +1885,8 @@ class BaseConnection:
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _init_connect_attrs(self, program_name: str | None) -> cython.bint:
-        """(cfunc) Initialize the 'connect_attrs' `<'bool'>`."""
+    def _setup_connect_attrs(self, program_name: str | None) -> cython.bint:
+        """(cfunc) Setup the 'connect_attrs'."""
         if program_name is None:
             attrs: bytes = sync_conn.DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
                 [str(_getpid)]
@@ -1338,15 +1901,21 @@ class BaseConnection:
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _init_internal(self) -> cython.bint:
-        """(cfunc) Initialize internal attributes `<'bool'>`."""
+    def _setup_internal(self) -> cython.bint:
+        """(cfunc) Setup internal attributes."""
+        # . charset
+        self._charset_changed = False
+        # . timeouts
+        self._read_timeout_changed = False
+        self._write_timeout_changed = False
+        self._wait_timeout_changed = False
         # . server
         self._server_protocol_version = -1
         self._server_info = None
         self._server_version = None
         self._server_version_major = -1
         self._server_vendor = None
-        self._server_thred_id = -1
+        self._server_thread_id = -1
         self._server_salt = None
         self._server_status = -1
         self._server_capabilities = -1
@@ -1354,7 +1923,6 @@ class BaseConnection:
         # . client
         self._set_use_time()
         self._secure = False
-        self._host_info = None
         self._close_reason = None
         # . query
         self._result = None
@@ -1368,67 +1936,70 @@ class BaseConnection:
     # . client
     @property
     def host(self) -> str:
-        """The 'host' of the database server `<'str'>`."""
+        """The host of the server `<'str'>`."""
         return self._host
 
     @property
     def port(self) -> int:
-        """The 'port' of the database server `<'int'>`."""
+        """The port of the server `<'int'>`."""
         return self._port
 
     @property
     def user(self) -> str | None:
-        """The 'user' to login as `<'str/None'>`."""
+        """The username to login as `<'str/None'>`."""
         if self._user is None:
             return None
         return decode_bytes(self._user, self._encoding_c)
 
     @property
     def password(self) -> str:
-        """The 'password' for user authentication `<'str'>`."""
+        """The password for login authentication. `<'str'>`."""
         return decode_bytes(self._password, "latin1")
 
     @property
     def database(self) -> str | None:
-        """The 'database' to be used by the client `<'str/None'>`."""
+        """The default database to use by the connection. `<'str/None'>`."""
         if self._database is None:
             return None
         return decode_bytes(self._database, self._encoding_c)
 
     @property
     def charset(self) -> str:
-        """The 'charactor set' to be used by the client `<'str'>`."""
+        """The 'CHARSET' of the connection `<'str'>`."""
         return self._charset
 
     @property
     def collation(self) -> str:
-        """The 'collation' to be used by the client `<'str'>`."""
+        """The 'COLLATION' of the connection `<'str'>`."""
         return self._collation
 
     @property
     def encoding(self) -> str:
-        """The 'encoding' to be used by the client `<'str'>`."""
+        """The 'encoding' of the connection `<'str'>`."""
         return decode_bytes(self._encoding, "ascii")
 
     @property
     def connect_timeout(self) -> int:
-        """The timeout in seconds for establishing the connection `<'int'>`."""
+        """Timeout in seconds for establishing the connection `<'int'>`."""
         return self._connect_timeout
 
     @property
     def bind_address(self) -> str | None:
-        """The 'bind_address' from which to connect to the host `<'str/None'>`."""
+        """The interface from which to connect to the host `<'str/None'>`."""
         return self._bind_address
 
     @property
     def unix_socket(self) -> str | None:
-        """The 'unix_socket' to be used rather than TCP/IP `<'str/None'>`."""
+        """The unix socket (rather than TCP/IP) for establishing the connection `<'str/None'>`."""
         return self._unix_socket
 
     @property
     def autocommit(self) -> bool | None:
-        """The 'autocommit' mode `<'bool/None'>`.
-        None means use server default.
+        """The 'autocommit' mode of the connection `<'bool/None'>`.
+
+        - `True` if the connection is operating in autocommit (non-transactional) mode.
+        - `False` if the connection is operating in manual commit (transactional) mode.
+        - `None` means connection is not connected and use server default.
         """
         if self._server_status == -1:
             return None if self._autocommit_mode == -1 else bool(self._autocommit_mode)
@@ -1437,7 +2008,7 @@ class BaseConnection:
 
     @property
     def local_infile(self) -> bool:
-        """Whether enable the use of LOAD DATA LOCAL command `<'bool'>`."""
+        """Whether LOAD DATA LOCAL command is enabled `<'bool'>`."""
         return self._local_infile
 
     @property
@@ -1447,47 +2018,35 @@ class BaseConnection:
 
     @property
     def sql_mode(self) -> str | None:
-        """The default 'sql_mode' to be used `<'str/None'>`."""
+        """The default SQL_MODE for the connection `<'str/None'>`."""
         return self._sql_mode
 
     @property
     def init_command(self) -> str | None:
-        """The 'init_command' to be executed after connecting `<'str/None'>`."""
+        """The initial SQL statement to run when connection is established `<'str/None'>`."""
         return self._init_command
 
     @property
     def client_flag(self) -> int:
-        """The 'client_flag' of the connection `<'int'>`."""
+        """The current client flag of the connection `<'int'>`."""
         return self._client_flag
 
     @property
-    def host_info(self) -> str:
-        """The information about the server `<'str'>`."""
-        return "Not connected" if self._host_info is None else self._host_info
-
-    @property
     def ssl(self) -> object | None:
-        """The 'ssl.SSLContext' to be used for secure connection `<'SSLContext/None'>`."""
+        """The 'ssl.SSLContext' for the connection `<'SSLContext/None'>`."""
         return self._ssl_ctx
 
     @property
     def auth_plugin(self) -> AuthPlugin | None:
-        """The 'auth_plugin' to be used for authentication `<'AuthPlugin/None'>`."""
+        """The authentication plugins handlers `<'AuthPlugin/None'>`."""
         return self._auth_plugin
 
     # . server
     @property
     def thread_id(self) -> int | None:
-        """The thread id from the server `<'int/None'>`."""
-        if self._server_thred_id != -1:
-            return self._server_thred_id
-        else:
-            return None
-
-    @property
-    def transaction_status(self) -> bool | None:
-        if self._server_status != -1:
-            return self.get_transaction_status()
+        """The 'thread id' of connection `<'int/None'>`."""
+        if self._server_thread_id != -1:
+            return self._server_thread_id
         else:
             return None
 
@@ -1501,17 +2060,21 @@ class BaseConnection:
 
     @property
     def server_info(self) -> str | None:
-        """The server information `<'str/None'>`."""
+        """The server information (name & version) `<'str/None'>`."""
         return self._server_info
 
     @property
     def server_version(self) -> tuple[int] | None:
-        """The server version `<'tuple[int]/None'>`."""
+        """The server version `<'tuple[int]/None'>`.
+        >>> (8, 0, 23)  # example
+        """
         return self.get_server_version()
 
     @property
     def server_version_major(self) -> int | None:
-        """The server major version `<'int/None'>`."""
+        """The server major version `<'int/None'>`.
+        >>> 8  # example
+        """
         if self._server_version_major != -1:
             return self._server_version_major
         else:
@@ -1519,7 +2082,7 @@ class BaseConnection:
 
     @property
     def server_vendor(self) -> Literal["mysql", "mariadb"] | None:
-        """The server vendor (database type) `<'str/None'>`."""
+        """The name of the server vendor (database type) `<'str/None'>`."""
         return self.get_server_vendor()
 
     @property
@@ -1540,7 +2103,7 @@ class BaseConnection:
 
     @property
     def server_auth_plugin_name(self) -> str | None:
-        """The server authentication plugin name `<'str/None'>`."""
+        """The authentication plugin name of the server `<'str/None'>`."""
         return self._server_auth_plugin_name
 
     # . query
@@ -1551,92 +2114,278 @@ class BaseConnection:
 
     @property
     def insert_id(self) -> int:
-        """The id of the last inserted row `<'int'>`."""
+        """The 'LAST_INSERT_ID' of the the last query `<'int'>`."""
         return self.get_insert_id()
+
+    @property
+    def transaction_status(self) -> bool | None:
+        """Whether the connection is in a TRANSACTION `<'bool/None'>`."""
+        if self._server_status != -1:
+            return self.get_transaction_status()
+        else:
+            return None
 
     # . decode
     @property
     def use_decimal(self) -> bool:
-        """Whether to convert DECIMAL to Decimal object `<'bool'>`.
-        If `False`, DECIMAL will be converted to float.
+        """Whether to use <'decimal.DECIMAL'> to represent
+        DECIMAL column data `<'bool'>`.
+
+        If `False`, use <'float'> instead.
         """
         return self._use_decimal
 
     @property
     def decode_json(self) -> bool:
-        """Whether to decode JSON data `<'bool'>`.
-        If `False`, JSON will be returned as string.
+        """Whether to decode JSON column data `<'bool'>`.
+
+        If `False`, keep as original json string.
         """
         return self._decode_json
 
     # Cursor ----------------------------------------------------------------------------------
     @cython.ccall
     def cursor(self, cursor: type[Cursor] = None) -> CursorManager:
+        """Acquire a new `async` cursor of the connection through
+        context manager `<'CursorManager'>`.
+
+        :param cursor: `<'type[Cursor]'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+
+        ### Example (context manager):
+        >>> async with conn.cursor() as cur:
+                await cur.execute("SELECT * FROM table")
+
+        ### Example (direct - NOT recommended):
+        >>> cur = await conn.cursor()
+            await cur.execute("SELECT * FROM table")
+            await cur.close()  # manual close
+        """
         self._verify_connected()
         cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
         return CursorManager(self, cur)
 
     @cython.ccall
     def transaction(self, cursor: type[Cursor] = None) -> TransactionManager:
+        """Acquire a new `async` cursor of the connection in `TRANSACTION` mode
+        through context manager `<'TransactionManager'>`.
+
+        By acquiring cursor through this method, the following happens:
+        - 1. Use the connection to `BEGIN` a transaction.
+        - 2. Returns the cursor of the connection.
+        - 3a. If catches ANY exceptions during the transaction, close the connection.
+        - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
+
+        :param cursor: `<'type[Cursor]'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+
+        ### Example:
+        >>> async with conn.transaction() as cur:
+                await cur.execute("INSERT INTO table VALUES (1, 'name')")
+                # COMMIT automatically if no error
+        """
         self._verify_connected()
         cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
         return TransactionManager(self, cur)
 
-    @cython.cfunc
-    @cython.inline(True)
-    @cython.exceptval(-1, check=False)
-    def _set_use_time(self) -> cython.bint:
-        self._last_used_time = unix_time()
-        return True
-
     # Query -----------------------------------------------------------------------------------
     async def query(self, sql: str, unbuffered: bool = False) -> int:
+        """Execute a SQL query `<'int'>`
+
+        :param sql: `<'str'>` The SQL query to execute.
+        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
+        :return: `<'int'>` The number of affected rows.
+        """
         await self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
         return await self._read_query_result(unbuffered)
 
     async def begin(self) -> None:
-        """Begin transaction `<'None'>`."""
+        """BEGIN a transaction."""
         await self._execute_command(_COMMAND.COM_QUERY, b"BEGIN")
         await self._read_ok_packet()
 
-    async def commit(self) -> None:
-        """Commit changes to stable storage.
+    async def start(self) -> None:
+        """START TRANSACTION, alias to 'Connection.begin()'."""
+        await self.begin()
 
-        See `Connection.commit() <https://www.python.org/dev/peps/pep-0249/#commit>`_
-        in the specification.
-        """
+    async def commit(self) -> None:
+        """COMMIT any pending transaction to the database."""
         await self._execute_command(_COMMAND.COM_QUERY, b"COMMIT")
         await self._read_ok_packet()
 
     async def rollback(self) -> None:
-        """Roll back the current transaction.
-
-        See `Connection.rollback() <https://www.python.org/dev/peps/pep-0249/#rollback>`_
-        in the specification.
-        """
+        """ROLLBACK the current transaction."""
         await self._execute_command(_COMMAND.COM_QUERY, b"ROLLBACK")
         await self._read_ok_packet()
 
+    async def kill(self, thread_id: cython.int) -> None:
+        """Execute KILL command.
+
+        :param thread_id: `<'int'>` The thread ID to be killed.
+        """
+        try:
+            await self._execute_command(
+                _COMMAND.COM_PROCESS_KILL, utils.pack_int32(thread_id)
+            )
+            await self._read_ok_packet()
+        except errors.OperationalUnknownCommandError:
+            # if COM_PROCESS_KILL [0x0C] raises 'unknown command'
+            # error, try execute 'KILL {thread_id}' query instead.
+            await self._execute_command(_COMMAND.COM_QUERY, b"KILL %d" % thread_id)
+            await self._read_ok_packet()
+
+    async def show_warnings(self) -> tuple[tuple]:
+        """Execute 'SHOW WARNINGS' sql and returns
+        the warnings `<'tuple[tuple]'>`."""
+        await self.query("SHOW WARNINGS")
+        return self._result.rows
+
+    async def select_database(self, db: str) -> None:
+        """Select database for the connection (SESSION).
+
+        :param db: `<'str'>` The name of the database to select.
+        """
+        database: bytes = self.encode_sql(db)
+        await self._execute_command(_COMMAND.COM_INIT_DB, database)
+        await self._read_ok_packet()
+        self._database = database
+
+    @cython.ccall
+    def escape_args(
+        self,
+        args: object,
+        many: cython.bint = False,
+        itemize: cython.bint = True,
+    ) -> object:
+        """Escape arguments into formatable object(s) `<'str/tuple/list[str/tuple]'>`.
+
+        ### Arguments
+        :param args: `<'object'>` The arguments to escape, supports:
+            - Python native: int, float, bool, str, None, datetime, date,
+              time, timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset.
+            - Library numpy: np.int_, np.uint, np.float_, np.bool_, np.bytes_,
+              np.datetime64, np.timedelta64, np.ndarray.
+            - Library pandas: pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+              pd.TimedeltaIndex, pd.Series, pd.DataFrame.
+
+        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
+            - When 'many=True', the argument 'itemize' is ignored.
+                * 1. 'list' and 'tuple' will be escaped into list of str or tuple[str],
+                  depends on type of the sequence items. Each item represents one row
+                  of the 'args' `<'list[str/tuple[str]]'>`.
+                * 2. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
+                  represents one row of the 'args' `<'list[tuple[str]]'>`.
+                * 3. All other sequences or mappings 'args' will be escaped into tuple
+                  of literal strings `<'tuple[str]'>`.
+                * 4. Single 'args' will be escaped into one literal string `<'str'>`.
+            - When 'many=False', the argument 'itemize' determines how to escape the 'args'.
+
+        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+            - When 'itemize=True', the 'args' type determines how to escape.
+                * 1. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
+                  represents one row of the 'args' `<'list[tuple[str]]'>`.
+                * 2. All sequences or mappings 'args' will be escaped into tuple of
+                  literal strings `<'tuple[str]'>`. This includes 'list', 'tuple',
+                  'set', 'frozenset', 'dict', 'np.ndarray', 'pd.Series', etc.
+                * 3. Single 'args' will be escaped into one literal string `<'str'>`.
+            - When 'itemize=False', regardless of the 'args' type, it will be escaped into
+              one single literal string `<'str'>`.
+
+        ### Exceptions
+        :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
+
+        ### Returns:
+        - If returns a <'str'>, it represents a single literal string.
+          The 'sql' should only have one '%s' placeholder.
+        - If returns a <'tuple'>, it represents a single row of literal
+          strings. The 'sql' should have '%s' placeholders equal to the
+          tuple length.
+        - If returns a <'list'>, it represents multiple rows of literal
+          strings. The 'sql' should have '%s' placeholders equal to the
+          item count in each row.
+
+        ### Example (list or tuple)
+        >>> escape([(1, 2), (3, 4)], many=True)
+        >>> [("1", "2"), ("3", "4")]  # list[tuple[str]]
+            # many=True, [optional] itemize=True
+        >>> escape([(1, 2), (3, 4)], many=False, itemize=True)
+        >>> ("(1,2)", "(3,4)")        # tuple[str]
+            # many=False, itemize=True
+        >>> escape([(1, 2), (3, 4)], many=False, itemize=False)
+        >>> "(1,2),(3,4)"             # str
+            # many=False, itemize=False
+
+        ### Example (set [sequence])
+        >>> escape({(1, 2), (3, 4)}, many=True)
+        >>> ("(1,2)", "(3,4)")        # tuple[str]
+            # many=True, [optional] itemize=True
+        >>> escape({(1, 2), (3, 4)}, many=False, itemize=True)
+        >>> ("(1,2)", "(3,4)")        # tuple[str]
+            # many=False, itemize=True
+        >>> escape({(1, 2), (3, 4)}, many=False, itemize=False)
+        >>> "(1,2),(3,4)"             # str
+            # many=False, itemize=False
+
+        ### Example (DataFrame)
+        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=True)
+        >>> [('1', '3'), ('2', '4')]  # list[tuple[str]]
+            # many=True, [optional] itemize=True
+        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=False, itemize=True)
+        >>> [('1', '3'), ('2', '4')]  # list[tuple[str]]
+            # many=False, itemize=True
+        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=False, itemize=False)
+        >>> "(1,3),(2,4)"             # str
+            # many=False, itemize=False
+
+        ### Example (single item)
+        >>> escape(1, many=True)
+        >>> "1"                       # str
+            # many=True, [optional] itemize=True
+        >>> escape(1, many=False, itemize=True)
+        >>> "1"                       # str
+            # many=False, itemize=True
+        >>> escape(1, many=False, itemize=False)
+        >>> "1"                       # str
+            # many=False, itemize=False
+        """
+        return escape(args, many, itemize)
+
+    @cython.ccall
+    def encode_sql(self, sql: str) -> bytes:
+        """Encode the 'sql' with connection's encoding `<'bytes'>`.
+
+        :param sql: `<'str'>` The sql to be encoded.
+        """
+        return utils.encode_str(sql, self._encoding_c)
+
+    # . client
     async def set_charset(
         self,
-        charset: str | None,
+        charset: str,
         collation: str | None = None,
     ) -> None:
-        """Set charset and collation[Optional] `<'bool'>`.
+        """Set CHARSET and COLLATION of the connection.
 
-        Send "SET NAMES charset [COLLATE collation]" query.
-        Update Connection.encoding based on charset.
+        :param charset: `<'str'>` The charset.
+        :param collation: `<'str/None'>` The collation. Defaults to `None`.
         """
         ch: Charset = utils.validate_charset(
             charset, collation, sync_conn.DEFUALT_CHARSET
         )
         if ch._name != self._charset or ch._collation != self._collation:
-            self._init_charset(ch)
+            self._setup_charset(ch)
             sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
             await self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
-            await self._read_packet()
+            await self._read_ok_packet()
+            self._charset_changed = True
 
     async def set_read_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'net_read_timeout'.
+
+        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
+        - When 'value=None', if connection 'read_timeout' is
+          specified, set the timeout to the connection value,
+          else set to the server GLOBAL value.
+        """
         name = "net_read_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
@@ -1650,11 +2399,20 @@ class BaseConnection:
 
         # Set timeout
         await self._set_timeout(name, value)
+        self._read_timeout_changed = True
 
     async def get_read_timeout(self) -> int:
+        """Get connection (SESSION) 'net_read_timeout' `<'int'>`."""
         return await self._get_timeout("net_read_timeout", True)
 
     async def set_write_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'net_write_timeout'.
+
+        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
+        - When 'value=None', if connection 'write_timeout' is
+          specified, set the timeout to the connection value,
+          else set to the server GLOBAL value.
+        """
         name = "net_write_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
@@ -1668,11 +2426,20 @@ class BaseConnection:
 
         # Set timeout
         await self._set_timeout(name, value)
+        self._write_timeout_changed = True
 
     async def get_write_timeout(self) -> int:
+        """Get connection (SESSION) 'net_write_timeout' `<'int'>`."""
         return await self._get_timeout("net_write_timeout", True)
 
     async def set_wait_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'wait_timeout'.
+
+        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
+        - When 'value=None', if connection 'wait_timeout' is
+          specified, set the timeout to the connection value,
+          else set to the server GLOBAL value.
+        """
         name = "wait_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
@@ -1686,37 +2453,63 @@ class BaseConnection:
 
         # Set timeout
         await self._set_timeout(name, value)
+        self._wait_timeout_changed = True
 
     async def get_wait_timeout(self) -> int:
+        """Get connection (SESSION) 'wait_timeout' `<'int'>`."""
         return await self._get_timeout("wait_timeout", True)
 
     async def _set_timeout(self, name: str, value: object) -> None:
-        async with self.cursor() as cur:
-            await cur.execute("SET SESSION %s = %s" % (name, value))
+        """(internal) Set connection (SESSION) timeout.
+
+        :param name: `<'str'>` The name of the timeout.
+        :param value: `<'int'>` The timeout value in seconds.
+        """
+        sql = "SET SESSION %s = %s" % (name, value)
+        await self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
+        await self._read_ok_packet()
 
     async def _get_timeout(self, name: str, session: cython.bint) -> int:
-        async with self.cursor() as cur:
-            await cur.execute(
-                "SHOW VARIABLES LIKE '%s'" % name
-                if session
-                else "SHOW GLOBAL VARIABLES LIKE '%s'" % name
-            )
-            try:
-                return int((await cur.fetchone())[1])
-            except Exception as err:
-                raise errors.DatabaseError(
-                    "Failed to get %s '%s' from server: %s"
-                    % ("SESSION" if session else "GLOBAL", name, err)
-                ) from err
+        """(internal) Get SESSION/GLOBAL timeout `<'int'>`.
+
+        :param name: `<'str'>` The name of the timeout.
+        :param session: `<'bool'> If True get SESSION timeout, else get GLOBAL timeout.
+        :return: `<'int'> The timeout value in seconds.
+        """
+        if session:
+            sql = "SHOW VARIABLES LIKE '%s'" % name
+        else:
+            sql = "SHOW GLOBAL VARIABLES LIKE '%s'" % name
+        await self.query(sql, False)
+        try:
+            return int(self._result.rows[0][1])
+        except Exception as err:
+            raise errors.DatabaseError(
+                "Failed to get %s '%s' from server: %s"
+                % ("SESSION" if session else "GLOBAL", name, err)
+            ) from err
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def get_autocommit(self) -> cython.bint:
+        """Get the 'autocommit' mode of the connection `<'bool'>`.
+
+        - `True` if the connection is operating in autocommit (non-transactional) mode.
+        - `False` if the connection is operating in manual commit (transactional) mode.
+
+        :raises `<'ConnectionClosedError'>`: If connection is not connected.
+        """
         if self._server_status == -1:
             raise errors.ConnectionClosedError(0, "Connection not connected.")
         return self._server_status & _SERVER_STATUS.SERVER_STATUS_AUTOCOMMIT
 
     async def set_autocommit(self, auto: cython.bint) -> None:
+        """Set the 'autocommit' mode of the connection (SESSION).
+
+        :param auto: `<'bool'>` Enable/Disable autocommit.
+            - `True` to operate in autocommit (non-transactional) mode.
+            - `False` to operate in manual commit (transactional) mode.
+        """
         if auto != self.get_autocommit():
             await self._execute_command(
                 _COMMAND.COM_QUERY,
@@ -1725,41 +2518,12 @@ class BaseConnection:
             await self._read_ok_packet()
             self._autocommit_mode = auto
 
-    async def show_warnings(self) -> tuple:
-        """Send the "SHOW WARNINGS" SQL command."""
-        await self._execute_command(_COMMAND.COM_QUERY, b"SHOW WARNINGS")
-        result = MysqlResult(self)
-        await result.read()
-        return result.rows
-
-    async def select_database(self, db: str) -> None:
-        """Set current db.
-
-        :param db: The name of the db.
-        """
-        database: bytes = self.encode_sql(db)
-        await self._execute_command(_COMMAND.COM_INIT_DB, database)
-        await self._read_ok_packet()
-        self._database = database
-
-    @cython.ccall
-    def get_affected_rows(self) -> cython.ulonglong:
-        return 0 if self._result is None else self._result.affected_rows
-
-    @cython.ccall
-    def get_insert_id(self) -> cython.ulonglong:
-        return 0 if self._result is None else self._result.insert_id
-
-    @cython.ccall
-    @cython.exceptval(-1, check=False)
-    def get_transaction_status(self) -> cython.bint:
-        """Whether the connection is in transaction `<'bool'>`."""
-        if self._server_status == -1:
-            raise errors.ConnectionClosedError(0, "Connection not connected.")
-        return self._server_status & _SERVER_STATUS.SERVER_STATUS_IN_TRANS
-
+    # . server
     @cython.ccall
     def get_server_version(self) -> tuple[int]:
+        """Get the server version `<'tuple[int]/None'>`.
+        >>> (8, 0, 23)  # example
+        """
         if self._server_version is None:
             # Not connected
             if self._server_info is None:
@@ -1778,6 +2542,7 @@ class BaseConnection:
 
     @cython.ccall
     def get_server_vendor(self) -> str:
+        """Get the name of the server vendor (database type) `<'str/None'>`."""
         if self._server_vendor is None:
             # Not connected
             if self._server_info is None:
@@ -1789,9 +2554,34 @@ class BaseConnection:
                 self._server_vendor = "mysql"
         return self._server_vendor
 
+    # . query
+    @cython.ccall
+    def get_affected_rows(self) -> cython.ulonglong:
+        """Get the number of affected rows by the last query `<'int'>`."""
+        return 0 if self._result is None else self._result.affected_rows
+
+    @cython.ccall
+    def get_insert_id(self) -> cython.ulonglong:
+        """Get the 'LAST_INSERT_ID' of the the last query `<'int'>`."""
+        return 0 if self._result is None else self._result.insert_id
+
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def get_transaction_status(self) -> cython.bint:
+        """Get whether the connection is in a TRANSACTION `<'bool'>`."""
+        if self._server_status == -1:
+            raise errors.ConnectionClosedError(0, "Connection not connected.")
+        return self._server_status & _SERVER_STATUS.SERVER_STATUS_IN_TRANS
+
+    # . decode
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_use_decimal(self, value: cython.bint) -> cython.bint:
+        """Set whether to use <'decimal.DECIMAL'> to
+        represent DECIMAL column data.
+
+        :param value: `<'bool'>` True to use <'DECIMAL>', else <'float'>.
+        """
         if self._use_decimal != value:
             self._use_decimal = value
         return True
@@ -1799,27 +2589,29 @@ class BaseConnection:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_decode_json(self, value: cython.bint) -> cython.bint:
+        """Set whether to decode JSON column data.
+
+        :param value: `<'bool'>` True to decode, else False.
+        """
         if self._decode_json != value:
             self._decode_json = value
         return True
 
-    @cython.ccall
-    def escape_args(self, args: object, itemize: cython.bint = True) -> object:
-        """Escape object into string `<'str/tuple'>`."""
-        return encode_item(args) if itemize else escape_item(args)
-
-    @cython.ccall
-    def encode_sql(self, sql: str) -> bytes:
-        return utils.encode_str(sql, self._encoding_c)
-
     # Connect / Close -------------------------------------------------------------------------
     async def connect(self) -> None:
-        """Establish connection with database server `<'bool'>`."""
+        """Establish connection with server.
+
+        If the connection is already established,
+        no action will be taken.
+        """
         if self.closed():
             await self._connect()
 
     async def _connect(self) -> None:
-        """Establish connection with database server `<'bool'>`."""
+        """(internal) Establish connection with server.
+
+        #### This method will establish connection REGARDLESS of the connection state.
+        """
         # Connect
         try:
             # . create socket
@@ -1828,7 +2620,6 @@ class BaseConnection:
                     self._open_unix(self._unix_socket),
                     timeout=self._connect_timeout,
                 )
-                self._host_info = "Localhost via UNIX socket"
                 self._secure = True
             else:
                 await _wait_for(
@@ -1843,7 +2634,6 @@ class BaseConnection:
                     ),
                     timeout=self._connect_timeout,
                 )
-                self._host_info = "socket %s:%s" % (self._host, self._port)
                 # . set no delay & keepalive
                 transport: Transport = self._writer.transport
                 transport.pause_reading()
@@ -1872,9 +2662,13 @@ class BaseConnection:
             # - https://github.com/PyMySQL/PyMySQL/issues/1092
             # - https://github.com/wagtail/wagtail/issues/9477
             # - https://zenn.dev/methane/articles/2023-mysql-collation (Japanese)
-            sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
-            await self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
-            await self._read_packet()
+            await self._execute_command(
+                _COMMAND.COM_QUERY,
+                self.encode_sql(
+                    "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
+                ),
+            )
+            await self._read_ok_packet()
 
             # . timeouts
             if self._read_timeout is not None:
@@ -1898,13 +2692,10 @@ class BaseConnection:
                 self._autocommit_mode != -1
                 and self._autocommit_mode != self.get_autocommit()
             ):
+                auto: cython.bint = self._autocommit_mode == 1
                 await self._execute_command(
                     _COMMAND.COM_QUERY,
-                    (
-                        b"SET AUTOCOMMIT = 1"
-                        if self._autocommit_mode
-                        else b"SET AUTOCOMMIT = 0"
-                    ),
+                    b"SET AUTOCOMMIT = 1" if auto else b"SET AUTOCOMMIT = 0",
                 )
                 await self._read_ok_packet()
 
@@ -1925,7 +2716,7 @@ class BaseConnection:
             raise err
 
     async def _open_tcp(self, host: str = None, port: int = None, **kwargs) -> None:
-        """Open a socket connection to server using TCP/IP `<'bool'>`."""
+        """(internal) Open the socket connection through TCP/IP."""
         loop = self._loop
         reader = StreamReader(loop=loop)
         protocol = StreamReaderProtocol(reader, loop=loop)
@@ -1938,7 +2729,7 @@ class BaseConnection:
         return True
 
     async def _open_unix(self, unix_socket: str = None, **kwargs) -> None:
-        """Open a socket connection to server using UNIX socket."""
+        """(internal) Open the socket connection through UNIX socket."""
         loop = self._loop
         reader = StreamReader(loop=loop)
         protocol = StreamReaderProtocol(reader, loop=loop)
@@ -1951,12 +2742,11 @@ class BaseConnection:
         return True
 
     async def close(self) -> None:
-        """Send the quit message and close the socket.
+        """Send QUIT command and close the connection
+        socket. The connection will be unusable after
+        this method is called.
 
-        See `Connection.close() <https://www.python.org/dev/peps/pep-0249/#Connection.close>`_
-        in the specification.
-
-        No error will be raised.
+        #### This method does not raise any error.
         """
         # Already closed
         if self.closed():
@@ -1971,6 +2761,12 @@ class BaseConnection:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def force_close(self) -> cython.bint:
+        """Close the connection socket directly without
+        sending a QUIT command. The connection will be
+        unusable after this method is called.
+
+        #### This method does not raise any error.
+        """
         if not self.closed():
             try:
                 self._writer.transport.close()
@@ -1984,6 +2780,12 @@ class BaseConnection:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _close_with_reason(self, reason: str) -> cython.bint:
+        """(cfunc) Force close the connection socket while
+        setting the closed reason. The connection will be
+        unusable after this method is called.
+
+        #### This method does not raise any error.
+        """
         self._close_reason = "Connection closed: %s" % reason
         self.force_close()
         return True
@@ -1991,28 +2793,15 @@ class BaseConnection:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def closed(self) -> cython.bint:
-        """The connection status, whether is closed `<'bool'>`."""
+        """Represents the connection state: whether is closed `<'bool'>`."""
         return self._writer is None
 
-    async def kill(self, thread_id: int) -> None:
-        try:
-            await self._execute_command(
-                _COMMAND.COM_PROCESS_KILL, utils.pack_int32(thread_id)
-            )
-            await self._read_ok_packet()
-        except errors.OperationalUnknownCommandError:
-            # if COM_PROCESS_KILL [0x0C] gets 'unknown command' error,
-            # try with 'kill {thread_id}' sql.
-            async with self.cursor() as cur:
-                await cur.execute("KILL %d" % thread_id)
-
     async def ping(self, reconnect: bool = True) -> None:
-        """Check if the server is alive.
+        """Check if the connection is alive.
 
-        :param reconnect: If the connection is closed, reconnect.
-        :type reconnect: boolean
-
-        :raise Error: If the connection is closed and reconnect=False.
+        :param reconnect: `<'bool'>` Whether to reconnect if disconnected. Defaults to `True`.
+            - If 'reconnect=False' and the connection is disconnected,
+              raise 'ConnectionClosedError' directly.
         """
         if self.closed():
             if not reconnect:
@@ -2029,6 +2818,7 @@ class BaseConnection:
             await self.ping(False)
 
     async def _setup_server_information(self) -> None:
+        """(internal) [Handshake] Setup server information."""
         # Read from packet
         pkt: MysqlPacket = await self._read_packet()
         data: cython.pchar = pkt._data_c
@@ -2044,7 +2834,7 @@ class BaseConnection:
         i: cython.Py_ssize_t = loc + 1
 
         # . server_thred_id
-        self._server_thred_id = utils.unpack_uint32(data, i)
+        self._server_thread_id = utils.unpack_uint32(data, i)
         i += 4
 
         # . salt
@@ -2094,6 +2884,7 @@ class BaseConnection:
             self._server_auth_plugin_name = decode_bytes_utf8(auth_plugin_name)
 
     async def _request_authentication(self) -> None:
+        """(internal) [Handshake] Request authentication."""
         # https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::HandshakeResponse
         # . mysql version 5+
         if self._server_version_major >= 5:
@@ -2202,7 +2993,7 @@ class BaseConnection:
                 )
 
     async def _process_authentication(self, auth_pkt: MysqlPacket) -> MysqlPacket:
-        """Process authentication response `<'MysqlPacket'>`."""
+        """(internal) [Handshake] Process authentication response `<'MysqlPacket'>`."""
         # Validate plugin name & capabilities
         plugin_name: bytes = auth_pkt._plugin_name
         if plugin_name is None or not self._server_capabilities & _CLIENT.PLUGIN_AUTH:
@@ -2298,8 +3089,8 @@ class BaseConnection:
         return pkt
 
     async def _process_auth_caching_sha2(self, pkt: MysqlPacket) -> MysqlPacket:
-        """Process 'caching_sha2_password' authentication
-        response `<'MysqlPacket'>`."""
+        """(internal) [Handshake] Process 'caching_sha2_password'
+        authentication response `<'MysqlPacket'>`."""
         # No password fast path
         if self._password is None:
             return await self._process_auth_send_data(b"")
@@ -2353,7 +3144,8 @@ class BaseConnection:
         return await self._process_auth_send_data(data)
 
     async def _process_auth_sha256(self, pkt: MysqlPacket) -> MysqlPacket:
-        """(cfunc) Process 'sha256_password' authentication response `<'MysqlPacket'>`."""
+        """(internal) [Handshake] Process 'sha256_password'
+        authentication response `<'MysqlPacket'>`."""
         if self._secure:
             # sha256: send plain password via secure connection
             return await self._process_auth_send_data(self._password + b"\0")
@@ -2381,7 +3173,7 @@ class BaseConnection:
         return await self._process_auth_send_data(data)
 
     async def _process_auth_send_data(self, data: bytes) -> MysqlPacket:
-        """(cfunc) Process authentication - send data `<'MysqlPacket'>`."""
+        """(internal) [Handshake] Process authentication: send data `<'MysqlPacket'>`."""
         self._write_packet(data)
         pkt: MysqlPacket = await self._read_packet()
         pkt.check_error()
@@ -2391,7 +3183,10 @@ class BaseConnection:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _verify_connected(self) -> cython.bint:
-        "(cfunc) Verify if the connection is connected."
+        """(cfunc) Verify if the connection is connected.
+
+        :raises `<'ConnectionClosedError'>`: If the connection has already been closed.
+        """
         if self.closed():
             if self._close_reason is None:
                 raise errors.ConnectionClosedError(0, "Connection not connected.")
@@ -2401,9 +3196,10 @@ class BaseConnection:
 
     # Write -----------------------------------------------------------------------------------
     async def _execute_command(self, command: cython.uint, sql: bytes) -> None:
-        """
-        :raise InterfaceError: If the connection is closed.
-        :raise ValueError: If no username was specified.
+        """(internal) Execute SQL command.
+
+        :param command: `<'int'> The command code, see 'constants.COMMAND'.
+        :param sql: `<'bytes'>` The query SQL encoded with connection's encoding.
         """
         # Validate connection
         self._verify_connected()
@@ -2444,11 +3240,13 @@ class BaseConnection:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _write_packet(self, payload: bytes) -> cython.bint:
-        """Writes an entire 'packet' in its entirety to the network
-        adding its length and sequence number.
+        """(cfunc) Writes the 'payload' as packet in its entirety
+        to the network (adds length, sequence number and update
+        'self._next_seq_id').
         """
-        # Internal note: when you build packet manually and calls _write_bytes()
-        # directly, you should set self._next_seq_id properly.
+        # Internal note: when you build packet manually and calls
+        # '_write_bytes()' directly instead of '_write_packet()',
+        # you should set 'self._next_seq_id' properly.
         data = utils.pack_I24B(bytes_len(payload), self._next_seq_id) + payload
         self._write_bytes(data)
         self._next_seq_id = (self._next_seq_id + 1) % 256
@@ -2458,6 +3256,7 @@ class BaseConnection:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _write_bytes(self, data: bytes) -> cython.bint:
+        """(cfunc) Writes the 'data' directly to the network."""
         try:
             self._writer.write(data)
         except OSError as err:
@@ -2472,12 +3271,28 @@ class BaseConnection:
             raise err
         return True
 
+    @cython.cfunc
+    @cython.inline(True)
+    @cython.exceptval(-1, check=False)
+    def _set_use_time(self) -> cython.bint:
+        """(cfunc) Set (recorde) the 'last_used_time' of the connection."""
+        self._last_used_time = unix_time()
+        return True
+
     # Read ------------------------------------------------------------------------------------
     async def next_result(self, unbuffered: bool = False) -> int:
-        """Go to the next query result, and returns affected rows `<'int'>`."""
+        """Go to the next query result, and returns
+        the affected rows `<'int'>`.
+
+        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
+        """
         return await self._read_query_result(unbuffered)
 
     async def _read_ok_packet(self) -> MysqlPacket:
+        """(internal) Read the next packet as OKPacket `<'MysqlPacket'>`
+
+        :raise `<'CommandOutOfSyncError'>`: If next packet is `NOT` OKPacket.
+        """
         pkt: MysqlPacket = await self._read_packet()
         if not pkt.read_ok_packet():
             raise errors.CommandOutOfSyncError(
@@ -2487,6 +3302,12 @@ class BaseConnection:
         return pkt
 
     async def _read_query_result(self, unbuffered: bool) -> int:
+        """(internal) Read the next query result, and returns
+        the affected rows `<'int'>`.
+
+        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
+        """
+        # Read result
         self._result = None
         if unbuffered:
             try:
@@ -2500,16 +3321,17 @@ class BaseConnection:
             result = MysqlResult(self)
             await result.read()
         self._result = result
+        # Update status
         if result.server_status != -1:
             self._server_status = result.server_status
         return result.affected_rows
 
     async def _read_packet(self) -> MysqlPacket:
-        """Read the entire 'packet' in its entirety
+        """(internal) Read the next packet in its entirety
         from the network and returns `<'MysqlPacket'>`.
 
-        :raise OperationalError: If the connection to the server is lost.
-        :raise InternalError: If the packet sequence number is wrong.
+        :raise `<'OperationalError'>`: If the connection to the server is lost.
+        :raise `<'InternalError'>`: If the packet sequence number is wrong.
         """
         buffer: bytes = await self._read_packet_buffer()
         pkt = MysqlPacket(buffer, self._encoding)
@@ -2520,11 +3342,10 @@ class BaseConnection:
         return pkt
 
     async def _read_field_descriptor_packet(self) -> FieldDescriptorPacket:
-        """Read the entire 'packet' in its entirety
-        from the network and returns `<'FieldDescriptorPacket'>`.
+        """(internal) Read the next packet as `<'FieldDescriptorPacket'>`.
 
-        :raise OperationalError: If the connection to the server is lost.
-        :raise InternalError: If the packet sequence number is wrong.
+        :raise `<'OperationalError'>`: If the connection to the server is lost.
+        :raise `<'InternalError'>`: If the packet sequence number is wrong.
         """
         buffer: bytes = await self._read_packet_buffer()
         pkt = FieldDescriptorPacket(buffer, self._encoding)
@@ -2535,11 +3356,11 @@ class BaseConnection:
         return pkt
 
     async def _read_packet_buffer(self) -> bytes:
-        """Read the entire 'packet' in its entirety from the network
-        and return the data buffer `<'bytes'>`.
+        """(internal) Read the next packet in its entirety from
+        the network and returns the data buffer `<'bytes'>`.
 
-        :raise OperationalError: If the connection to the server is lost.
-        :raise InternalError: If the packet sequence number is wrong.
+        :raise `<'OperationalError'>`: If the connection to the server is lost.
+        :raise `<'InternalError'>`: If the packet sequence number is wrong.
         """
         # Read buffer data
         buffer: bytearray = bytearray()
@@ -2574,9 +3395,11 @@ class BaseConnection:
         return bytes(buffer)
 
     async def _read_bytes(self, size: cython.uint) -> bytes:
-        """Read 'size' bytes from the network and return the bytes read `<'bytes'>`.
+        """(internal) Read data from the network based on the
+        given 'size', and returns the data in `<'bytes'>`.
 
-        :raise OperationalError: If the connection to the server is lost.
+        :param size: `<'int'>` The number of bytes to read.
+        :raise `<'OperationalError'>`: If the connection to the server is lost.
         """
         while True:
             try:
@@ -2594,9 +3417,7 @@ class BaseConnection:
                 self._close_with_reason(msg)
                 raise errors.ConnectionLostError(CR.CR_SERVER_LOST, msg) from err
             except asyncio.CancelledError:
-                self._close_with_reason(
-                    "Connection closed: cancelled during execution."
-                )
+                self._close_with_reason("Cancelled during execution.")
                 raise
             except BaseException as err:
                 # Don't convert unknown exception to MySQLError.
@@ -2617,6 +3438,12 @@ class BaseConnection:
 
 @cython.cclass
 class Connection(BaseConnection):
+    """Represents the `async` socket connection to the server.
+
+    This class inherits from the `<'aio.BaseConnection'>` class, and
+    will perform argument validations during initialization.
+    """
+
     def __init__(
         self,
         host: str | None = "localhost",
@@ -2627,7 +3454,7 @@ class Connection(BaseConnection):
         *,
         charset: str | None = "utf8mb4",
         collation: str | None = None,
-        connect_timeout: int = 10,
+        connect_timeout: int = 5,
         read_timeout: int | None = None,
         write_timeout: int | None = None,
         wait_timeout: int | None = None,
@@ -2649,6 +3476,49 @@ class Connection(BaseConnection):
         decode_json: bool = False,
         loop: AbstractEventLoop | None = None,
     ):
+        """
+        ### The `async` socket connection to the server.
+
+        :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
+        :param port: `<'int'>` The port of the server. Defaults to `3306`.
+        :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
+        :param password: `<'str/bytes/None'>` The password for login authentication. Defaults to `None`.
+        :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
+        :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
+        :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
+        :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection. Defaults to `5`.
+        :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. Defaults to `None` (use GLOBAL settings).
+        :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. Defaults to `None` (use GLOBAL settings).
+        :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. Defaults to `None` (use GLOBAL settings).
+        :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
+        :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
+        :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
+        :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
+        :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
+        :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
+        :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
+        :param cursor: `<'type[Cursor]'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+        :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
+        :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
+        :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
+            - Recommand use <'OptionFile'> to load MySQL option file.
+            - If passed str/bytes/PathLike argument, it will be automatically converted
+              to <'OptionFile'>, with option group defaults to 'client'.
+
+        :param ssl: `<'SSL/ssl.SSLContext/None'>` The SSL configuration for the connection. Defaults to `None`.
+            - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
+
+        :param auth_plugin: `<'AuthPlugin/dict/None'>` The authentication plugins handlers. Defaults to `None`.
+            - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
+            - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
+
+        :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
+        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string. Defaults to `False`.
+        :param loop: `<'AbstractEventLoop/None'>` The event loop for the connection. Defaults to `None`.
+        """
+        # . internal
+        self._setup_internal()
         # . option file
         if option_file is not None:
             if isinstance(option_file, OptionFile):
@@ -2684,7 +3554,7 @@ class Connection(BaseConnection):
 
         # fmt: off
         # . charset
-        self._init_charset(utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET))
+        self._setup_charset(utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET))
         # . basic
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535) 
@@ -2707,8 +3577,8 @@ class Connection(BaseConnection):
         self._sql_mode = utils.validate_sql_mode(sql_mode)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = utils.validate_cursor(cursor, Cursor)
-        self._init_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))
-        self._init_connect_attrs(utils.validate_arg_str(program_name, "program_name", None))
+        self._setup_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))
+        self._setup_connect_attrs(utils.validate_arg_str(program_name, "program_name", None))
         # . ssl
         self._ssl_ctx = utils.validate_ssl(ssl)
         # fmt: on
@@ -2732,8 +3602,6 @@ class Connection(BaseConnection):
         # . decode
         self._use_decimal = bool(use_decimal)
         self._decode_json = bool(decode_json)
-        # . internal
-        self._init_internal()
         # . loop
         if loop is None or not isinstance(loop, AbstractEventLoop):
             self._loop = _get_event_loop()

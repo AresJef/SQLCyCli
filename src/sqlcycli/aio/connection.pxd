@@ -33,20 +33,20 @@ cdef class Cursor:
         BaseConnection _conn
         char* _encoding_c
         bytes _executed_sql
+        unsigned long long _arraysize
         MysqlResult _result
         unsigned long long _field_count
-        tuple _fields, _rows
+        tuple _fields, _rows, _columns
         unsigned long long _affected_rows, _row_idx, _row_size
         unsigned long long _insert_id
         unsigned int _warning_count
-    # Init
-    cdef inline bint _init_setup(self, BaseConnection conn, bint unbuffered) except -1
+    # Setup
+    cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
-    cpdef str mogrify(self, str sql, object args=?, bint itemize=?)
-    cpdef object escape_args(self, object args, bint itemize=?)
-    cpdef bytes encode_sql(self, str sql)
+    cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
     cdef inline str _format(self, str sql, object args)
     # Read
+    cdef inline dict _convert_row_to_dict(self, tuple row, tuple cols, unsigned long long field_count)
     cpdef tuple columns(self)
     cdef inline bint _read_result(self) except -1
     cdef inline bint _clear_result(self) except -1
@@ -64,6 +64,7 @@ cdef class CursorManager:
         BaseConnection _conn
         object _cur_type
         Cursor _cur
+        bint _closed
 
 cdef class TransactionManager(CursorManager):
     pass
@@ -79,11 +80,15 @@ cdef class BaseConnection:
         unsigned int _charset_id
         bytes _encoding
         char* _encoding_c
+        bint _charset_changed
         # Timeouts
         object _connect_timeout
         object _read_timeout
+        bint _read_timeout_changed
         object _write_timeout
+        bint _write_timeout_changed
         object _wait_timeout
+        bint _wait_timeout_changed
         # Client
         str _bind_address, _unix_socket
         int _autocommit_mode
@@ -107,7 +112,7 @@ cdef class BaseConnection:
         tuple _server_version
         int _server_version_major
         str _server_vendor
-        long long _server_thred_id
+        long long _server_thread_id
         bytes _server_salt
         int _server_status
         long long _server_capabilities
@@ -115,7 +120,7 @@ cdef class BaseConnection:
         # . client
         double _last_used_time
         bint _closed, _secure
-        str _host_info, _close_reason
+        str _close_reason
         # . query
         MysqlResult _result
         unsigned int _next_seq_id
@@ -124,25 +129,24 @@ cdef class BaseConnection:
         # . loop
         object _loop
     # Init
-    cdef inline bint _init_charset(self, Charset charset) except -1
-    cdef inline bint _init_client_flag(self, unsigned int client_flag) except -1
-    cdef inline bint _init_connect_attrs(self, object program_name) except -1
-    cdef inline bint _init_internal(self) except -1
+    cdef inline bint _setup_charset(self, Charset charset) except -1
+    cdef inline bint _setup_client_flag(self, unsigned int client_flag) except -1
+    cdef inline bint _setup_connect_attrs(self, object program_name) except -1
+    cdef inline bint _setup_internal(self) except -1
     # Cursor
     cpdef CursorManager cursor(self, object cursor=?)
     cpdef TransactionManager transaction(self, object cursor=?)
-    cdef inline bint _set_use_time(self) except -1
     # Query
+    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
+    cpdef bytes encode_sql(self, str sql)
     cpdef bint get_autocommit(self) except -1
+    cpdef tuple get_server_version(self)
+    cpdef str get_server_vendor(self)
     cpdef unsigned long long get_affected_rows(self)
     cpdef unsigned long long get_insert_id(self)
     cpdef bint get_transaction_status(self) except -1
-    cpdef tuple get_server_version(self)
-    cpdef str get_server_vendor(self)
     cpdef bint set_use_decimal(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1
-    cpdef object escape_args(self, object args, bint itemize=?)
-    cpdef bytes encode_sql(self, str sql)
     # Connect / Close
     cpdef bint force_close(self) except -1
     cdef inline bint _close_with_reason(self, str reason) except -1
@@ -151,3 +155,4 @@ cdef class BaseConnection:
     # Write
     cdef inline bint _write_packet(self, bytes payload) except -1
     cdef inline bint _write_bytes(self, bytes data) except -1
+    cdef inline bint _set_use_time(self) except -1
