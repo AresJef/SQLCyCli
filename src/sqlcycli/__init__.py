@@ -1,8 +1,10 @@
-from sqlcycli import aio, constants, errors
+from sqlcycli import constants, errors
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
 from sqlcycli._ssl import SSL, SSL_ENABLED
 from sqlcycli.charset import Charset, all_charsets
+from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
+from sqlcycli._connect import connect
 from sqlcycli.connection import (
     Cursor,
     DictCursor,
@@ -10,15 +12,14 @@ from sqlcycli.connection import (
     SSCursor,
     SSDictCursor,
     SSDfCursor,
-    CursorManager,
-    TransactionManager,
     BaseConnection,
     Connection,
 )
-from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
+from sqlcycli import aio
+from sqlcycli.aio.pool import Pool, PoolConnection
+
 
 __all__ = [
-    "aio",
     "constants",
     "errors",
     "AuthPlugin",
@@ -27,16 +28,18 @@ __all__ = [
     "SSL_ENABLED",
     "Charset",
     "all_charsets",
+    "MysqlPacket",
+    "FieldDescriptorPacket",
+    "connect",
     "Cursor",
     "DictCursor",
     "DfCursor",
     "SSCursor",
     "SSDictCursor",
     "SSDfCursor",
-    "CursorManager",
-    "TransactionManager",
     "BaseConnection",
     "Connection",
-    "MysqlPacket",
-    "FieldDescriptorPacket",
+    "aio",
+    "Pool",
+    "PoolConnection",
 ]
