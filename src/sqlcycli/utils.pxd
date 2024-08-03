@@ -491,8 +491,7 @@ cdef inline object validate_cursor(object cursor, object cursor_class):
         return cursor_class
     if type(cursor) is not type or not issubclass(cursor, cursor_class):
         raise errors.InvalidConnectionArgsError(
-            "Invalid 'cursor' argument: %r, "
-            "must be a class type of <'mysqlcycle.Cursor'>." % cursor
+            "Invalid 'cursor' %r, must be type of %r." % (cursor, cursor_class)
         )
     return cursor
 
