@@ -166,7 +166,7 @@ cdef class BaseConnection:
     cdef inline bint _setup_connect_attrs(self, object program_name) except -1
     cdef inline bint _setup_internal(self) except -1
     # Cursor
-    cpdef CursorManager cursor(self, object cursor=?)
+    cpdef Cursor cursor(self, object cursor=?)
     cpdef TransactionManager transaction(self, object cursor=?)
     # Query
     cpdef unsigned long long query(self, str sql, bint unbuffered=?)

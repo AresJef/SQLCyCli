@@ -536,14 +536,14 @@ class Cursor:
     async def execute(
         self,
         sql: str,
-        args: object = None,
+        args: Any = None,
         many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> int:
         """Prepare and execute a query, returns the affected/selected rows `<'int'>`.
 
         :param sql: `<'str'>` The query SQL to execute.
-        :param args: `<'object'>` Arguments to bound to the SQL. Defaults to `None`. Supports:
+        :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`. Supports:
             - Python native: int, float, bool, str, None, datetime, date,
               time, timedelta, struct_time, bytes, bytearray, memoryview,
               Decimal, dict, list, tuple, set, frozenset.
@@ -681,12 +681,12 @@ class Cursor:
         self._affected_rows = rows
         return rows
 
-    async def executemany(self, sql: str, args: object = None) -> int:
+    async def executemany(self, sql: str, args: Any = None) -> int:
         """Prepare and execute multi-row 'args' against a query,
         returns the affected/selected rows `<'int'>`.
 
         :param sql: `<'str'>` The query SQL to execute.
-        :param args: `<'object'>` Sequences or mappings to bound to the SQL. Defaults to `None`.
+        :param args: `<'Any'>` Sequences or mappings to bound to the SQL. Defaults to `None`.
 
         #### Compliance with PEP-0249.
         - Equivalent to 'cur.execute(sql, args, many=True)'.
@@ -767,7 +767,7 @@ class Cursor:
     def mogrify(
         self,
         sql: str,
-        args: object = None,
+        args: Any = None,
         many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> str:
@@ -775,7 +775,7 @@ class Cursor:
         will be sent to the database by calling the execute*() method `<'str'>`.
 
         :param sql: `<'str'>` The query SQL to mogrify.
-        :param args: `<'object'>` Arguments to bound to the SQL. Defaults to `None`.
+        :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`.
         :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
         :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
 
@@ -850,7 +850,7 @@ class Cursor:
 
     @cython.cfunc
     @cython.inline(True)
-    def _format(self, sql: str, args: object) -> str:
+    def _format(self, sql: str, args: str | tuple) -> str:
         """(cfunc) Format the query with the arguments `<'str'>`.
 
         :param sql: `<'str'>` The query to format.
@@ -869,16 +869,16 @@ class Cursor:
     # Read ------------------------------------------------------------------------------------
     # . fetchone
     async def fetchone(self) -> tuple | None:
-        """Fetch the next row of the query result set.
-        Returns a single `tuple`, or `None` when no more
-        data is available `<'tuple/None'>`.
+        """Fetch the next row of the query result set `<'tuple/None'>`.
+
+        :return: a single `tuple`, or `None` when no more data is available.
         """
         return await self._fetchone_tuple()
 
     async def _fetchone_tuple(self) -> tuple | None:
-        """(internal) Fetch the next row of the query result set.
-        Returns a single `tuple`, or `None` when no more data
-        is available `<'tuple/None'>`.
+        """(internal) Fetch the next row of the query result set `<'tuple/None'>`.
+
+        :return: a single `tuple`, or `None` when no more data is available.
 
         #### Used by Cursor & SSCursor.
         """
@@ -901,9 +901,9 @@ class Cursor:
             return row  # exit: one row
 
     async def _fetchone_dict(self) -> dict | None:
-        """(internal) Fetch the next row of the query result set.
-        Returns a `dict`, or `None` when no more data is
-        available `<'dict/None'>`.
+        """(internal) Fetch the next row of the query result set `<'dict/None'>`.
+
+        :return: a `dict`, or `None` when no more data is available.
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -918,9 +918,9 @@ class Cursor:
         return self._convert_row_to_dict(row, cols, self._field_count)
 
     async def _fetchone_df(self) -> DataFrame | None:
-        """(internal) Fetch the next row of the query result set.
-        Returns a `DataFrame`, or `None` when no more data is
-        available `<'DataFrame/None'>`.
+        """(internal) Fetch the next row of the query result set `<'DataFrame/None'>`.
+
+        :return: a `DataFrame`, or `None` when no more data is available.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -936,22 +936,22 @@ class Cursor:
 
     # . fetchmany
     async def fetchmany(self, size: int = 1) -> tuple[tuple]:
-        """Fetch the next set of rows of the query result.
-        Returns `tuple of tuples`, or an empty `tuple`
-        when no more rows are available. `<'tuple[tuple]'>`.
+        """Fetch the next set of rows of the query result `<'tuple[tuple]'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
         """
         return await self._fetchmany_tuple(size)
 
     async def _fetchmany_tuple(self, size: cython.ulonglong) -> tuple[tuple]:
-        """(internal) Fetch the next set of rows of the query result.
-        Returns `tuple of tuples`, or an empty `tuple` when no more
-        rows are available. `<'tuple[tuple]'>`.
+        """(internal) Fetch the next set of rows of the query result `<'tuple[tuple]'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
 
         #### Used by Cursor & SSCursor.
         """
@@ -983,12 +983,12 @@ class Cursor:
             return list_to_tuple(rows)  # exit: multi-rows
 
     async def _fetchmany_dict(self, size: cython.ulonglong) -> tuple[dict]:
-        """(internal) Fetch the next set of rows of the query result.
-        Returns `tuple of dicts`, or an empty `tuple` when no more
-        rows are available. `<'tuple[dict]'>`.
+        """(internal) Fetch the next set of rows of the query result `<'tuple[dict]'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available. .
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -1006,12 +1006,12 @@ class Cursor:
         )
 
     async def _fetchmany_df(self, size: cython.ulonglong) -> DataFrame:
-        """(internal) Fetch the next set of rows of the query result.
-        Returns a `DataFrame`, or an empty `DataFrame` when no more
-        rows are available. `<'DataFrame'>`.
+        """(internal) Fetch the next set of rows of the query result `<'DataFrame'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -1029,16 +1029,16 @@ class Cursor:
 
     # . fetchall
     async def fetchall(self) -> tuple[tuple]:
-        """Fetch all (remaining) rows of the query result.
-        Returns `tuple of tuples`, or an empty `tuple` when
-        no more rows are available. `<'tuple[tuple]'>`.
+        """Fetch all (remaining) rows of the query result `<'tuple[tuple]'>`.
+
+        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
         """
         return await self._fetchall_tuple()
 
     async def _fetchall_tuple(self) -> tuple[tuple]:
-        """(internal) Fetch all (remaining) rows of the query result.
-        Returns `tuple of tuples`, or an empty `tuple` when no more
-        rows are available. `<'tuple[tuple]'>`.
+        """(internal) Fetch all (remaining) rows of the query result `<'tuple[tuple]'>`.
+
+        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
 
         #### Used by Cursor & SSCursor.
         """
@@ -1072,9 +1072,9 @@ class Cursor:
             return list_to_tuple(rows)  # exit: remain rows
 
     async def _fetchall_dict(self) -> tuple[dict]:
-        """(internal) Fetch all (remaining) rows of the query result.
-        Returns `tuple of dicts`, or an empty `tuple` when no more
-        rows are available. `<'tuple[dict]'>`.
+        """(internal) Fetch all (remaining) rows of the query result `<'tuple[dict]'>`.
+
+        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available.
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -1092,9 +1092,9 @@ class Cursor:
         )
 
     async def _fetchall_df(self) -> DataFrame:
-        """(internal) Fetch all (remaining) rows of the query result.
-        Returns a `DataFrame`, or an empty `DataFrame` when no more
-        rows are available. `<'DataFrame'>`.
+        """(internal) Fetch all (remaining) rows of the query result `<'DataFrame'>`.
+
+        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -1402,27 +1402,29 @@ class DictCursor(Cursor):
 
     # . fetchone
     async def fetchone(self) -> dict | None:
-        """Fetch the next row of the query result set.
-        Returns a `dict`, or `None` when no more data
-        is available `<'dict/None'>`."""
+        """Fetch the next row of the query result set `<'dict/None'>`.
+
+        :return: a `dict`, or `None` when no more data is available.
+        """
         return await self._fetchone_dict()
 
     # . fetchmanny
     async def fetchmany(self, size: int = 1) -> tuple[dict]:
-        """Fetch the next set of rows of the query result.
-        Returns `tuple of dicts`, or an empty `tuple` when
-        no more rows are available. `<'tuple[dict]'>`.
+        """Fetch the next set of rows of the query result `<'tuple[dict]'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available. .
         """
         return await self._fetchmany_dict(size)
 
     # . fetchall
     async def fetchall(self) -> tuple[dict]:
-        """Fetch all (remaining) rows of the query result.
-        Returns `tuple of dicts`, or an empty `tuple` when
-        no more rows are available. `<'tuple[dict]'>`."""
+        """Fetch all (remaining) rows of the query result `<'tuple[dict]'>`.
+
+        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available.
+        """
         return await self._fetchall_dict()
 
     # Special methods -------------------------------------------------------------------------
@@ -1452,27 +1454,29 @@ class DfCursor(Cursor):
 
     # . fetchone
     async def fetchone(self) -> DataFrame | None:
-        """Fetch the next row of the query result set.
-        Returns a `DataFrame`, or `None` when no more
-        data is available `<'DataFrame/None'>`."""
+        """Fetch the next row of the query result set `<'DataFrame/None'>`.
+
+        :return: a `DataFrame`, or `None` when no more data is available.
+        """
         return await self._fetchone_df()
 
     # . fetchmanny
     async def fetchmany(self, size: int = 1) -> DataFrame:
-        """Fetch the next set of rows of the query result.
-        Returns a `DataFrame`, or an empty `DataFrame` when
-        no more rows are available. `<'DataFrame'>`.
+        """Fetch the next set of rows of the query result `<'DataFrame'>`.
 
         :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
+
+        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
         """
         return await self._fetchmany_df(size)
 
     # . fetchall
     async def fetchall(self) -> DataFrame:
-        """Fetch all (remaining) rows of the query result.
-        Returns a `DataFrame`, or an empty `DataFrame` when
-        no more rows are available. `<'DataFrame'>`."""
+        """Fetch all (remaining) rows of the query result `<'DataFrame'>`.
+
+        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
+        """
         return await self._fetchall_df()
 
     # Special methods -------------------------------------------------------------------------
@@ -1565,7 +1569,6 @@ class CursorManager:
     async def _acquire(self) -> Cursor:
         """(internal) Acquire the connection cursor `<'Cursor'>`."""
         try:
-            await self._conn.connect()
             return self._cur_type(self._conn)
         except:  # noqa
             await self._close()
@@ -2146,8 +2149,7 @@ class BaseConnection:
     # Cursor ----------------------------------------------------------------------------------
     @cython.ccall
     def cursor(self, cursor: type[Cursor] = None) -> CursorManager:
-        """Acquire a new `async` cursor of the connection through
-        context manager `<'CursorManager'>`.
+        """Acquire a new `async` cursor through context manager `<'CursorManager'>`.
 
         :param cursor: `<'type[Cursor]'>` The cursor type (class) to use. Defaults to `None` (use connection default).
 
@@ -2158,7 +2160,7 @@ class BaseConnection:
         ### Example (direct - NOT recommended):
         >>> cur = await conn.cursor()
             await cur.execute("SELECT * FROM table")
-            await cur.close()  # manual close
+            await cur.close()  # close manually
         """
         self._verify_connected()
         cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
@@ -2166,12 +2168,12 @@ class BaseConnection:
 
     @cython.ccall
     def transaction(self, cursor: type[Cursor] = None) -> TransactionManager:
-        """Acquire a new `async` cursor of the connection in `TRANSACTION` mode
+        """Acquire a new `async` cursor in `TRANSACTION` mode
         through context manager `<'TransactionManager'>`.
 
         By acquiring cursor through this method, the following happens:
         - 1. Use the connection to `BEGIN` a transaction.
-        - 2. Returns the cursor of the connection.
+        - 2. Returns a cursor of the connection.
         - 3a. If catches ANY exceptions during the transaction, close the connection.
         - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
 
@@ -2251,14 +2253,14 @@ class BaseConnection:
     @cython.ccall
     def escape_args(
         self,
-        args: object,
+        args: Any,
         many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> object:
         """Escape arguments into formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
         ### Arguments
-        :param args: `<'object'>` The arguments to escape, supports:
+        :param args: `<'Any'>` The arguments to escape, supports:
             - Python native: int, float, bool, str, None, datetime, date,
               time, timedelta, struct_time, bytes, bytearray, memoryview,
               Decimal, dict, list, tuple, set, frozenset.
@@ -3282,7 +3284,7 @@ class BaseConnection:
     # Read ------------------------------------------------------------------------------------
     async def next_result(self, unbuffered: bool = False) -> int:
         """Go to the next query result, and returns
-        the affected rows `<'int'>`.
+        the affected/selected rows `<'int'>`.
 
         :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
         """
@@ -3303,7 +3305,7 @@ class BaseConnection:
 
     async def _read_query_result(self, unbuffered: bool) -> int:
         """(internal) Read the next query result, and returns
-        the affected rows `<'int'>`.
+        the affected/selected rows `<'int'>`.
 
         :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
         """
