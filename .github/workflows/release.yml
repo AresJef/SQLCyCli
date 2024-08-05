@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         if: ${{ matrix.arch == 'aarch64' }}
       - name: Install Build Tools
         run: |
@@ -37,7 +37,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.17.0
         env:
           CIBW_ARCHS_WINDOWS: AMD64 ARM64
-          CIBW_ARCHS_MACOS: x86_64 universal2
+          CIBW_ARCHS_MACOS: x86_64 universal2 arm64
           CIBW_ARCHS_LINUX: ${{matrix.arch}}
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
