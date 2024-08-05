@@ -65,11 +65,11 @@ jobs:
           python -m pip install build Cython==3.0.10
       - name: Build 'sdist'
         run: |
-          python -m build --sdist --outdir dists
+          python -m build --sdist --outdir dist
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          path: dists/*.tar.gz
+          path: dist/*.tar.gz
           retention-days: 1
   
   upload:
