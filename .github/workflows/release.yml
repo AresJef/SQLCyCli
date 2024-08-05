@@ -38,11 +38,11 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 universal2
           CIBW_ARCHS_LINUX: ${{matrix.arch}}
         run: |
-          python -m cibuildwheel --output-dir wheelhouse
+          python -m cibuildwheel --output-dir wheels
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          path: ./wheelhouse/*.whl
+          path: wheels/*.whl
           retention-days: 1
     
   build_sdist:
@@ -65,11 +65,11 @@ jobs:
           python -m pip install build Cython==3.0.10
       - name: Build 'sdist'
         run: |
-          python -m build --sdist --outdir dist
+          python -m build --sdist --outdir dists
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          path: dist/*.tar.gz
+          path: dists/*.tar.gz
           retention-days: 1
   
   upload:
