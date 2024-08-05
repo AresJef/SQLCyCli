@@ -16,14 +16,26 @@ import asyncio
 
 class TestCase(unittest.TestCase):
     name: str = "Case"
-    host: str = "localhost"
-    user: str = "root"
-    password: str = "Password_123456"
     unix_socket: str = None
     db: str = "test"
     tb: str = "test_table"
     min_size: int = 1
     max_size: int = 10
+
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 3306,
+        user: str = "root",
+        password: str = "password",
+    ) -> None:
+        super().__init__("runTest")
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self._start_time = None
+        self._ended_time = None
 
     @property
     def table(self) -> str:
@@ -4300,6 +4312,11 @@ class TestGitHubIssues(TestCase):
 
 
 if __name__ == "__main__":
+    HOST = "localhost"
+    PORT = 3306
+    USER = "root"
+    PSWD = "Password_123456"
+
     for test in [
         TestPool,
         TestConnection,
@@ -4311,5 +4328,5 @@ if __name__ == "__main__":
         TestNewIssues,
         TestGitHubIssues,
     ]:
-        tester: TestCase = test()
+        tester: TestCase = test(HOST, PORT, USER, PSWD)
         asyncio.run(tester.test_all())

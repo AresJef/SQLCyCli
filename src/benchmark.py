@@ -7,11 +7,6 @@ warnings.filterwarnings("ignore", category=Warning)
 
 # Benchmark
 class Benchmark:
-    # . server
-    host: str = "localhost"
-    port: int = 3306
-    user: str = "root"
-    password: str = "Password_123456"
     # . query
     db: str = "test"
     tb: str = "benchmark"
@@ -49,7 +44,18 @@ class Benchmark:
     sql_delete_per_row = f"DELETE from {db}.`{tb}` WHERE `id` = %s"
     sql_delete_all = f"DELETE from {db}.`{tb}`"
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 3306,
+        user: str = "root",
+        password: str = "password",
+    ) -> None:
+        # . server
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
         # . stats
         self._start: float = None
         self._ended: float = None
@@ -313,7 +319,12 @@ class Benchmark_Async(Benchmark):
 
 # Main
 if __name__ == "__main__":
-    rows = 50_000
+    HOST = "localhost"
+    PORT = 3306
+    USER = "root"
+    PSWD = "Password_123456"
+    ROWS = 50_000
+
     stats = []
     for cls, args in (
         (Benchmark_Sync, {"name": "mysqlclient", "conn_cls": MySQLdb.Connection}),
@@ -323,8 +334,8 @@ if __name__ == "__main__":
         (Benchmark_Async, {"name": "aiomysql", "conn_cls": aiomysql.Connection}),
         (Benchmark_Async, {"name": "asyncmy", "conn_cls": asyncmy.Connection}),
     ):
-        benchmark = cls()
-        args["rows"] = rows
+        benchmark = cls(HOST, PORT, USER, PSWD)
+        args["rows"] = ROWS
         if asyncio.iscoroutinefunction(benchmark.run):
             asyncio.run(benchmark.run(**args))
         else:

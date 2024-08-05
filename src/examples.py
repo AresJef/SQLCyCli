@@ -1,11 +1,6 @@
 import asyncio
 import sqlcycli
 
-HOST = "localhost"
-PORT = 3306
-USER = "root"
-PSWD = "Password_123456"
-
 
 # Synchronous Connection
 def test_sync_connection() -> None:
@@ -76,6 +71,11 @@ async def test_pool_direct_connected() -> None:
 
 
 if __name__ == "__main__":
+    HOST = "localhost"
+    PORT = 3306
+    USER = "root"
+    PSWD = "Password_123456"
+
     test_sync_connection()
     asyncio.run(test_async_connection())
     asyncio.run(test_pool_context_connected())
