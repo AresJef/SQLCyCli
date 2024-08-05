@@ -13,6 +13,16 @@ Install from `github`
 pip install git+https://github.com/AresJef/SQLCyCli.git
 ```
 
+For Linux systems, if you encounter the following error when installing the SQLCyCli dependency [mysqlclient](https://github.com/PyMySQL/mysqlclient):
+```
+Exception: Can not find valid pkg-config name.
+Specify MYSQLCLIENT_CFLAGS and MYSQLCLIENT_LDFLAGS env vars manually
+```
+Try the following to fix dependency issue (source: [Stack Overflow](https://stackoverflow.com/questions/76585758/mysqlclient-cannot-install-via-pip-cannot-find-pkg-config-name-in-ubuntu)):
+```bash
+sudo apt-get install pkg-config python3-dev default-libmysqlclient-dev build-essential
+```
+
 ### Requirements
 - Python 3.10 or higher.
 - MySQL 5.5 or higher.
