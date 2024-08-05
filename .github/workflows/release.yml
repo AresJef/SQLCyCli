@@ -14,14 +14,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         arch: [auto]
-        include:
-        - os: ubuntu-latest
-          arch: aarch64
-
+        # include:
+        # - os: ubuntu-latest
+        #   arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
       - name: Install Python
         uses: actions/setup-python@v5
@@ -37,7 +37,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.17.0
         env:
           CIBW_ARCHS_WINDOWS: AMD64 ARM64
-          CIBW_ARCHS_MACOS: x86_64 universal2 arm64
+          CIBW_ARCHS_MACOS: x86_64 arm64 universal2
           CIBW_ARCHS_LINUX: ${{matrix.arch}}
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
@@ -52,6 +52,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
       - name: Install Python
         uses: actions/setup-python@v5
