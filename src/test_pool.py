@@ -3401,7 +3401,7 @@ class TestCursor(TestCase):
             except TypeError:
                 self.fail()
             finally:
-                await conn.close()
+                await pool.release(conn)
 
     async def test_previous_cursor_not_closed(self):
         test = "PREVIOUS CURSOR NOT CLOSED"
@@ -4010,8 +4010,8 @@ class TestNewIssues(TestCase):
                 self.log_ended(test)
 
             finally:
-                await conn1.close()
-                await conn2.close()
+                await pool.release(conn1)
+                await pool.release(conn2)
 
     async def test_issue_37(self):
         test = "ISSUE 37"

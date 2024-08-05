@@ -9,6 +9,7 @@ warnings.filterwarnings("ignore", category=Warning)
 class Benchmark:
     # . server
     host: str = "localhost"
+    port: int = 3306
     user: str = "root"
     password: str = "Password_123456"
     # . query
@@ -94,7 +95,12 @@ class Benchmark_Sync(Benchmark):
         self._stats["type"] = "sync"
         self._stats["rows"] = rows
         data = [self.data for _ in range(rows)]
-        with conn_cls(host=self.host, user=self.user, password=self.password) as conn:
+        with conn_cls(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
+        ) as conn:
             # Connect ----------------------------------------------------------
             if self.is_conn_closed(conn):
                 if hasattr(conn, "_connect"):
@@ -192,7 +198,12 @@ class Benchmark_Sync(Benchmark):
 
 # Async -------------------------------------------------------------------------------------------------------------------------
 class Benchmark_Async(Benchmark):
-    async def run(self, name: str, conn_cls: type, rows: int = 5_0000) -> None:
+    async def run(
+        self,
+        name: str,
+        conn_cls: type,
+        rows: int = 5_0000,
+    ) -> None:
         print(f"Benchmarking: {name} (Async)...".ljust(60), end="\r")
 
         self._stats["name"] = name
@@ -200,7 +211,10 @@ class Benchmark_Async(Benchmark):
         self._stats["rows"] = rows
         data = [self.data for _ in range(rows)]
         async with conn_cls(
-            host=self.host, user=self.user, password=self.password
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
         ) as conn:
             # Connect ----------------------------------------------------------
             if self.is_conn_closed(conn):
@@ -310,7 +324,7 @@ if __name__ == "__main__":
         (Benchmark_Async, {"name": "asyncmy", "conn_cls": asyncmy.Connection}),
     ):
         benchmark = cls()
-        args |= {"rows": rows}
+        args["rows"] = rows
         if asyncio.iscoroutinefunction(benchmark.run):
             asyncio.run(benchmark.run(**args))
         else:

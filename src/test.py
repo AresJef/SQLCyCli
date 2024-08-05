@@ -968,6 +968,7 @@ class TestConnection(TestCase):
             self.assertEqual(type(conn.server_capabilites), int)
             self.assertEqual(conn.affected_rows, 0)
             self.assertEqual(conn.insert_id, 0)
+
         self.log_ended(test)
 
     def test_set_charset(self):
