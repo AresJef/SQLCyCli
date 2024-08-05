@@ -2186,10 +2186,10 @@ class BaseConnection:
 
     # Cursor ----------------------------------------------------------------------------------
     @cython.ccall
-    def cursor(self, cursor: type[Cursor] = None) -> Cursor:
+    def cursor(self, cursor: type[Cursor] | None = None) -> Cursor:
         """Acquire a new cursor `<'Cursor'>`.
 
-        :param cursor: `<'type[Cursor]'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+        :param cursor: `<'type[Cursor]/None'>` The cursor type (class) to use. Defaults to `None` (use connection default).
 
         ### Example (context manager):
         >>> with conn.cursor() as cur:
@@ -2205,7 +2205,7 @@ class BaseConnection:
         return cur(self)
 
     @cython.ccall
-    def transaction(self, cursor: type[Cursor] = None) -> TransactionManager:
+    def transaction(self, cursor: type[Cursor] | None = None) -> TransactionManager:
         """Acquire a new cursor in `TRANSACTION` mode
         through context manager `<'TransactionManager'>`.
 
@@ -2215,7 +2215,7 @@ class BaseConnection:
         - 3a. If catches ANY exceptions during the transaction, close the connection.
         - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
 
-        :param cursor: `<'type[Cursor]'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+        :param cursor: `<'type[Cursor]/None'>` The cursor type (class) to use. Defaults to `None` (use connection default).
 
         ### Example:
         >>> with conn.transaction() as cur:
@@ -3564,7 +3564,7 @@ class Connection(BaseConnection):
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[Cursor] = Cursor,
+        cursor: type[Cursor] | None = Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -3595,7 +3595,7 @@ class Connection(BaseConnection):
         :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
         :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
         :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
-        :param cursor: `<'type[Cursor]'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+        :param cursor: `<'type[Cursor]/None'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
         :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
         :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
         :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
