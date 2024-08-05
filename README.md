@@ -27,7 +27,7 @@ pip install git+https://github.com/AresJef/SQLCyCli.git
 ### Benchmark
 The following result comes from [benchmark](./src/benchmark.py):
 - Device: MacbookPro M1Pro(2E8P) 32GB
-- Python: 3.12.0
+- Python: 3.12.4
 - MySQL: 8.3.0
 - mysqlclient: 2.2.4
 - PyMySQL: 1.1.1
