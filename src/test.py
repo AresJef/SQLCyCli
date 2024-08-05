@@ -949,10 +949,10 @@ class TestConnection(TestCase):
         self.log_start(test)
 
         with self.get_conn() as conn:
-            self.assertEqual(conn.host, "localhost")
-            self.assertEqual(conn.port, 3306)
-            self.assertEqual(conn.user, "root")
-            self.assertEqual(type(conn.password), str)
+            self.assertEqual(conn.host, self.host)
+            self.assertEqual(conn.port, self.port)
+            self.assertEqual(conn.user, self.user)
+            self.assertEqual(conn.password, self.password)
             self.assertEqual(conn.database, None)
             self.assertEqual(conn.charset, "utf8mb4")
             self.assertEqual(conn.collation, "utf8mb4_general_ci")
@@ -1103,9 +1103,12 @@ class TestConnection(TestCase):
                 cur.execute("SELECT database()")
                 self.assertEqual(cur.fetchone()[0], "mysql")
 
+                cur.execute("CREATE DATABASE IF NOT EXISTS test")
                 conn.select_database("test")
                 cur.execute("SELECT database()")
                 self.assertEqual(cur.fetchone()[0], "test")
+                cur.execute("DROP DATABASE IF EXISTS test")
+
         self.log_ended(test)
 
     def test_connection_gone_away(self):
@@ -1119,7 +1122,7 @@ class TestConnection(TestCase):
         with self.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SET wait_timeout=1")
-                time.sleep(1.2)
+                time.sleep(3)
                 with self.assertRaises(errors.OperationalError) as cm:
                     cur.execute("SELECT 1+1")
                     # error occurs while reading, not writing because of socket buffer.
@@ -4372,7 +4375,7 @@ if __name__ == "__main__":
     PORT = 3306
     USER = "root"
     PSWD = "Password_123456"
-    
+
     for test in [
         TestCharset,
         TestTranscode,

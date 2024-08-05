@@ -125,10 +125,10 @@ class TestPool(TestCase):
         self.log_start(test)
 
         async with await self.get_pool(min_size=1, max_size=10) as pool:
-            self.assertEqual(pool.host, "localhost")
-            self.assertEqual(pool.port, 3306)
-            self.assertEqual(pool.user, "root")
-            self.assertEqual(type(pool.password), str)
+            self.assertEqual(pool.host, self.host)
+            self.assertEqual(pool.port, self.port)
+            self.assertEqual(pool.user, self.user)
+            self.assertEqual(pool.password, self.password)
             self.assertEqual(pool.database, None)
             self.assertEqual(pool.charset, "utf8mb4")
             self.assertEqual(pool.collation, "utf8mb4_general_ci")
@@ -723,10 +723,10 @@ class TestConnection(TestCase):
         async with await self.get_pool() as pool:
             async with pool.acquire() as conn:
                 self.assertEqual(conn.close_scheduled, False)
-                self.assertEqual(conn.host, "localhost")
-                self.assertEqual(conn.port, 3306)
-                self.assertEqual(conn.user, "root")
-                self.assertEqual(type(conn.password), str)
+                self.assertEqual(conn.host, self.host)
+                self.assertEqual(conn.port, self.port)
+                self.assertEqual(conn.user, self.user)
+                self.assertEqual(conn.password, self.password)
                 self.assertEqual(conn.database, None)
                 self.assertEqual(conn.charset, "utf8mb4")
                 self.assertEqual(conn.collation, "utf8mb4_general_ci")
@@ -886,9 +886,12 @@ class TestConnection(TestCase):
                     await cur.execute("SELECT database()")
                     self.assertEqual((await cur.fetchone())[0], "mysql")
 
+                    await cur.execute("CREATE DATABASE IF NOT EXISTS test")
                     await conn.select_database("test")
                     await cur.execute("SELECT database()")
                     self.assertEqual((await cur.fetchone())[0], "test")
+                    await cur.execute("DROP DATABASE IF EXISTS test")
+
         self.log_ended(test)
 
     async def test_connection_gone_away(self):
@@ -903,7 +906,7 @@ class TestConnection(TestCase):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("SET wait_timeout=1")
-                    await asyncio.sleep(1.2)
+                    await asyncio.sleep(3)
                     with self.assertRaises(errors.OperationalError) as cm:
                         await cur.execute("SELECT 1+1")
                         # error occurs while reading, not writing because of socket buffer.

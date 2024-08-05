@@ -112,10 +112,10 @@ class TestConnection(TestCase):
         self.log_start(test)
 
         async with await self.get_conn() as conn:
-            self.assertEqual(conn.host, "localhost")
-            self.assertEqual(conn.port, 3306)
-            self.assertEqual(conn.user, "root")
-            self.assertEqual(type(conn.password), str)
+            self.assertEqual(conn.host, self.host)
+            self.assertEqual(conn.port, self.port)
+            self.assertEqual(conn.user, self.user)
+            self.assertEqual(conn.password, self.password)
             self.assertEqual(conn.database, None)
             self.assertEqual(conn.charset, "utf8mb4")
             self.assertEqual(conn.collation, "utf8mb4_general_ci")
@@ -269,9 +269,12 @@ class TestConnection(TestCase):
                 await cur.execute("SELECT database()")
                 self.assertEqual((await cur.fetchone())[0], "mysql")
 
+                await cur.execute("CREATE DATABASE IF NOT EXISTS test")
                 await conn.select_database("test")
                 await cur.execute("SELECT database()")
                 self.assertEqual((await cur.fetchone())[0], "test")
+                await cur.execute("DROP DATABASE IF EXISTS test")
+
         self.log_ended(test)
 
     async def test_connection_gone_away(self):
@@ -285,7 +288,7 @@ class TestConnection(TestCase):
         async with await self.get_conn() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SET wait_timeout=1")
-                await asyncio.sleep(1.2)
+                await asyncio.sleep(3)
                 with self.assertRaises(errors.OperationalError) as cm:
                     await cur.execute("SELECT 1+1")
                     # error occurs while reading, not writing because of socket buffer.
@@ -3506,7 +3509,7 @@ if __name__ == "__main__":
     PORT = 3306
     USER = "root"
     PSWD = "Password_123456"
-    
+
     for test in [
         TestConnection,
         TestAuthentication,
