@@ -1,4 +1,3 @@
-cytimes>=1.0.3
 numpy>=1.25.2
 orjson>=3.10.2
 pandas>=2.1.0

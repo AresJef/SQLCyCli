@@ -7,7 +7,6 @@ from time import struct_time
 from pandas import Series, DataFrame
 from pandas import Timestamp, DatetimeIndex
 from pandas import Timedelta, TimedeltaIndex
-from cytimes import pddt, pydt
 
 # Constants -------------------------------------------------------------------------
 # . python types
@@ -41,6 +40,3 @@ TIMESTAMP: type[Timestamp] = Timestamp
 DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTA: type[Timedelta] = Timedelta
 TIMEDELTAINDEX: type[TimedeltaIndex] = TimedeltaIndex
-# . cytimes
-PDDT: type[pddt] = pddt
-PYDT: type[pydt] = pydt

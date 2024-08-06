@@ -32,6 +32,13 @@ from sqlcycli import typeref, errors
 __all__ = ["escape", "decode"]
 
 # Constants -----------------------------------------------------------------------------------
+# . cytimes [library]
+try:
+    from cytimes import pddt, pydt
+
+    CYTIMES_AVAILABLE: cython.bint = True
+except ImportError:
+    CYTIMES_AVAILABLE: cython.bint = False
 # . translate table
 # Used to translate Python string to literal string.
 STR_ESCAPE_TABLE: list = [chr(x) for x in range(128)]
@@ -904,7 +911,7 @@ def _escape_uncommon(data: object, dtype: type) -> str:
     if dtype is typeref.STRUCT_TIME:
         return _escape_struct_time(data)
     # . <'cytimes.pydt'>
-    if dtype is typeref.PYDT:
+    if CYTIMES_AVAILABLE and dtype is pydt:
         return _escape_datetime(data.dt)
 
     # Bytes Types
@@ -951,7 +958,7 @@ def _escape_uncommon(data: object, dtype: type) -> str:
     ):
         return _escape_series(data)
     # . <'cytimes.pddt'>
-    if dtype is typeref.PDDT:
+    if CYTIMES_AVAILABLE and dtype is pddt:
         return _escape_series(data.dt)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:
@@ -1563,7 +1570,7 @@ def _escape_item_uncommon(data: object, dtype: type) -> object:
     if dtype is typeref.STRUCT_TIME:
         return _escape_struct_time(data)
     # . <'cytimes.pydt'>
-    if dtype is typeref.PYDT:
+    if CYTIMES_AVAILABLE and dtype is pydt:
         return _escape_datetime(data.dt)
 
     # Bytes Types
@@ -1610,7 +1617,7 @@ def _escape_item_uncommon(data: object, dtype: type) -> object:
     ):
         return _escape_item_series(data)
     # . <'cytimes.pddt'>
-    if dtype is typeref.PDDT:
+    if CYTIMES_AVAILABLE and dtype is pddt:
         return _escape_item_series(data.dt)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:

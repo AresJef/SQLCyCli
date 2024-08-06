@@ -155,7 +155,6 @@ SQLCyCli is build on top of the following open-source repositories:
 - [PyMySQL](https://github.com/PyMySQL/PyMySQL)
 
 SQLCyCli is based on the following open-source repositories:
-- [cytimes](https://github.com/AresJef/cyTimes)
 - [numpy](https://github.com/numpy/numpy)
 - [orjson](https://github.com/ijl/orjson)
 - [pandas](https://github.com/pandas-dev/pandas)

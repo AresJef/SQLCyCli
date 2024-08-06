@@ -12,6 +12,8 @@ from numpy cimport PyArray_TYPE, PyArray_Cast, PyArray_DATA
 
 # Constants
 cdef:
+    # . cytimes [library]
+    bint CYTIMES_AVAILABLE
     # . translate table
     list STR_ESCAPE_TABLE, DT64_JSON_TABLE
     # . time units
