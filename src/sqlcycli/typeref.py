@@ -1,5 +1,8 @@
 # cython: language_level=3
 
+# Cython imports
+import cython
+
 # Python imports
 import numpy as np
 from decimal import Decimal
@@ -40,3 +43,15 @@ TIMESTAMP: type[Timestamp] = Timestamp
 DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTA: type[Timedelta] = Timedelta
 TIMEDELTAINDEX: type[TimedeltaIndex] = TimedeltaIndex
+# . cytimes types
+try:
+    from cytimes import pydt, pddt
+
+    CYTIMES_AVAILABLE: cython.bint = True
+    PYDT: type[pydt] = pydt
+    PDDT: type[pddt] = pddt
+except ImportError:
+    CYTIMES_AVAILABLE: cython.bint = False
+    PYDT: type[pydt] = None
+    PDDT: type[pydt] = None
+
