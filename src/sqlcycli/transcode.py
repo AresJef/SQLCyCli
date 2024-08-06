@@ -8,6 +8,7 @@ from cython.cimports import numpy as np  # type: ignore
 from cython.cimports.libc.math import isnormal, isfinite  # type: ignore
 from cython.cimports.cpython import datetime  # type: ignore
 from cython.cimports.cpython.list import PyList_AsTuple as list_to_tuple  # type: ignore
+from cython.cimports.cpython.tuple import PyTuple_GET_ITEM as tuple_getitem  # type: ignore
 from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # type: ignore
@@ -32,13 +33,6 @@ from sqlcycli import typeref, errors
 __all__ = ["escape", "decode"]
 
 # Constants -----------------------------------------------------------------------------------
-# . cytimes [library]
-try:
-    from cytimes import pddt, pydt
-
-    CYTIMES_AVAILABLE: cython.bint = True
-except ImportError:
-    CYTIMES_AVAILABLE: cython.bint = False
 # . translate table
 # Used to translate Python string to literal string.
 STR_ESCAPE_TABLE: list = [chr(x) for x in range(128)]
@@ -396,6 +390,15 @@ def _escape_timedelta64(data: object) -> str:
     >>> "'12:00:00.000100'"
     """
     us: cython.longlong = td64_to_microseconds(data)  # type: ignore
+    return _escape_timedelta64_fr_us(us)
+
+
+@cython.cfunc
+@cython.inline(True)
+@cython.cdivision(True)
+def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
+    """(cfunc) Escape numpy.timedelta64 microseconds
+    value into literal string `<'str'>`."""
     negate: cython.bint = us < 0
     us = abs(us)
     hours = us // US_HOUR
@@ -550,203 +553,379 @@ def _escape_ndarray(data: np.ndarray) -> str:
     >>> _escape_ndarray(np.array([1, 2, 3]))
     >>> "(1,2,3)"
     """
-    # Validate ndarray dimensions & size
-    if data.ndim != 1:
-        raise ValueError("only supports 1-dimensional <'numpy.ndarray'>.")
-    size: cython.Py_ssize_t = data.shape[0]
-    if size == 0:
-        return "()"  # exit
-    # Escape ndarray
+    # Get ndarray dtype
     dtype: cython.char = data.descr.kind
+
     # . ndarray[object]
     if dtype == NDARRAY_DTYPE_OBJECT:
-        return _escape_ndarray_object(data, size)
+        return _escape_ndarray_object(data)
     # . ndarray[float]
     if dtype == NDARRAY_DTYPE_FLOAT:
-        return _escape_ndarray_float(data, size)
+        return _escape_ndarray_float(data)
     # . ndarray[int]
     if dtype == NDARRAY_DTYPE_INT:
-        return _escape_ndarray_int(data, size)
+        return _escape_ndarray_int(data)
     # . ndarray[uint]
     if dtype == NDARRAY_DTYPE_UINT:
-        return _escape_ndarray_int(data, size)
+        return _escape_ndarray_int(data)
     # . ndarray[bool]
     if dtype == NDARRAY_DTYPE_BOOL:
-        return _escape_ndarray_bool(data, size)
+        return _escape_ndarray_bool(data)
     # . ndarray[datetime64]
     if dtype == NDARRAY_DTYPE_DT64:
-        return _escape_ndarray_dt64(data, size)
+        return _escape_ndarray_dt64(data)
     # . ndarray[timedelta64]
     if dtype == NDARRAY_DTYPE_TD64:
-        return _escape_ndarray_td64(data, size)
+        return _escape_ndarray_td64(data)
     # . ndarray[bytes]
     if dtype == NDARRAY_DTYPE_BYTES:
-        return _escape_ndarray_bytes(data, size)
+        return _escape_ndarray_bytes(data)
     # . ndarray[str]
     if dtype == NDARRAY_DTYPE_UNICODE:
-        return _escape_ndarray_unicode(data, size)
+        return _escape_ndarray_unicode(data)
     # # . invalid dtype
     raise TypeError("unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_object(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of: "O" (object).
 
-    >>> _escape_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"), 3)
+    >>> _escape_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"))
     >>> "(1,1.23,'abc')"
     """
-    l = [_escape_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
-    return "(" + ",".join(l) + ")"
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [_escape_common(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
+        return "(" + ",".join(l_i) + ")"
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [
+            "(" + ",".join([_escape_common(arr_getitem_2d(arr, i, j)) for j in range(s_j)]) + ")"  # type: ignore
+            for i in range(s_i)
+        ]
+        return ",".join(l_i)
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_float(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of: "f" (float).
 
     :raises `<'TypeError'>`: If float value is invalid.
 
-    >>> _escape_ndarray_float(np.array([1.23, 4.56, 7.89], dtype=np.float64), 3)
+    >>> _escape_ndarray_float(np.array([1.23, 4.56, 7.89], dtype=np.float64))
     >>> "(1.23,4.56,7.89)"
     """
-    if not is_arr_double_finite(arr, size):  # type: ignore
-        raise TypeError("float value such as 'nan' & 'inf' is invalid.")
-    # Alternative approach:
-    # str = _orjson_dumps(np.PyArray_ToList(arr))
-    res: str = _orjson_dumps_numpy(arr)
-    return replace_bracket(res)  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . check if value is finite
+        if not is_arr_double_finite_1d(arr, s_i):  # type: ignore
+            raise TypeError("float value such as 'nan' & 'inf' is invalid.")
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        return replace_bracket(res, 1)  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . check if value is finite
+        if not is_arr_double_finite_2d(arr, s_i, s_j):  # type: ignore
+            raise TypeError("float value such as 'nan' & 'inf' is invalid.")
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        if read_char(res, 1) == "[":
+            res = str_substr(res, 1, str_len(res) - 1)
+        return replace_bracket(res, -1)  # type: ignore
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_int(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray with dtype of:
     "i" (int) and "u" (uint).
 
-    >>> _escape_ndarray_int(np.array([-1, -2, -3], dtype=np.int64), 3)
+    >>> _escape_ndarray_int(np.array([-1, -2, -3], dtype=np.int64))
     >>> "(-1,-2,-3)"
 
-    >>> _escape_ndarray_int(np.array([1, 2, 3], dtype=np.uint64), 3)
+    >>> _escape_ndarray_int(np.array([1, 2, 3], dtype=np.uint64))
     >>> "(1,2,3)"
     """
-    # Alternative approach:
-    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    res: str = _orjson_dumps_numpy(arr)
-    return replace_bracket(res)  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        return replace_bracket(res, 1)  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        if read_char(res, 1) == "[":
+            res = str_substr(res, 1, str_len(res) - 1)
+        return replace_bracket(res, -1)  # type: ignore
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_bool(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "b" (bool).
 
-    >>> _escape_ndarray_bool(np.array([True, False, True], dtype=np.bool_), 3)
+    >>> _escape_ndarray_bool(np.array([True, False, True], dtype=np.bool_))
     >>> "(1,0,1)"
     """
-    # Alternative approach:
-    # l = ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(size)]
-    # return "(" + ",".join(l) + ")"
-    res: str = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
-    return replace_bracket(res)  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
+        return replace_bracket(res, 1)  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
+        if read_char(res, 1) == "[":
+            res = str_substr(res, 1, str_len(res) - 1)
+        return replace_bracket(res, -1)  # type: ignore
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_dt64(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray with
     dtype of: "M" (datetime64).
 
-    >>> _escape_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"), 3)
+    >>> _escape_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"))
     >>> "('1970-01-01 00:00:01','1970-01-01 00:00:02','1970-01-01 00:00:03')"
     """
-    # Notes: This approach is faster than escaping each element individually.
-    # 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
-    # so character ['"', "T", "[", "]"] will be replaced to comply with literal
+    # Notes: 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
+    # so character ['"', "T", "[", "]"] should be replaced to comply with literal
     # datetime format.
-    res: str = _orjson_dumps_numpy(arr)
-    return res.translate(DT64_JSON_TABLE)
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        return res.translate(DT64_JSON_TABLE)
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        res: str = _orjson_dumps_numpy(arr)
+        if read_char(res, 1) == "[":
+            res = str_substr(res, 1, str_len(res) - 1)
+        return res.translate(DT64_JSON_TABLE)
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
 @cython.cdivision(True)
-def _escape_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_td64(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray with
     dtype of: "m" (timedelta64).
 
-    >>> _escape_ndarray_td64(np.array([1, 2, 3], dtype="timedelta64[s]"), 3)
+    >>> _escape_ndarray_td64(np.array([1, 2, 3], dtype="timedelta64[s]"))
     >>> "('00:00:01','00:00:02','00:00:03')"
     """
-    unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
-    arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
-    res: list = []
-    for i in range(size):
-        us: cython.longlong = arr_getitem_1d_long(arr, i)  # type: ignore
-        us = nptime_to_microseconds(us, unit)  # type: ignore
-        negate: cython.bint = us < 0
-        us = abs(us)
-        hours = us // US_HOUR
-        us %= US_HOUR
-        minutes = us // 60_000_000
-        us %= 60_000_000
-        seconds = us // 1_000_000
-        us %= 1_000_000
-        if us == 0:
-            if negate:
-                res.append("'-%02d:%02d:%02d'" % (hours, minutes, seconds))
-            else:
-                res.append("'%02d:%02d:%02d'" % (hours, minutes, seconds))
-        else:
-            if negate:
-                res.append("'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us))
-            else:
-                res.append("'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us))
-    return "(" + ",".join(res) + ")"
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
+        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        l_i: list = []
+        for i in range(s_i):
+            us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
+            us = nptime_to_microseconds(us, unit)  # type: ignore
+            l_i.append(_escape_timedelta64_fr_us(us))
+        return "(" + ",".join(l_i) + ")"
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0, 0])
+        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        l_i: list = []
+        for i in range(s_i):
+            l_j: list = []
+            for j in range(s_j):
+                us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
+                us = nptime_to_microseconds(us, unit)  # type: ignore
+                l_j.append(_escape_timedelta64_fr_us(us))
+            l_i.append("(" + ",".join(l_j) + ")")
+        return ",".join(l_i)
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_bytes(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "S" (bytes string).
 
-    >>> _escape_ndarray_bytes(np.array([1, 2, 3], dtype="S"), 3)
+    >>> _escape_ndarray_bytes(np.array([1, 2, 3], dtype="S"))
     >>> "(_binary'1',_binary'2',_binary'3')"
     """
-    l = [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
-    return "(" + ",".join(l) + ")"
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
+        return "(" + ",".join(l_i) + ")"
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [
+            "(" + ",".join([_escape_bytes(arr_getitem_2d(arr, i, j)) for j in range(s_j)]) + ")"  # type: ignore
+            for i in range(s_i)
+        ]
+        return ",".join(l_i)
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> str:
+def _escape_ndarray_unicode(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' into literal string `<'str'>`.
 
     This function is specifically for ndarray
     with dtype of: "S" (bytes string).
 
-    >>> _escape_ndarray_unicode(np.array([1, 2, 3], dtype="U"), 3)
+    >>> _escape_ndarray_unicode(np.array([1, 2, 3], dtype="U"))
     >>> "('1','2','3')"
     """
-    l = [_escape_str(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
-    return "(" + ",".join(l) + ")"
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [_escape_str(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
+        return "(" + ",".join(l_i) + ")"
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        l_i = [
+            "(" + ",".join([_escape_str(arr_getitem_2d(arr, i, j)) for j in range(s_j)]) + ")"  # type: ignore
+            for i in range(s_i)
+        ]
+        return ",".join(l_i)
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 # . Pandas Series - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -786,15 +965,11 @@ def _escape_dataframe(data: DataFrame) -> str:
         return "()"  # exit
 
     # Escape DataFrame
-    rows: list = []
-    cols: list[list] = [
-        _escape_item_dataframe_column(col, size) for _, col in data.items()
+    cols: list = [_escape_item_ndarray(col.values) for _, col in data.items()]
+    rows: list = [
+        "(" + ",".join([cython.cast(object, tuple_getitem(cols[j], i)) for j in range(width)]) + ")"  # type: ignore
+        for i in range(size)
     ]
-    for i in range(size):
-        row: list = []
-        for j in range(width):
-            row.append(cols[j][i])
-        rows.append("(" + ",".join(row) + ")")
     return ",".join(rows)
 
 
@@ -911,7 +1086,7 @@ def _escape_uncommon(data: object, dtype: type) -> str:
     if dtype is typeref.STRUCT_TIME:
         return _escape_struct_time(data)
     # . <'cytimes.pydt'>
-    if CYTIMES_AVAILABLE and dtype is pydt:
+    if typeref.CYTIMES_AVAILABLE and dtype is typeref.PYDT:
         return _escape_datetime(data.dt)
 
     # Bytes Types
@@ -958,7 +1133,7 @@ def _escape_uncommon(data: object, dtype: type) -> str:
     ):
         return _escape_series(data)
     # . <'cytimes.pddt'>
-    if CYTIMES_AVAILABLE and dtype is pddt:
+    if typeref.CYTIMES_AVAILABLE and dtype is typeref.PDDT:
         return _escape_series(data.dt)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:
@@ -1115,246 +1290,480 @@ def _escape_item_sequence(data: Iterable) -> tuple:
 # . Numpy ndarray - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray(data: np.ndarray) -> tuple:
+def _escape_item_ndarray(data: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'data' into
-    tuple of literal strings `<'tuple[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
+    ### Notice
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
     >>> _escape_item_ndarray(np.array([1, 2, 3]))
     >>> ("1", "2", "3")
+
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray(
+            np.array([[1.1, 2.2, 3.3], [1.1, 2.2, 3.3]]))
+    >>> [("1.1", "2.2", "3.3"), ("1.1", "2.2", "3.3")]
     """
-    # Validate ndarray dimensions & size
-    if data.ndim != 1:
-        raise ValueError("only supports 1-dimensional <'numpy.ndarray'>.")
-    size: cython.Py_ssize_t = data.shape[0]
-    if size == 0:
-        return ()  # exit
-    # Escape ndarray
+    # Get ndarray dtype
     dtype: cython.char = data.descr.kind
+
     # . ndarray[object]
     if dtype == NDARRAY_DTYPE_OBJECT:
-        return list_to_tuple(_escape_item_ndarray_object(data, size))
+        return _escape_item_ndarray_object(data)
     # . ndarray[float]
     if dtype == NDARRAY_DTYPE_FLOAT:
-        return list_to_tuple(_escape_item_ndarray_float(data, size))
+        return _escape_item_ndarray_float(data)
     # . ndarray[int]
     if dtype == NDARRAY_DTYPE_INT:
-        return list_to_tuple(_escape_item_ndarray_int(data, size))
+        return _escape_item_ndarray_int(data)
     # . ndarray[uint]
     if dtype == NDARRAY_DTYPE_UINT:
-        return list_to_tuple(_escape_item_ndarray_int(data, size))
+        return _escape_item_ndarray_int(data)
     # . ndarray[bool]
     if dtype == NDARRAY_DTYPE_BOOL:
-        return list_to_tuple(_escape_item_ndarray_bool(data, size))
+        return _escape_item_ndarray_bool(data)
     # . ndarray[datetime64]
     if dtype == NDARRAY_DTYPE_DT64:
-        return list_to_tuple(_escape_item_ndarray_dt64(data, size))
+        return _escape_item_ndarray_dt64(data)
     # . ndarray[timedelta64]
     if dtype == NDARRAY_DTYPE_TD64:
-        return list_to_tuple(_escape_item_ndarray_td64(data, size))
+        return _escape_item_ndarray_td64(data)
     # . ndarray[bytes]
     if dtype == NDARRAY_DTYPE_BYTES:
-        return list_to_tuple(_escape_item_ndarray_bytes(data, size))
+        return _escape_item_ndarray_bytes(data)
     # . ndarray[str]
     if dtype == NDARRAY_DTYPE_UNICODE:
-        return list_to_tuple(_escape_item_ndarray_unicode(data, size))
+        return _escape_item_ndarray_unicode(data)
     # . invalid dtype
     raise TypeError("unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_object(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_object(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "O" (object).
 
-    >>> _escape_item_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"), 3)
-    >>> ["1", "1.23", "'abc'"]
-
     ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"))
+    >>> ("1", "1.23", "'abc'")  # tuple
+
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_object(
+            np.array([[1, 1.23, "abc"], [1, 1.23, "abc"]], dtype="O"))
+    >>> [("1", "1.23", "'abc'"), ("1", "1.23", "'abc'")]  # list
     """
-    return [_escape_common(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        return list_to_tuple([_escape_common(arr_getitem_1d(arr, i)) for i in range(s_i)])  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        return [
+            list_to_tuple([_escape_common(arr_getitem_2d(arr, i, j)) for j in range(s_j)])  # type: ignore
+            for i in range(s_i)
+        ]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_float(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_float(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray arr into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of:
     "f" (float), "i" (int) and "u" (uint).
 
-    :raises `<'TypeError'>`: If float value is invalid.
-
-    >>> _escape_item_ndarray_float(np.array([1.23, 4.56, 7.89], dtype=np.float64), 3)
-    >>> ["1.23", "4.56", "7.89"]
+    :raises `<'TypeError'>`: If float value is invalid (not finite).
 
     ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_float(np.array([1.23, 4.56, 7.89], dtype=np.float64))
+    >>> ("1.23", "4.56", "7.89")
+
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_float(
+            np.array([[1.23, 4.56, 7.89], [1.23, 4.56, 7.89]], dtype=np.float64))
+    >>> [("1.23", "4.56", "7.89"), ("1.23", "4.56", "7.89")]
     """
-    # Check if any item is not finite.
-    if not is_arr_double_finite(arr, size):  # type: ignore
-        raise TypeError("float value of 'nan' & 'inf' is invalid.")
-    # Alternative approach:
-    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    res: str = _orjson_dumps_numpy(arr)
-    return str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . check if value is finite
+        if not is_arr_double_finite_1d(arr, s_i):  # type: ignore
+            raise TypeError("float value such as 'nan' & 'inf' is invalid.")
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        return list_to_tuple(str_split(str_substr(res, 1, str_len(res) - 1), ",", -1))
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . check if value is finite
+        if not is_arr_double_finite_2d(arr, s_i, s_j):  # type: ignore
+            raise TypeError("float value such as 'nan' & 'inf' is invalid.")
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        l_i: list = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
+        return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_int(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_int(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of:
     "i" (int) and "u" (uint).
 
-    >>> _escape_item_ndarray_int(np.array([-1, -2, -3], dtype=np.int64), 3)
-    >>> ["-1", "-2", "-3"]
-
-    >>> _escape_item_ndarray_int(np.array([1, 2, 3], dtype=np.uint64), 3)
-    >>> ["1", "2", "3"]
-
     ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_int(np.array([-1, -2, -3], dtype=np.int64))
+    >>> ("-1", "-2", "-3")
+
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_int(
+            np.array([[1, 2, 3], [1, 2, 3]], dtype=np.uint64))
+    >>> [("1", "2", "3"), ("1", "2", "3")]
     """
-    # Alternative approach:
-    # res: str = _orjson_dumps(np.PyArray_ToList(arr))
-    res: str = _orjson_dumps_numpy(arr)
-    return str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        return list_to_tuple(str_split(str_substr(res, 1, str_len(res) - 1), ",", -1))
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        l_i: list = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
+        return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_bool(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_bool(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "b" (bool).
 
-    >>> _escape_item_ndarray_bool(np.array([True, False, True], dtype=np.bool_), 3)
-    >>> ["1", "0", "1"]
-
     ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_bool(np.array([True, False, True], dtype=np.bool_))
+    >>> ("1", "0", "1")
+
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_bool(
+            np.array([[True, False, True], [True, False, True]], dtype=np.bool_))
+    >>> [("1", "0", "1"), ("1", "0", "1")]
     """
-    return ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(size)]  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        return list_to_tuple(["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(s_i)])  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        return [
+            list_to_tuple(["1" if arr_getitem_2d_bint(arr, i, j) else "0" for j in range(s_j)])  # type: ignore
+            for i in range(s_i)
+        ]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_dt64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_dt64(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "M" (datetime64).
 
-    >>> _escape_item_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"), 3)
+    ### Notice
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"))
     >>> ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'")
 
-    ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_dt64(
+            np.array([[1, 2, 3], [1, 2, 3]], dtype="datetime64[s]"))
+    >>> [
+            ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'"),
+            ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'"),
+        ]
     """
-    # Notes: This approach is faster than encoding each element individually.
-    # 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
-    # so character ['"', "T"] will be replaced to comply with literal datetime
-    # format, and then split by "," into sequence of literal strings.
-    res: str = _orjson_dumps_numpy(arr)
-    res = str_substr(res, 1, str_len(res) - 1)
-    return str_split(res.translate(DT64_JSON_TABLE), ",", -1)
+    # Notes: 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
+    # so character ['"', "T", "[", "]"] should be replaced to comply with literal
+    # datetime format.
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        res = str_substr(res, 1, str_len(res) - 1)
+        return list_to_tuple(str_split(res.translate(DT64_JSON_TABLE), ",", -1))
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        res: str = _orjson_dumps_numpy(arr)
+        res = res.translate(DT64_JSON_TABLE)
+        l_i: list = str_split(str_substr(res, 2, str_len(res) - 2), "),(", -1)
+        return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_td64(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_td64(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "m" (timedelta64).
 
-    >>> _escape_item_ndarray_td64(np.array([1, 2, 3], dtype="timedelta64[s]"), 3)
+    ### Notice
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_td64(np.array([1, 2, 3], dtype="timedelta64[s]"))
     >>> ("'00:00:01'", "'00:00:02'", "'00:00:03'")
 
-    ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_td64(
+            np.array([[1, 2, 3], [1, 2, 3]], dtype="timedelta64[s]"))
+    >>> [("00:00:01", "00:00:02", "00:00:03"), ("00:00:01", "00:00:02", "00:00:03")]
     """
-    unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
-    arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
-    res: list = []
-    for i in range(size):
-        us: cython.longlong = arr_getitem_1d_long(arr, i)  # type: ignore
-        us = nptime_to_microseconds(us, unit)  # type: ignore
-        negate: cython.bint = us < 0
-        us = abs(us)
-        hours = us // US_HOUR
-        us %= US_HOUR
-        minutes = us // 60_000_000
-        us %= 60_000_000
-        seconds = us // 1_000_000
-        us %= 1_000_000
-        if us == 0:
-            if negate:
-                res.append("'-%02d:%02d:%02d'" % (hours, minutes, seconds))
-            else:
-                res.append("'%02d:%02d:%02d'" % (hours, minutes, seconds))
-        else:
-            if negate:
-                res.append("'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us))
-            else:
-                res.append("'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us))
-    return res
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
+        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        l_i: list = []
+        for i in range(s_i):
+            us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
+            us = nptime_to_microseconds(us, unit)  # type: ignore
+            l_i.append(_escape_timedelta64_fr_us(us))
+        return list_to_tuple(l_i)
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0, 0])
+        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        l_i: list = []
+        for i in range(s_i):
+            l_j: list = []
+            for j in range(s_j):
+                us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
+                us = nptime_to_microseconds(us, unit)  # type: ignore
+                l_j.append(_escape_timedelta64_fr_us(us))
+            l_i.append(list_to_tuple(l_j))
+        return l_i
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_bytes(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_bytes(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "S" (bytes string).
 
-    >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="S"), 3)
+    ### Notice
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="S"))
     >>> ("_binary'1'", "_binary'2'", "_binary'3'")
 
-    ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_bytes(
+            np.array([[1, 2, 3], [1, 2, 3]], dtype="S"))
+    >>> [
+            ("_binary'1'", "_binary'2'", "_binary'3'"),
+            ("_binary'1'", "_binary'2'", "_binary'3'")
+        ]
     """
-    return [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        return list_to_tuple([_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)])  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        return [
+            list_to_tuple([_escape_bytes(arr_getitem_2d(arr, i, j)) for j in range(s_j)])  # type: ignore
+            for i in range(s_i)
+        ]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_unicode(arr: np.ndarray, size: cython.Py_ssize_t) -> list:
+def _escape_item_ndarray_unicode(arr: np.ndarray) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' into
-    list of literal strings `<'list[str]'>`.
+    list of literal strings `<'tuple/list[tuple]'>`.
 
     This function is specifically for ndarray with dtype of: "S" (bytes string).
 
-    >>> _escape_item_ndarray_unicode(np.array([1, 2, 3], dtype="U"), 3)
+    ### Notice
+    - 1-dimensional ndarray will be escaped into `TUPLE`.
+    - 2-dimensional ndarray will be escaped into `LIST of TUPLE`.
+
+    ### Example (1-dimensional)
+    >>> _escape_item_ndarray_unicode(np.array([1, 2, 3], dtype="U"))
     >>> ("'1'", "'2'", "'3'")
 
-    ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
+    ### Example (2-dimensional)
+    >>> _escape_item_ndarray_unicode(
+            np.array([[1, 2, 3], [1, 2, 3]], dtype="U"))
+    >>> [("1", "2", "3"), ("1", "2", "3")]
     """
-    return [_escape_str(arr_getitem_1d(arr, i)) for i in range(size)]  # type: ignore
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    s_i: cython.Py_ssize_t
+    s_j: cython.Py_ssize_t
+    # 1-dimensional
+    if ndim == 1:
+        s_i, s_j = shape[0], 0
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literal
+        return list_to_tuple([_escape_str(arr_getitem_1d(arr, i)) for i in range(s_i)])  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i, s_j = shape[0], shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literal
+        return [
+            list_to_tuple([_escape_str(arr_getitem_2d(arr, i, j)) for j in range(s_j)])  # type: ignore
+            for i in range(s_i)
+        ]
+    # invalid
+    raise ValueError("unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
 # . Pandas Series - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_series(data: Series) -> tuple:
+def _escape_item_series(data: Series) -> object:
     """(cfunc) Escape items of pandas.Series 'data' into
     tuple of literal strings `<'tuple[str]'>`.
 
@@ -1392,67 +1801,11 @@ def _escape_item_dataframe(data: DataFrame) -> list:
         return ()  # exit
 
     # Escape DataFrame
-    rows: list = []
-    cols: list[list] = [
-        _escape_item_dataframe_column(col, size) for _, col in data.items()
+    cols: list = [_escape_item_ndarray(col.values) for _, col in data.items()]
+    return [
+        list_to_tuple([cython.cast(object, tuple_getitem(cols[j], i)) for j in range(width)])  # type: ignore
+        for i in range(size)
     ]
-    for i in range(size):
-        row: list = []
-        for j in range(width):
-            row.append(cols[j][i])
-        rows.append(list_to_tuple(row))
-    return rows
-
-
-@cython.cfunc
-@cython.inline(True)
-def _escape_item_dataframe_column(data: Series, size: cython.Py_ssize_t) -> list:
-    """(cfunc) Escape items of pandas.DataFrame column 'data' into
-    list of literal strings `<'list[str]'>`.
-
-    >>> _escape_item_dataframe_column(pd.Series([1, 2, 3]), 3)
-    >>> ["1", "2", "3"]
-
-    ### Notice
-    This function returns `LIST` instead of `TUPLE`
-    for performance optimization.
-    """
-    # Get values
-    try:
-        arr: np.ndarray = data.values
-    except Exception as err:
-        raise TypeError("Expects <'pandas.Series'>, got %s." % type(data)) from err
-    # Escape ndarray
-    dtype: cython.char = arr.descr.kind
-    # . ndarray[object]
-    if dtype == NDARRAY_DTYPE_OBJECT:
-        return _escape_item_ndarray_object(arr, size)
-    # . ndarray[float]
-    if dtype == NDARRAY_DTYPE_FLOAT:
-        return _escape_item_ndarray_float(arr, size)
-    # . ndarray[int]
-    if dtype == NDARRAY_DTYPE_INT:
-        return _escape_item_ndarray_int(arr, size)
-    # . ndarray[uint]
-    if dtype == NDARRAY_DTYPE_UINT:
-        return _escape_item_ndarray_int(arr, size)
-    # . ndarray[bool]
-    if dtype == NDARRAY_DTYPE_BOOL:
-        return _escape_item_ndarray_bool(arr, size)
-    # . ndarray[datetime64]
-    if dtype == NDARRAY_DTYPE_DT64:
-        return _escape_item_ndarray_dt64(arr, size)
-    # . ndarray[timedelta64]
-    if dtype == NDARRAY_DTYPE_TD64:
-        return _escape_item_ndarray_td64(arr, size)
-    # . ndarray[bytes]
-    if dtype == NDARRAY_DTYPE_BYTES:
-        return _escape_item_ndarray_bytes(arr, size)
-    # . ndarray[str]
-    if dtype == NDARRAY_DTYPE_UNICODE:
-        return _escape_item_ndarray_unicode(arr, size)
-    # . invalid dtype
-    raise TypeError("unsupported <'Series'> dtype [%s]." % data.dtype)
 
 
 # . Escape - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1570,7 +1923,7 @@ def _escape_item_uncommon(data: object, dtype: type) -> object:
     if dtype is typeref.STRUCT_TIME:
         return _escape_struct_time(data)
     # . <'cytimes.pydt'>
-    if CYTIMES_AVAILABLE and dtype is pydt:
+    if typeref.CYTIMES_AVAILABLE and dtype is typeref.PYDT:
         return _escape_datetime(data.dt)
 
     # Bytes Types
@@ -1617,7 +1970,7 @@ def _escape_item_uncommon(data: object, dtype: type) -> object:
     ):
         return _escape_item_series(data)
     # . <'cytimes.pddt'>
-    if CYTIMES_AVAILABLE and dtype is pddt:
+    if typeref.CYTIMES_AVAILABLE and dtype is typeref.PDDT:
         return _escape_item_series(data.dt)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:

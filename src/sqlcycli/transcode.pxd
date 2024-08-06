@@ -7,13 +7,11 @@ from cpython.bytes cimport PyBytes_AS_STRING as bytes_to_chars
 from cpython.bytearray cimport PyByteArray_AsString, PyByteArray_GET_SIZE
 from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8, PyUnicode_Replace
 cimport numpy as np
-from numpy cimport PyArray_GETITEM, PyArray_GETPTR1
 from numpy cimport PyArray_TYPE, PyArray_Cast, PyArray_DATA
+from numpy cimport PyArray_GETITEM, PyArray_GETPTR1, PyArray_GETPTR2
 
 # Constants
 cdef:
-    # . cytimes [library]
-    bint CYTIMES_AVAILABLE
     # . translate table
     list STR_ESCAPE_TABLE, DT64_JSON_TABLE
     # . time units
@@ -43,11 +41,14 @@ ctypedef struct hms:
     unsigned int microsecond
 
 # Utils
-cdef inline str replace_bracket(str value):
+cdef inline str replace_bracket(str value, Py_ssize_t maxcount):
     """Specifically designed to replace string '[...]' into '(...)' `<'str'>`.
     Both '[' and ']' are replaced by '(' and ')' once respectively.
     """
-    return PyUnicode_Replace(PyUnicode_Replace(value, "[", "(", 1), "]", ")", 1)
+    return PyUnicode_Replace(
+        PyUnicode_Replace(value, "[", "(", maxcount), 
+        "]", ")", maxcount
+    )
 
 cdef inline str decode_bytes(object value, char* encoding):
     """Decode bytes to string using 'encoding' with "surrogateescape" error handling `<'str'>`."""
@@ -181,10 +182,90 @@ cdef inline bint arr_getitem_1d_bint(np.ndarray arr, np.npy_intp i) except -1:
     cdef char* item = <char*>PyArray_GETPTR1(arr, i)
     return item[0]
 
-cdef inline long long arr_getitem_1d_long(np.ndarray arr, np.npy_intp i):
+cdef inline long long arr_getitem_1d_ll(np.ndarray arr, np.npy_intp i):
     """Get item from 1-dimensional numpy ndarray as `<'long long'>`."""
     cdef long long* item = <long long*>PyArray_GETPTR1(arr, i)
     return item[0]
+
+cdef inline bint is_arr_double_finite_1d(np.ndarray arr, np.npy_intp s_i) except -1:
+    """Check if all items for 1-dimensional ndarray[double] is finite `<'bool'>`."""
+    cdef:
+        int dtype = PyArray_TYPE(arr)
+        double* d_ptr
+        float* f_ptr
+
+    # Check float64
+    if dtype == np.NPY_TYPES.NPY_FLOAT64:
+        d_ptr = <double*> PyArray_DATA(arr)
+        for i in range(s_i):
+            if not isfinite(d_ptr[i]):
+                return False
+        return True
+        
+    # Cast others to float32
+    if dtype != np.NPY_TYPES.NPY_FLOAT32:
+        arr = PyArray_Cast(arr, np.NPY_TYPES.NPY_FLOAT32)
+        dtype = np.NPY_TYPES.NPY_FLOAT32
+
+    # Check float32
+    if dtype == np.NPY_TYPES.NPY_FLOAT32:
+        f_ptr = <float*> PyArray_DATA(arr)
+        for i in range(s_i):
+            if not isfinite(f_ptr[i]):
+                return False
+        return True
+
+    # Invalid dtype
+    raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
+
+cdef inline object arr_getitem_2d(np.ndarray arr, np.npy_intp i, np.npy_intp j):
+    """Get item from 2-dimensional numpy ndarray as `<'object'>`."""
+    cdef void* itemptr = <void*>PyArray_GETPTR2(arr, i, j)
+    cdef object item = PyArray_GETITEM(arr, itemptr)
+    return item
+
+cdef inline bint arr_getitem_2d_bint(np.ndarray arr, np.npy_intp i, np.npy_intp j) except -1:
+    """Get item from 2-dimensional numpy ndarray as `<'bint'>`."""
+    cdef char* item = <char*>PyArray_GETPTR2(arr, i, j)
+    return item[0]
+
+cdef inline long long arr_getitem_2d_ll(np.ndarray arr, np.npy_intp i, np.npy_intp j):
+    """Get item from 2-dimensional numpy ndarray as `<'long long'>`."""
+    cdef long long* item = <long long*>PyArray_GETPTR2(arr, i, j)
+    return item[0]
+
+cdef inline bint is_arr_double_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_intp s_j) except -1:
+    """Check if all items for 2-dimensional ndarray[double] is finite `<'bool'>`."""
+    cdef:
+        int dtype = PyArray_TYPE(arr)
+        double* d_ptr
+        float* f_ptr
+
+    # Check float64
+    if dtype == np.NPY_TYPES.NPY_FLOAT64:
+        d_ptr = <double*> PyArray_DATA(arr)
+        for i in range(s_i):
+            for j in range(s_j):
+                if not isfinite(d_ptr[i * s_j + j]):
+                    return False
+        return True
+        
+    # Cast others to float32
+    if dtype != np.NPY_TYPES.NPY_FLOAT32:
+        arr = PyArray_Cast(arr, np.NPY_TYPES.NPY_FLOAT32)
+        dtype = np.NPY_TYPES.NPY_FLOAT32
+
+    # Check float32
+    if dtype == np.NPY_TYPES.NPY_FLOAT32:
+        f_ptr = <float*> PyArray_DATA(arr)
+        for i in range(s_i):
+            for j in range(s_j):
+                if not isfinite(f_ptr[i * s_j + j]):
+                    return False
+        return True
+
+    # Invalid dtype
+    raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
 cdef inline long long nptime_to_microseconds(np.npy_datetime value, np.NPY_DATETIMEUNIT unit):
     """Convert numpy.datetime64/timedelta64 value into microseconds `<'long long'>`."""
@@ -223,37 +304,6 @@ cdef inline long long dt64_to_microseconds(object dt64):
 cdef inline long long td64_to_microseconds(object td64):
     """Convert numpy.timedelta64 to total microseconds `<'long long'>`."""
     return nptime_to_microseconds(np.get_timedelta64_value(td64), np.get_datetime64_unit(td64))
-
-cdef inline bint is_arr_double_finite(np.ndarray arr, Py_ssize_t size) except -1:
-    """Check if all items of the ndarray[double] is finite `<'bool'>`."""
-    cdef:
-        int dtype = PyArray_TYPE(arr)
-        double* d_ptr
-        float* f_ptr
-
-    # Check float64
-    if dtype == np.NPY_TYPES.NPY_FLOAT64:
-        d_ptr = <double*> PyArray_DATA(arr)
-        for i in range(size):
-            if not isfinite(d_ptr[i]):
-                return False
-        return True
-        
-    # Cast float16 -> float32
-    if dtype == np.NPY_TYPES.NPY_FLOAT16:
-        arr = PyArray_Cast(arr, np.NPY_TYPES.NPY_FLOAT32)
-        dtype = np.NPY_TYPES.NPY_FLOAT32
-
-    # Check float32
-    if dtype == np.NPY_TYPES.NPY_FLOAT32:
-        f_ptr = <float*> PyArray_DATA(arr)
-        for i in range(size):
-            if not isfinite(f_ptr[i]):
-                return False
-        return True
-
-    # Invalid dtype
-    raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
 cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end):
     """Slice data `<'char*'>` from 'start' to 'end', and convert to `<'long long'>`."""
