@@ -2928,15 +2928,23 @@ class TestLoadLocal(TestCase):
         test = "NO FILE"
         self.log_start(test)
 
-        async with await self.setup() as conn:
-            async with conn.cursor() as cur:
-                with self.assertRaises(errors.OperationalError):
-                    await cur.execute(
-                        "LOAD DATA LOCAL INFILE 'no_data.txt' INTO TABLE "
-                        "test_load_local fields terminated by ','"
-                    )
-            await self.drop(conn)
-        self.log_ended(test)
+        try:
+            async with await self.setup() as conn:
+                async with conn.cursor() as cur:
+                    with self.assertRaises(errors.OperationalError):
+                        await cur.execute(
+                            "LOAD DATA LOCAL INFILE 'no_data.txt' INTO TABLE "
+                            "test_load_local fields terminated by ','"
+                        )
+                await self.drop(conn)
+
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     async def test_load_file(self, unbuffered: bool = False):
         test = "LOAD FILE"
@@ -2944,51 +2952,73 @@ class TestLoadLocal(TestCase):
 
         if unbuffered:
             test += " UNBUFFERED"
-        async with await self.setup() as conn:
-            async with conn.cursor(SSCursor if unbuffered else SSCursor) as cur:
-                filename = os.path.join(
-                    os.path.dirname(os.path.realpath(__file__)),
-                    "test_data",
-                    "load_local_data.txt",
-                )
-                await cur.execute(
-                    f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {self.table}"
-                    " FIELDS TERMINATED BY ','"
-                )
-                await cur.execute(f"SELECT COUNT(*) FROM {self.table}")
-                self.assertEqual(22749, (await cur.fetchone())[0])
+        try:
+            async with await self.setup() as conn:
+                async with conn.cursor(SSCursor if unbuffered else SSCursor) as cur:
+                    filename = os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        "test_data",
+                        "load_local_data.txt",
+                    )
+                    try:
+                        await cur.execute(
+                            f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {self.table}"
+                            " FIELDS TERMINATED BY ','"
+                        )
+                    except FileNotFoundError:
+                        self.log_ended(test, True)
+                        return None
+                    await cur.execute(f"SELECT COUNT(*) FROM {self.table}")
+                    self.assertEqual(22749, (await cur.fetchone())[0])
+                await self.drop(conn)
 
-            await self.drop(conn)
-        self.log_ended(test)
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     async def test_load_warnings(self):
         test = "LOAD WARNINGS"
         self.log_start(test)
 
-        async with await self.setup() as conn:
-            async with conn.cursor() as cur:
-                filename = os.path.join(
-                    os.path.dirname(os.path.realpath(__file__)),
-                    "test_data",
-                    "load_local_warn_data.txt",
-                )
-                await cur.execute(
-                    f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE "
-                    f"{self.table} FIELDS TERMINATED BY ','"
-                )
-                self.assertEqual(1, cur.warning_count)
+        try:
+            async with await self.setup() as conn:
+                async with conn.cursor() as cur:
+                    filename = os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        "test_data",
+                        "load_local_warn_data.txt",
+                    )
+                    try:
+                        await cur.execute(
+                            f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE "
+                            f"{self.table} FIELDS TERMINATED BY ','"
+                        )
+                    except FileNotFoundError:
+                        self.log_ended(test, True)
+                        return None
+                    self.assertEqual(1, cur.warning_count)
 
-                await cur.execute("SHOW WARNINGS")
-                row = await cur.fetchone()
+                    await cur.execute("SHOW WARNINGS")
+                    row = await cur.fetchone()
 
-                self.assertEqual(ER.TRUNCATED_WRONG_VALUE_FOR_FIELD, row[1])
-                self.assertIn(
-                    "incorrect integer value",
-                    row[2].lower(),
-                )
+                    self.assertEqual(ER.TRUNCATED_WRONG_VALUE_FOR_FIELD, row[1])
+                    self.assertIn(
+                        "incorrect integer value",
+                        row[2].lower(),
+                    )
+                await self.drop(conn)
 
-            await self.drop(conn)
-        self.log_ended(test)
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     # . utils
     async def setup(self, table: str = None, **kwargs) -> Connection:
@@ -2996,6 +3026,7 @@ class TestLoadLocal(TestCase):
         tb = self.tb if table is None else table
         async with conn.cursor() as cur:
             await cur.execute("SET GLOBAL local_infile=ON")
+            await cur.execute(f"DROP TABLE IF EXISTS {self.db}.{tb}")
             await cur.execute(f"CREATE TABLE {self.db}.{tb} (a INTEGER, b INTEGER)")
         await conn.commit()
         return conn

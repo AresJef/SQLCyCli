@@ -96,8 +96,11 @@ class TestCharset(TestCase):
         self.test_utf8()
 
     def validate_charsets(self) -> None:
+        try:
+            from pymysql import charset as pycharset  # type: ignore
+        except ImportError:
+            return None
         from sqlcycli import charset
-        from pymysql import charset as pycharset
 
         test = "VALIDATE CHARSETS"
         self.log_start(test)
@@ -181,24 +184,52 @@ class TestTranscode(TestCase):
     }
 
     def test_all(self) -> None:
-        self.test_escape_encode_bool()
-        self.test_escape_encode_int()
-        self.test_escape_encode_float()
-        self.test_escape_encode_str()
-        self.test_escape_encode_none()
-        self.test_escape_encode_datetime()
-        self.test_escape_encode_date()
-        self.test_escape_encode_time()
-        self.test_escape_encode_timedelta()
-        self.test_escape_encode_bytes()
-        self.test_escape_encode_decimal()
-        self.test_escape_encode_dict()
-        self.test_escape_encode_sequence()
-        self.test_escape_encode_ndarray_series()
-        self.test_escape_encode_dataframe()
+        self.test_escape_bool()
+        self.test_escape_int()
+        self.test_escape_float()
+        self.test_escape_str()
+        self.test_escape_none()
+        self.test_escape_datetime()
+        self.test_escape_date()
+        self.test_escape_time()
+        self.test_escape_timedelta()
+        self.test_escape_bytes()
+        self.test_escape_decimal()
+        self.test_escape_dict()
+        self.test_escape_sequence()
+        self.test_escape_ndarray_series()
+        self.test_escape_dataframe()
+        self.test_escape_cytimes()
         self.test_decode()
 
-    def test_escape_encode_bool(self) -> None:
+    def test_escape_cytimes(self) -> None:
+        try:
+            import cytimes  # type: ignore
+
+        except ImportError:
+            return None
+
+        from sqlcycli.transcode import escape
+
+        test = "ESCAPE CYTIMES"
+        self.log_start(test)
+
+        dt = "2023-01-01 12:00:00"
+        self.assertEqual(escape(cytimes.pydt(dt), True, True), "'%s'" % dt)
+        self.assertEqual(escape(cytimes.pydt(dt), False, True), "'%s'" % dt)
+        self.assertEqual(escape(cytimes.pydt(dt), False, False), "'%s'" % dt)
+
+        dts = [dt] * 2
+        self.assertEqual(escape(cytimes.pddt(dts), True, True), ("'%s'" % dt,) * 2)
+        self.assertEqual(escape(cytimes.pddt(dts), False, True), ("'%s'" % dt,) * 2)
+        self.assertEqual(
+            escape(cytimes.pddt(dts), False, False),
+            "(%s)" % ",".join(["'%s'" % dt] * 2),
+        )
+
+        self.log_ended(test)
+
+    def test_escape_bool(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE BOOL"
@@ -212,7 +243,7 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(False, False, False), "0")
         self.log_ended(test)
 
-    def test_escape_encode_int(self) -> None:
+    def test_escape_int(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE INT"
@@ -247,7 +278,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_float(self) -> None:
+    def test_escape_float(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE FLOAT"
@@ -269,7 +300,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_str(self) -> None:
+    def test_escape_str(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE STR"
@@ -281,7 +312,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_none(self) -> None:
+    def test_escape_none(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE NONE"
@@ -293,7 +324,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_datetime(self) -> None:
+    def test_escape_datetime(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DATETIME"
@@ -326,7 +357,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_date(self) -> None:
+    def test_escape_date(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DATE"
@@ -339,7 +370,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_time(self) -> None:
+    def test_escape_time(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE TIME"
@@ -357,7 +388,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_timedelta(self) -> None:
+    def test_escape_timedelta(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE TIMEDELTA"
@@ -404,7 +435,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_bytes(self) -> None:
+    def test_escape_bytes(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE BYTES"
@@ -427,7 +458,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_decimal(self) -> None:
+    def test_escape_decimal(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DECIMAL"
@@ -440,7 +471,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_dict(self) -> None:
+    def test_escape_dict(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DICT"
@@ -453,7 +484,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_sequence(self) -> None:
+    def test_escape_sequence(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE SEQUENCE"
@@ -492,7 +523,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_ndarray_series(self) -> None:
+    def test_escape_ndarray_series(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE NDARRAY/SERIES"
@@ -608,7 +639,7 @@ class TestTranscode(TestCase):
 
         self.log_ended(test)
 
-    def test_escape_encode_dataframe(self) -> None:
+    def test_escape_dataframe(self) -> None:
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DATAFRAME"
@@ -731,8 +762,13 @@ class TestProtocol(TestCase):
         self.test_EOFPacket()
 
     def test_FieldDescriptorPacket(self) -> None:
+        try:
+            from pymysql.protocol import (  # type: ignore
+                FieldDescriptorPacket as PyFieldDescriptorPacket,
+            )
+        except ImportError:
+            return None
         from sqlcycli.protocol import FieldDescriptorPacket
-        from pymysql.protocol import FieldDescriptorPacket as PyFieldDescriptorPacket
 
         test = "FIELD DESCRIPTOR PACKET"
         self.log_start(test)
@@ -823,8 +859,11 @@ class TestProtocol(TestCase):
         self.log_ended(test)
 
     def test_OKPacket(self) -> None:
+        try:
+            from pymysql.protocol import MysqlPacket as PyMysqlPacket, OKPacketWrapper  # type: ignore
+        except ImportError:
+            return None
         from sqlcycli.protocol import MysqlPacket
-        from pymysql.protocol import MysqlPacket as PyMysqlPacket, OKPacketWrapper
 
         test = "OK PACKET"
         self.log_start(test)
@@ -891,8 +930,11 @@ class TestProtocol(TestCase):
         self.log_ended(test)
 
     def test_EOFPacket(self) -> None:
+        try:
+            from pymysql.protocol import MysqlPacket as PyMysqlPacket, EOFPacketWrapper  # type: ignore
+        except ImportError:
+            return None
         from sqlcycli.protocol import MysqlPacket
-        from pymysql.protocol import MysqlPacket as PyMysqlPacket, EOFPacketWrapper
 
         test = "EOF PACKET"
         self.log_start(test)
@@ -1260,35 +1302,42 @@ class TestAuthentication(TestCase):
         self.test_plugin()
 
     def test_password_algo(self) -> None:
+        try:
+            from pymysql._auth import (  # type: ignore
+                scramble_native_password as py_scramble_native_password,
+                scramble_caching_sha2 as py_scramble_caching_sha2,
+                ed25519_password as py_ed25519_password,
+            )
+        except ImportError:
+            return None
+        from sqlcycli._auth import (
+            scramble_native_password,
+            scramble_caching_sha2,
+            ed25519_password,
+        )
+
         test = "PASSWORD ALGORITHM"
         self.log_start(test)
 
         password = b"mypassword_123"
         salt = b"\x1aOZeFXX{XY\x18\x0c CW (u\x17F"
 
-        from sqlcycli._auth import scramble_native_password
-        from pymysql._auth import (
-            scramble_native_password as py_scramble_native_password,
-        )
-
         r1 = scramble_native_password(password, salt)
         r2 = py_scramble_native_password(password, salt)
         self.assertEqual(r1, r2)
-
-        from sqlcycli._auth import scramble_caching_sha2
-        from pymysql._auth import scramble_caching_sha2 as py_scramble_caching_sha2
 
         r1 = scramble_caching_sha2(password, salt)
         r2 = py_scramble_caching_sha2(password, salt)
         self.assertEqual(r1, r2)
 
-        from sqlcycli._auth import ed25519_password
-        from pymysql._auth import ed25519_password as py_ed25519_password
+        try:
+            import nacl  # type: ignore
 
-        r1 = ed25519_password(password, salt)
-        r2 = py_ed25519_password(password, salt)
-        self.assertEqual(r1, r2)
-
+            r1 = ed25519_password(password, salt)
+            r2 = py_ed25519_password(password, salt)
+            self.assertEqual(r1, r2)
+        except ImportError:
+            pass
         self.log_ended(test)
 
     def test_plugin(self) -> None:
@@ -3746,15 +3795,23 @@ class TestLoadLocal(TestCase):
         test = "NO FILE"
         self.log_start(test)
 
-        with self.setup() as conn:
-            with conn.cursor() as cur:
-                with self.assertRaises(errors.OperationalError):
-                    cur.execute(
-                        "LOAD DATA LOCAL INFILE 'no_data.txt' INTO TABLE "
-                        "test_load_local fields terminated by ','"
-                    )
-            self.drop(conn)
-        self.log_ended(test)
+        try:
+            with self.setup() as conn:
+                with conn.cursor() as cur:
+                    with self.assertRaises(errors.OperationalError):
+                        cur.execute(
+                            "LOAD DATA LOCAL INFILE 'no_data.txt' INTO TABLE "
+                            "test_load_local fields terminated by ','"
+                        )
+                self.drop(conn)
+
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     def test_load_file(self, unbuffered: bool = False):
         test = "LOAD FILE"
@@ -3762,51 +3819,73 @@ class TestLoadLocal(TestCase):
 
         if unbuffered:
             test += " UNBUFFERED"
-        with self.setup() as conn:
-            with conn.cursor(SSCursor if unbuffered else SSCursor) as cur:
-                filename = os.path.join(
-                    os.path.dirname(os.path.realpath(__file__)),
-                    "test_data",
-                    "load_local_data.txt",
-                )
-                cur.execute(
-                    f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {self.table}"
-                    " FIELDS TERMINATED BY ','"
-                )
-                cur.execute(f"SELECT COUNT(*) FROM {self.table}")
-                self.assertEqual(22749, cur.fetchone()[0])
+        try:
+            with self.setup() as conn:
+                with conn.cursor(SSCursor if unbuffered else SSCursor) as cur:
+                    filename = os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        "test_data",
+                        "load_local_data.txt",
+                    )
+                    try:
+                        cur.execute(
+                            f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE {self.table}"
+                            " FIELDS TERMINATED BY ','"
+                        )
+                    except FileNotFoundError:
+                        self.log_ended(test, True)
+                        return None
+                    cur.execute(f"SELECT COUNT(*) FROM {self.table}")
+                    self.assertEqual(22749, cur.fetchone()[0])
+                self.drop(conn)
 
-            self.drop(conn)
-        self.log_ended(test)
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     def test_load_warnings(self):
         test = "LOAD WARNINGS"
         self.log_start(test)
 
-        with self.setup() as conn:
-            with conn.cursor() as cur:
-                filename = os.path.join(
-                    os.path.dirname(os.path.realpath(__file__)),
-                    "test_data",
-                    "load_local_warn_data.txt",
-                )
-                cur.execute(
-                    f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE "
-                    f"{self.table} FIELDS TERMINATED BY ','"
-                )
-                self.assertEqual(1, cur.warning_count)
+        try:
+            with self.setup() as conn:
+                with conn.cursor() as cur:
+                    filename = os.path.join(
+                        os.path.dirname(os.path.realpath(__file__)),
+                        "test_data",
+                        "load_local_warn_data.txt",
+                    )
+                    try:
+                        cur.execute(
+                            f"LOAD DATA LOCAL INFILE '{filename}' INTO TABLE "
+                            f"{self.table} FIELDS TERMINATED BY ','"
+                        )
+                    except FileNotFoundError:
+                        self.log_ended(test, True)
+                        return None
+                    self.assertEqual(1, cur.warning_count)
 
-                cur.execute("SHOW WARNINGS")
-                row = cur.fetchone()
+                    cur.execute("SHOW WARNINGS")
+                    row = cur.fetchone()
 
-                self.assertEqual(ER.TRUNCATED_WRONG_VALUE_FOR_FIELD, row[1])
-                self.assertIn(
-                    "incorrect integer value",
-                    row[2].lower(),
-                )
+                    self.assertEqual(ER.TRUNCATED_WRONG_VALUE_FOR_FIELD, row[1])
+                    self.assertIn(
+                        "incorrect integer value",
+                        row[2].lower(),
+                    )
+                self.drop(conn)
 
-            self.drop(conn)
-        self.log_ended(test)
+        except errors.OperationalError as err:
+            if err.args[0] in (ER.ACCESS_DENIED_ERROR, ER.SPECIFIC_ACCESS_DENIED_ERROR):
+                self.log_ended(test, True)
+                return None
+            raise err
+        else:
+            self.log_ended(test)
 
     # . utils
     def setup(self, table: str = None, **kwargs) -> Connection:
@@ -3814,6 +3893,7 @@ class TestLoadLocal(TestCase):
         tb = self.tb if table is None else table
         with conn.cursor() as cur:
             cur.execute("SET GLOBAL local_infile=ON")
+            cur.execute(f"DROP TABLE IF EXISTS {self.db}.{tb}")
             cur.execute(f"CREATE TABLE {self.db}.{tb} (a INTEGER, b INTEGER)")
         conn.commit()
         return conn
@@ -3834,7 +3914,11 @@ class TestOptionFile(TestCase):
         filename = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), "test_data", "my.cnf"
         )
-        opt = OptionFile(filename, "client")
+        try:
+            opt = OptionFile(filename, "client")
+        except FileNotFoundError:
+            self.log_ended(test, True)
+            return None
         self.assertEqual("client", opt.opt_group)
         self.assertEqual("localhost", opt.host)
         self.assertEqual(3306, opt.port)
