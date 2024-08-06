@@ -1060,7 +1060,7 @@ class TestConversion(TestCase):
                 # . validate float
                 test_value = tuple(float(i) for i in range(-2, 3))
                 for dtype in (np.float16, np.float32, np.float64):
-                    test_value_np = np.array(test_value, dtype=dtype)
+                    test_value_np = np.array([test_value, test_value], dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values (%s,%s,%s,%s,%s)",
                         test_value_np,
@@ -1083,7 +1083,7 @@ class TestConversion(TestCase):
                     await self.delete(conn)
 
                     # ------------------------------------------------------
-                    test_value_pd = pd.Series(test_value_np, dtype=dtype)
+                    test_value_pd = pd.Series(test_value, dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values %s",
                         test_value_pd,
@@ -1114,7 +1114,7 @@ class TestConversion(TestCase):
                 # . validate int
                 test_value = tuple(range(-2, 3))
                 for dtype in (np.int8, np.int16, np.int32, np.int64):
-                    test_value_np = np.array(test_value, dtype=dtype)
+                    test_value_np = np.array([test_value, test_value], dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values (%s,%s,%s,%s,%s)",
                         test_value_np,
@@ -1138,7 +1138,7 @@ class TestConversion(TestCase):
                     await self.delete(conn)
 
                     # ------------------------------------------------------
-                    test_value_pd = pd.Series(test_value_np, dtype=dtype)
+                    test_value_pd = pd.Series(test_value, dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values %s",
                         test_value_pd,
@@ -1154,7 +1154,7 @@ class TestConversion(TestCase):
                 # . validate uint
                 test_value = tuple(range(5))
                 for dtype in (np.uint8, np.uint16, np.uint32, np.uint64):
-                    test_value_np = np.array(test_value, dtype=dtype)
+                    test_value_np = np.array([test_value, test_value], dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values (%s,%s,%s,%s,%s)",
                         test_value_np,
@@ -1177,7 +1177,7 @@ class TestConversion(TestCase):
                     await self.delete(conn)
 
                     # ------------------------------------------------------
-                    test_value_pd = pd.Series(test_value_np, dtype=dtype)
+                    test_value_pd = pd.Series(test_value, dtype=dtype)
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e) values %s",
                         test_value_pd,
@@ -1203,7 +1203,8 @@ class TestConversion(TestCase):
                 # . create test table
                 await cur.execute(f"create table {self.table} (a bit, b tinyint)")
                 # . insert values
-                test_value_np = np.array([True, False], dtype=np.bool_)
+                test_value = [True, False]
+                test_value_np = np.array([test_value, test_value], dtype=np.bool_)
                 await cur.execute(
                     f"insert into {self.table} (a,b) values (%s,%s)", test_value_np
                 )
@@ -1226,7 +1227,7 @@ class TestConversion(TestCase):
                 await self.delete(conn)
 
                 ##################################################################
-                test_value_pd = pd.Series(test_value_np, dtype=np.bool_)
+                test_value_pd = pd.Series(test_value, dtype=np.bool_)
                 await cur.execute(
                     f"insert into {self.table} (a,b) values %s",
                     test_value_pd,
@@ -1261,7 +1262,7 @@ class TestConversion(TestCase):
                     datetime.datetime(2014, 5, 15, 7, 45, 57),
                     datetime.datetime(2014, 5, 15, 7, 45, 57, 51000),
                 )
-                test_value_np = np.array(test_value, dtype="datetime64[us]")
+                test_value_np = np.array([test_value, test_value], dtype="datetime64[us]")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d) values (%s,%s,%s,%s)",
                     test_value_np,
@@ -1285,7 +1286,7 @@ class TestConversion(TestCase):
                 await self.delete(conn)
 
                 ##################################################################
-                test_value_pd = pd.Series(test_value_np, dtype="datetime64[us]")
+                test_value_pd = pd.Series(test_value, dtype="datetime64[us]")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d) values %s",
                     test_value_pd,
@@ -1314,7 +1315,7 @@ class TestConversion(TestCase):
                     "(a time, b time, c time(6), d time, e time, f time(6), g time)"
                 )
                 # . insert values
-                test_values = (
+                test_value = (
                     datetime.timedelta(0, 45000),
                     datetime.timedelta(0, 83579),
                     datetime.timedelta(0, 83579, 51000),
@@ -1323,40 +1324,40 @@ class TestConversion(TestCase):
                     -datetime.timedelta(0, 83579, 51000),
                     -datetime.timedelta(0, 1800),
                 )
-                test_values_np = np.array(test_values, dtype="timedelta64[us]")
+                test_value_np = np.array([test_value, test_value], dtype="timedelta64[us]")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e,f,g) values (%s,%s,%s,%s,%s,%s,%s)",
-                    test_values_np,
+                    test_value_np,
                 )
                 # . validate
                 await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                 row = await cur.fetchone()
-                self.assertEqual(test_values, row)
+                self.assertEqual(test_value, row)
                 await self.delete(conn)
 
                 ##################################################################
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e,f,g) values %s",
-                    test_values_np,
+                    test_value_np,
                     itemize=False,
                 )
                 # . validate
                 await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                 row = await cur.fetchone()
-                self.assertEqual(test_values, row)
+                self.assertEqual(test_value, row)
                 await self.delete(conn)
 
                 ##################################################################
-                test_values_pd = pd.Series(test_values_np, dtype="timedelta64[us]")
+                test_value_pd = pd.Series(test_value, dtype="timedelta64[us]")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e,f,g) values %s",
-                    test_values_pd,
+                    test_value_pd,
                     itemize=False,
                 )
                 # . validate
                 await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                 row = await cur.fetchone()
-                self.assertEqual(test_values, row)
+                self.assertEqual(test_value, row)
                 await self.delete(conn)
 
                 ##################################################################
@@ -1377,7 +1378,7 @@ class TestConversion(TestCase):
                 )
                 # . insert values
                 test_value = tuple(str(i).encode("utf8") for i in range(5))
-                test_value_np = np.array(test_value, dtype="S")
+                test_value_np = np.array([test_value, test_value], dtype="S")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e) values (%s,%s,%s,%s,%s)",
                     test_value_np,
@@ -1401,7 +1402,7 @@ class TestConversion(TestCase):
                 await self.delete(conn)
 
                 ##################################################################
-                test_value_pd = pd.Series(test_value_np, dtype="S")
+                test_value_pd = pd.Series(test_value, dtype="S")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e) values %s",
                     test_value_pd,
@@ -1431,7 +1432,7 @@ class TestConversion(TestCase):
                 )
                 # . insert values
                 test_value = tuple(str(i) for i in range(5))
-                test_value_np = np.array(test_value, dtype="U")
+                test_value_np = np.array([test_value, test_value], dtype="U")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e) values (%s,%s,%s,%s,%s)",
                     test_value_np,
@@ -1455,7 +1456,7 @@ class TestConversion(TestCase):
                 await self.delete(conn)
 
                 ##################################################################
-                test_value_pd = pd.Series(test_value_np, dtype="U")
+                test_value_pd = pd.Series(test_value, dtype="U")
                 await cur.execute(
                     f"insert into {self.table} (a,b,c,d,e) values %s",
                     test_value_pd,
@@ -1535,7 +1536,7 @@ class TestConversion(TestCase):
                     "mediumblob 中国 Español".encode(conn.encoding),  # 252
                     "longblob 中国 Español".encode(conn.encoding),  # 252
                 )
-                test_value_np = np.array(test_value, dtype="O")
+                test_value_np = np.array([test_value, test_value], dtype="O")
                 await cur.execute(
                     "insert into %s (%s) values (%s)"
                     % (self.table, ",".join(cols.keys()), ",".join(["%s"] * len(cols))),
@@ -1561,7 +1562,7 @@ class TestConversion(TestCase):
                 await self.delete(conn)
 
                 ##################################################################
-                test_value_pd = pd.Series(test_value_np, dtype="O")
+                test_value_pd = pd.Series(test_value, dtype="O")
                 await cur.execute(
                     "insert into %s (%s) values %s"
                     % (self.table, ",".join(cols.keys()), "%s"),

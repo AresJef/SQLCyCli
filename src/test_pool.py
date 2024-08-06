@@ -2026,7 +2026,7 @@ class TestConversion(TestCase):
                         "(a time, b time, c time(6), d time, e time, f time(6), g time)"
                     )
                     # . insert values
-                    test_values = (
+                    test_value = (
                         datetime.timedelta(0, 45000),
                         datetime.timedelta(0, 83579),
                         datetime.timedelta(0, 83579, 51000),
@@ -2035,40 +2035,40 @@ class TestConversion(TestCase):
                         -datetime.timedelta(0, 83579, 51000),
                         -datetime.timedelta(0, 1800),
                     )
-                    test_values_np = np.array(test_values, dtype="timedelta64[us]")
+                    test_value_np = np.array(test_value, dtype="timedelta64[us]")
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e,f,g) values (%s,%s,%s,%s,%s,%s,%s)",
-                        test_values_np,
+                        test_value_np,
                     )
                     # . validate
                     await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                     row = await cur.fetchone()
-                    self.assertEqual(test_values, row)
+                    self.assertEqual(test_value, row)
                     await self.delete(conn)
 
                     ##################################################################
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e,f,g) values %s",
-                        test_values_np,
+                        test_value_np,
                         itemize=False,
                     )
                     # . validate
                     await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                     row = await cur.fetchone()
-                    self.assertEqual(test_values, row)
+                    self.assertEqual(test_value, row)
                     await self.delete(conn)
 
                     ##################################################################
-                    test_values_pd = pd.Series(test_values_np, dtype="timedelta64[us]")
+                    test_value_pd = pd.Series(test_value_np, dtype="timedelta64[us]")
                     await cur.execute(
                         f"insert into {self.table} (a,b,c,d,e,f,g) values %s",
-                        test_values_pd,
+                        test_value_pd,
                         itemize=False,
                     )
                     # . validate
                     await cur.execute(f"SELECT a,b,c,d,e,f,g FROM {self.table}")
                     row = await cur.fetchone()
-                    self.assertEqual(test_values, row)
+                    self.assertEqual(test_value, row)
                     await self.delete(conn)
 
                     ##################################################################
