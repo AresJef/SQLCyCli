@@ -1,10 +1,35 @@
 # cython: language_level=3
 
 cdef:
-    unsigned int COM_SLEEP, COM_QUIT, COM_INIT_DB, COM_QUERY, COM_FIELD_LIST, COM_CREATE_DB
-    unsigned int COM_DROP_DB, COM_REFRESH, COM_SHUTDOWN, COM_STATISTICS, COM_PROCESS_INFO
-    unsigned int COM_CONNECT, COM_PROCESS_KILL, COM_DEBUG, COM_PING, COM_TIME
-    unsigned int COM_DELAYED_INSERT, COM_CHANGE_USER, COM_BINLOG_DUMP, COM_TABLE_DUMP
-    unsigned int COM_CONNECT_OUT, COM_REGISTER_SLAVE, COM_STMT_PREPARE, COM_STMT_EXECUTE
-    unsigned int COM_STMT_SEND_LONG_DATA, COM_STMT_CLOSE, COM_STMT_RESET, COM_SET_OPTION
-    unsigned int COM_STMT_FETCH, COM_DAEMON, COM_BINLOG_DUMP_GTID, COM_END
+    unsigned int COM_SLEEP
+    unsigned int COM_QUIT
+    unsigned int COM_INIT_DB
+    unsigned int COM_QUERY
+    unsigned int COM_FIELD_LIST
+    unsigned int COM_CREATE_DB
+    unsigned int COM_DROP_DB
+    unsigned int COM_REFRESH
+    unsigned int COM_SHUTDOWN
+    unsigned int COM_STATISTICS
+    unsigned int COM_PROCESS_INFO
+    unsigned int COM_CONNECT
+    unsigned int COM_PROCESS_KILL
+    unsigned int COM_DEBUG
+    unsigned int COM_PING
+    unsigned int COM_TIME
+    unsigned int COM_DELAYED_INSERT
+    unsigned int COM_CHANGE_USER
+    unsigned int COM_BINLOG_DUMP
+    unsigned int COM_TABLE_DUMP
+    unsigned int COM_CONNECT_OUT
+    unsigned int COM_REGISTER_SLAVE
+    unsigned int COM_STMT_PREPARE
+    unsigned int COM_STMT_EXECUTE
+    unsigned int COM_STMT_SEND_LONG_DATA
+    unsigned int COM_STMT_CLOSE
+    unsigned int COM_STMT_RESET
+    unsigned int COM_SET_OPTION
+    unsigned int COM_STMT_FETCH
+    unsigned int COM_DAEMON
+    unsigned int COM_BINLOG_DUMP_GTID
+    unsigned int COM_END

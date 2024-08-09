@@ -3,7 +3,6 @@ import cython
 from sqlcycli.constants import CLIENT
 
 # https://dev.mysql.com/doc/internals/en/capability-flags.html#packet-Protocol::CapabilityFlags
-
 LONG_PASSWORD: cython.uint = CLIENT.LONG_PASSWORD
 FOUND_ROWS: cython.uint = CLIENT.FOUND_ROWS
 LONG_FLAG: cython.uint = CLIENT.LONG_FLAG
@@ -26,6 +25,8 @@ PLUGIN_AUTH: cython.uint = CLIENT.PLUGIN_AUTH
 CONNECT_ATTRS: cython.uint = CLIENT.CONNECT_ATTRS
 PLUGIN_AUTH_LENENC_CLIENT_DATA: cython.uint = CLIENT.PLUGIN_AUTH_LENENC_CLIENT_DATA
 CAPABILITIES: cython.uint = CLIENT.CAPABILITIES
+
+# Not done yet
 HANDLE_EXPIRED_PASSWORDS: cython.uint = CLIENT.HANDLE_EXPIRED_PASSWORDS
 SESSION_TRACK: cython.uint = CLIENT.SESSION_TRACK
 DEPRECATE_EOF: cython.uint = CLIENT.DEPRECATE_EOF
