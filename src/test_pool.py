@@ -1125,6 +1125,7 @@ class TestConversion(TestCase):
         await self.test_time()
         await self.test_timedelta()
         await self.test_binary()
+        await self.test_bit()
         await self.test_dict()
         await self.test_sequence()
         await self.test_ndarray_series_float()
@@ -1663,6 +1664,55 @@ class TestConversion(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_bit(self) -> None:
+        from sqlcycli.transcode import BIT
+
+        test = "BIT TYPE"
+        self.log_start(test)
+
+        async with await self.get_pool() as pool:
+            async with pool.acquire() as conn:
+                await self.setup(conn)
+                async with conn.cursor() as cur:
+                    ##################################################################
+                    conn.set_decode_bit(False)
+                    # . create test table
+                    await cur.execute(
+                        f"create table {self.table} (a bit(8), b bit(16), c bit(64))"
+                    )
+                    # . insert values
+                    test_value = (BIT(512), BIT(1024))
+                    await cur.execute(
+                        f"insert into {self.table} (a,b,c) values (_binary'\x01',%s,%s)",
+                        test_value,
+                    )
+                    # . validate
+                    await cur.execute(f"SELECT * FROM {self.table}")
+                    res = await cur.fetchone()
+                    self.assertEqual(
+                        (b"\x01", b"\x02\x00", b"\x00\x00\x00\x00\x00\x00\x04\x00"), res
+                    )
+                    await self.delete(conn)
+
+                    ##################################################################
+                    # . insert values
+                    conn.set_decode_bit(True)
+                    test_value = [BIT(i) for i in res]
+                    await cur.execute(
+                        f"insert into {self.table} (a,b,c) values (%s,%s,%s)",
+                        test_value,
+                    )
+                    # . validate
+                    await cur.execute(f"SELECT * FROM {self.table}")
+                    res = await cur.fetchone()
+                    self.assertEqual((1, 512, 1024), res)
+                    await self.delete(conn)
+
+                    ##################################################################
+                    await self.drop(conn)
+
         self.log_ended(test)
 
     async def test_dict(self) -> None:
@@ -2371,6 +2421,8 @@ class TestConversion(TestCase):
         self.log_ended(test)
 
     async def test_json(self) -> None:
+        from sqlcycli.transcode import JSON
+
         test = "JSON TYPE"
         self.log_start(test)
 
@@ -2409,6 +2461,31 @@ class TestConversion(TestCase):
                     await self.delete(conn)
 
                     ##################################################################
+                    # Custom JSON class
+                    # . decode_json = False
+                    conn.set_decode_json(False)
+                    # . insert values
+                    await cur.execute(
+                        f"INSERT INTO {self.table} " "(id, `json`) values (42, %s)",
+                        JSON(res),
+                    )
+                    # . decode_json = False
+                    conn.set_decode_json(False)
+                    # . validate
+                    await cur.execute(f"SELECT `json` from {self.table} WHERE `id`=42")
+                    res = (await cur.fetchone())[0]
+                    self.assertEqual(orjson.loads(test_value), orjson.loads(res))
+
+                    ##################################################################
+                    # . decode_json = True
+                    conn.set_decode_json(True)
+                    # . validate
+                    await cur.execute(f"SELECT `json` from {self.table} WHERE `id`=42")
+                    res = (await cur.fetchone())[0]
+                    self.assertEqual(orjson.loads(test_value), res)
+                    await self.delete(conn)
+
+                    ##################################################################
                     await self.drop(conn)
         self.log_ended(test)
 
@@ -2419,7 +2496,6 @@ class TestConversion(TestCase):
         async with await self.get_pool() as pool:
             async with pool.acquire() as conn:
                 await self.setup(conn)
-                table_encoded = self.table.encode(conn.encoding)
                 async with conn.cursor() as cur:
                     ##################################################################
                     cols: dict = {
@@ -2491,11 +2567,11 @@ class TestConversion(TestCase):
                     # . validate
                     self.assertEqual(
                         sql,
-                        b"insert into %s (a,b,c,d,e,f,g) values "
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
-                        b"as v" % table_encoded,
+                        "insert into %s (a,b,c,d,e,f,g) values "
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
+                        "as v" % self.table,
                     )
                     await cur.execute(f"SELECT * FROM {self.table}")
                     row = await cur.fetchone()
@@ -2517,11 +2593,11 @@ class TestConversion(TestCase):
                     # . validate
                     self.assertEqual(
                         sql,
-                        b"insert into %s (a,b,c,d,e,f,g) values "
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
-                        b"on duplicate key update a = values(a)" % table_encoded,
+                        "insert into %s (a,b,c,d,e,f,g) values "
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
+                        "on duplicate key update a = values(a)" % self.table,
                     )
                     await cur.execute(f"SELECT * FROM {self.table}")
                     row = await cur.fetchone()
@@ -2543,11 +2619,11 @@ class TestConversion(TestCase):
                     # . validate
                     self.assertEqual(
                         sql,
-                        b"insert into %s (a,b,c,d,e,f,g) values "
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
-                        b"(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
-                        b"as v on duplicate key update a = v.a" % table_encoded,
+                        "insert into %s (a,b,c,d,e,f,g) values "
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar'),"
+                        "(1.1,2,1,'2014-05-15 07:45:57','24:00:02.000003',_binary'binary','varchar') "
+                        "as v on duplicate key update a = v.a" % self.table,
                     )
                     await cur.execute(f"SELECT * FROM {self.table}")
                     row = await cur.fetchone()
@@ -2613,7 +2689,7 @@ class TestCursor(TestCase):
                     await cur.execute(
                         f"insert into {self.table} (value) values (1),(2)"
                     )
-                    self.assertTrue(cur.executed_sql.startswith(b"insert into"))
+                    self.assertTrue(cur.executed_sql.startswith("insert into"))
                     self.assertEqual(cur.field_count, 0)
                     self.assertIsNone(cur.fields)
                     self.assertEqual(cur.insert_id, 1)
@@ -2626,7 +2702,7 @@ class TestCursor(TestCase):
                     await cur.execute(
                         f"SELECT value FROM {self.table} where value in (1)"
                     )
-                    self.assertTrue(cur.executed_sql.startswith(b"SELECT value FROM"))
+                    self.assertTrue(cur.executed_sql.startswith("SELECT value FROM"))
                     self.assertEqual(cur.field_count, 1)
                     self.assertEqual(type(cur.fields[0]), FieldDescriptorPacket)
                     self.assertEqual(cur.insert_id, 0)
@@ -2761,7 +2837,7 @@ class TestCursor(TestCase):
                         f"create table {self.table} (id integer primary key)"
                     )
                     await cur.executemany(
-                        f"insert into {self.table} (id) values (%s)", list(range(10))
+                        f"insert into {self.table} (id) values (%s)", range(10)
                     )
                     await cur.execute(f"SELECT sum(id) FROM {self.table}")
                     row = await cur.fetchone()
@@ -2865,7 +2941,7 @@ class TestCursor(TestCase):
                     # . argument 1 should automatically be escaped into
                     # . str '1' and formatted into the sql as one row values.
                     await cur.execute(f"insert into {self.table} (i) values (%s)", 1)
-                    self.assertEqual(cur.executed_sql.endswith(b"values (1)"), True)
+                    self.assertEqual(cur.executed_sql.endswith("values (1)"), True)
                     await cur.execute(f"select i from {self.table}")
                     self.assertEqual(await cur.fetchone(), (1,))
                     await self.delete(conn)
@@ -2877,7 +2953,7 @@ class TestCursor(TestCase):
                     await cur.execute(
                         f"insert into {self.table} (i, j) values (%s, %s)", (1, 2)
                     )
-                    self.assertEqual(cur.executed_sql.endswith(b"values (1, 2)"), True)
+                    self.assertEqual(cur.executed_sql.endswith("values (1, 2)"), True)
                     await cur.execute(f"select * from {self.table}")
                     self.assertEqual(await cur.fetchone(), (1, 2))
                     await self.delete(conn)
@@ -2888,11 +2964,11 @@ class TestCursor(TestCase):
                     # . formatted into the sql as one row, it should be formatted
                     # . as multiple rows values.
                     await cur.executemany(
-                        f"insert into {self.table} (i) values (%s)", list(range(10))
+                        f"insert into {self.table} (i) values (%s)", range(10)
                     )
                     self.assertEqual(
                         cur.executed_sql.endswith(
-                            b"values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
+                            "values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
                         ),
                         True,
                     )
@@ -2906,13 +2982,13 @@ class TestCursor(TestCase):
                     # . many should automatically set itemize to True.
                     await cur.execute(
                         f"insert into {self.table} (i) values (%s)",
-                        list(range(10)),
+                        range(10),
                         many=True,
                         itemize=False,
                     )
                     self.assertEqual(
                         cur.executed_sql.endswith(
-                            b"values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
+                            "values (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)"
                         ),
                         True,
                     )
@@ -2932,7 +3008,7 @@ class TestCursor(TestCase):
                         itemize=False,
                     )
                     self.assertEqual(
-                        cur.executed_sql.endswith(b"values (1,2),(3,4),(5,6)"), True
+                        cur.executed_sql.endswith("values (1,2),(3,4),(5,6)"), True
                     )
                     await cur.execute(f"select * from {self.table}")
                     self.assertEqual(await cur.fetchall(), ((1, 2), (3, 4), (5, 6)))
@@ -3027,10 +3103,10 @@ class TestCursor(TestCase):
                 # list args
                 async with conn.cursor() as cur:
                     await cur.executemany(
-                        f"insert into {self.table} (data) values (%s)", list(range(10))
+                        f"insert into {self.table} (data) values (%s)", range(10)
                     )
                     self.assertTrue(
-                        cur.executed_sql.endswith(b",(7),(8),(9)"),
+                        cur.executed_sql.endswith(",(7),(8),(9)"),
                         "execute many with %s not in one query",
                     )
                 await self.drop(conn)
@@ -3048,7 +3124,7 @@ class TestCursor(TestCase):
                     self.assertIsNotNone(INSERT_VALUES_RE.match(sql))
                     await cur.executemany(sql, [(3, 4), (5, 6)])
                     self.assertTrue(
-                        cur.executed_sql.endswith(b"(3, 4),(5, 6)"),
+                        cur.executed_sql.endswith("(3, 4),(5, 6)"),
                         "executemany with %% not in one query",
                     )
                     await cur.execute(f"DROP TABLE {self.db}.percent_test")
