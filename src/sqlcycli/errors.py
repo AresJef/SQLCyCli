@@ -238,11 +238,7 @@ class EscapeTypeError(TranscodeTypeError, NotSupportedError):
     """Raised when an escape type is not supported."""
 
 
-class EncodeTypeError(EscapeTypeError, NotSupportedError):
-    """Raised when an encode type is not supported."""
-
-
-class DecodeFieldTypeError(TranscodeValueError, NotSupportedError):
+class DecodeTypeError(TranscodeValueError, NotSupportedError):
     """Raised when a decode type is not supported."""
 
 
