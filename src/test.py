@@ -1320,7 +1320,9 @@ class TestConnection(TestCase):
         test = "AUTOCOMMIT"
         self.log_start(test)
 
-        with self.get_conn() as conn:
+        with self.get_conn(autocommit=True) as conn:
+            self.assertTrue(conn.autocommit)
+
             conn.set_autocommit(False)
             self.assertFalse(conn.autocommit)
 
@@ -1328,12 +1330,12 @@ class TestConnection(TestCase):
                 cur.execute("SET AUTOCOMMIT=1")
                 self.assertTrue(conn.autocommit)
 
-            conn.set_autocommit(True)
-            self.assertTrue(conn.autocommit)
+            conn.set_autocommit(False)
+            self.assertFalse(conn.autocommit)
 
             with conn.cursor() as cur:
                 cur.execute("SELECT @@AUTOCOMMIT")
-                self.assertEqual(cur.fetchone()[0], 1)
+                self.assertEqual(cur.fetchone()[0], 0)
         self.log_ended(test)
 
     def test_select_db(self):

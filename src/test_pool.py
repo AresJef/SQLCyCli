@@ -922,6 +922,9 @@ class TestConnection(TestCase):
 
         async with await self.get_pool() as pool:
             async with pool.acquire() as conn:
+                await conn.set_autocommit(True)
+                self.assertTrue(conn.autocommit)
+
                 await conn.set_autocommit(False)
                 self.assertFalse(conn.autocommit)
 
@@ -929,12 +932,28 @@ class TestConnection(TestCase):
                     await cur.execute("SET AUTOCOMMIT=1")
                     self.assertTrue(conn.autocommit)
 
-                await conn.set_autocommit(True)
-                self.assertTrue(conn.autocommit)
+                await conn.set_autocommit(False)
+                self.assertFalse(conn.autocommit)
 
                 async with conn.cursor() as cur:
                     await cur.execute("SELECT @@AUTOCOMMIT")
-                    self.assertEqual((await cur.fetchone())[0], 1)
+                    self.assertEqual((await cur.fetchone())[0], 0)
+
+        async with await self.get_pool(autocommit=True) as pool:
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.autocommit)
+                self.assertTrue(conn.autocommit)
+
+            pool.set_autocommit(False)
+            async with pool.acquire() as conn:
+                self.assertFalse(pool.autocommit)
+                self.assertFalse(conn.autocommit)
+
+            pool.set_autocommit(True)
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.autocommit)
+                self.assertTrue(conn.autocommit)
+
         self.log_ended(test)
 
     async def test_select_db(self):
@@ -1316,6 +1335,22 @@ class TestConversion(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+
+        async with await self.get_pool(use_decimal=True) as pool:
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.use_decimal)
+                self.assertTrue(conn.use_decimal)
+
+            pool.set_use_decimal(False)
+            async with pool.acquire() as conn:
+                self.assertFalse(pool.use_decimal)
+                self.assertFalse(conn.use_decimal)
+
+            pool.set_use_decimal(True)
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.use_decimal)
+                self.assertTrue(conn.use_decimal)
+
         self.log_ended(test)
 
     async def test_string(self) -> None:
@@ -1712,6 +1747,21 @@ class TestConversion(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+
+        async with await self.get_pool(decode_bit=True) as pool:
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.decode_bit)
+                self.assertTrue(conn.decode_bit)
+
+            pool.set_decode_bit(False)
+            async with pool.acquire() as conn:
+                self.assertFalse(pool.decode_bit)
+                self.assertFalse(conn.decode_bit)
+
+            pool.set_decode_bit(True)
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.decode_bit)
+                self.assertTrue(conn.decode_bit)
 
         self.log_ended(test)
 
@@ -2487,6 +2537,22 @@ class TestConversion(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+
+        async with await self.get_pool(decode_json=True) as pool:
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.decode_json)
+                self.assertTrue(conn.decode_json)
+
+            pool.set_decode_json(False)
+            async with pool.acquire() as conn:
+                self.assertFalse(pool.decode_json)
+                self.assertFalse(conn.decode_json)
+
+            pool.set_decode_json(True)
+            async with pool.acquire() as conn:
+                self.assertTrue(pool.decode_json)
+                self.assertTrue(conn.decode_json)
+
         self.log_ended(test)
 
     async def test_bulk_insert(self) -> None:
