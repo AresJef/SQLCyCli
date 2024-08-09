@@ -66,19 +66,20 @@ class PoolConnection(BaseConnection):
         wait_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
-        autocommit_mode: cython.int,
-        local_infile: cython.bint,
-        max_allowed_packet: cython.uint,
+        autocommit_mode: int,
+        local_infile: bool,
+        max_allowed_packet: int,
         sql_mode: str | None,
         init_command: str | None,
         cursor: type[Cursor],
-        client_flag: cython.uint,
+        client_flag: int,
         program_name: str | None,
         ssl_ctx: object | None,
         auth_plugin: AuthPlugin | None,
         server_public_key: bytes | None,
-        use_decimal: cython.bint,
-        decode_json: cython.bint,
+        use_decimal: bool,
+        decode_bit: bool,
+        decode_json: bool,
         loop: AbstractEventLoop,
     ):
         """The `async` connection to the server managed by a `Pool`.
@@ -116,8 +117,9 @@ class PoolConnection(BaseConnection):
         :param ssl_ctx: `<ssl.SSLContext/None>` The SSL context for the connection.
         :param auth_plugin: `<'AuthPlugin/None'>` The authentication plugin handlers.
         :param server_public_key: `<'bytes/None'>` The public key for the server authentication.
-        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>.
-        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string.
+        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>.
+        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes.
+        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string.
         :param loop: `<'AbstractEventLoop'>` The event loop for the connection.
         """
         # . pool
@@ -142,7 +144,7 @@ class PoolConnection(BaseConnection):
         self._bind_address = bind_address
         self._unix_socket = unix_socket
         self._autocommit_mode = autocommit_mode
-        self._local_infile = local_infile
+        self._local_infile = bool(local_infile)
         self._max_allowed_packet = max_allowed_packet
         self._sql_mode = sql_mode
         self._init_command = init_command
@@ -155,8 +157,9 @@ class PoolConnection(BaseConnection):
         self._auth_plugin = auth_plugin
         self._server_public_key = server_public_key
         # . decode
-        self._use_decimal = use_decimal
-        self._decode_json = decode_json
+        self._use_decimal = bool(use_decimal)
+        self._decode_bit = bool(decode_bit)
+        self._decode_json = bool(decode_json)
         # . loop
         self._loop = loop
 
@@ -287,7 +290,7 @@ class Pool:
     _bind_address: str
     _unix_socket: str
     _autocommit_mode: object  # int
-    _autocommit_value: cython.bint
+    _autocommit: cython.bint
     _local_infile: object  # bool
     _max_allowed_packet: object  # uint
     _sql_mode: str
@@ -302,6 +305,7 @@ class Pool:
     _server_public_key: bytes
     # . decode
     _use_decimal: cython.bint  # bool
+    _decode_bit: cython.bint  # bool
     _decode_json: cython.bint  # bool
 
     def __init__(
@@ -336,6 +340,7 @@ class Pool:
         auth_plugin: dict[str | bytes, type] | AuthPlugin | None = None,
         server_public_key: bytes | None = None,
         use_decimal: bool = False,
+        decode_bit: bool = False,
         decode_json: bool = False,
         loop: AbstractEventLoop | None = None,
     ):
@@ -387,8 +392,9 @@ class Pool:
             - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
         :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string. Defaults to `False`.
+        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
         """
         # Pool Args
         self._setup(min_size, max_size, recycle, loop)
@@ -477,6 +483,7 @@ class Pool:
         )
         # . decode
         self._use_decimal = bool(use_decimal)
+        self._decode_bit = bool(decode_bit)
         self._decode_json = bool(decode_json)
 
     # Setup -----------------------------------------------------------------------------------
@@ -611,11 +618,18 @@ class Pool:
 
     @property
     def autocommit(self) -> bool | None:
-        """The 'autocommit' mode of the connections `<'bool/None'>`.
+        """The default 'autocommit' mode of the pool. All acquired
+        connections will comply to this setting `<'bool/None'>`.
 
         `None` means pool is not connected and use server default.
         """
-        return None if self._closed else self._autocommit_value
+        if self._closed:
+            if self._autocommit_mode == -1:
+                return None
+            else:
+                return bool(self._autocommit_mode)
+        else:
+            return self._autocommit
 
     @property
     def local_infile(self) -> bool:
@@ -696,18 +710,31 @@ class Pool:
     # . decode
     @property
     def use_decimal(self) -> bool:
-        """Whether to use <'decimal.DECIMAL'> to represent
-        DECIMAL column data `<'bool'>`.
+        """The default decode behavior of the pool: whether to
+        use <'DECIMAL'> to represent DECIMAL column data `<'bool'>`.
 
-        If `False`, use <'float'> instead.
+        If `False`, use <'float'> instead. All acquired
+        connections will comply to this settings.
         """
         return self._use_decimal
 
     @property
-    def decode_json(self) -> bool:
-        """Whether to decode JSON column data `<'bool'>`.
+    def decode_bit(self) -> bool:
+        """The default decode behavior of the pool: whether
+        to decode BIT column data to integer `<'bool'>`.
 
-        If `False`, keep as original json string.
+        If `False`, keep as the original bytes. All acq
+        uired connections will comply to this settings.
+        """
+        return self._decode_bit
+
+    @property
+    def decode_json(self) -> bool:
+        """The default decode behavior of the pool: whether
+        to deserialize JSON column data `<'bool'>`.
+
+        If `False`, keep as the original JSON string. All
+        acquired connections will comply to this settings.
         """
         return self._decode_json
 
@@ -747,6 +774,7 @@ class Pool:
         return None if self._recycle == -1 else self._recycle
 
     # Pool ------------------------------------------------------------------------------------
+    # . pool
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def get_free(self) -> cython.uint:
@@ -830,11 +858,74 @@ class Pool:
             self._free = 0
             return None
 
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def set_autocommit(self, value: cython.bint) -> cython.bint:
+        """Set the default 'autocommit' mode of the pool. All acquired
+        connections will comply to this setting.
+
+        :param value: `<'bool'>` Enable/Disable autocommit.
+            - `True` to operate in autocommit (non-transactional) mode.
+            - `False` to operate in manual commit (transactional) mode.
+        """
+        if not self._closed:
+            self._autocommit = value
+        return True
+
+    # . decode
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def set_use_decimal(self, value: cython.bint) -> cython.bint:
+        """Set the default decode behavior of the pool: whether to
+        use `<'DECIMAL'> to represent DECIMAL column data. All
+        acquired connections will comply to this setting.
+
+        :param value: `<'bool'>` True to use <'DECIMAL>', else <'float'>.
+        """
+        self._use_decimal = value
+        return True
+
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def set_decode_bit(self, value: cython.bint) -> cython.bint:
+        """Set the default decode behavior of the pool: whether to
+        decode BIT column data to integer. All acquired connections
+        will comply to this settings.
+
+        :param value: `<'bool'>` True to decode BIT column, else keep as original bytes.
+        """
+        self._decode_bit = value
+        return True
+
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def set_decode_json(self, value: cython.bint) -> cython.bint:
+        """Set the default decode behavior of the pool: whether to
+        deserialize JSON column data. All acquired connections will
+        comply to this settings.
+
+        :param value: `<'bool'>` True to deserialize JSON column, else keep as original JSON string.
+        """
+        self._decode_json = value
+        return True
+
     # Acquire / Fill / Release ----------------------------------------------------------------
     @cython.ccall
     def acquire(self) -> PoolConnectionManager:
         """Acquire a free connection from the pool through
         context manager `<'PoolConnectionManager'>`.
+
+        ### Pool Connection Consistency:
+        - To maintain consistency, connection 'autocommit', 'used_decimal',
+          'decode_bit' and 'decode_json' will be reset to pool settings
+          when 'acquire()' from the pool.
+        - If user changes 'charset', 'read_timeout', 'write_timeout' or
+          'wait_timeout' through connection built-in methods, such as
+          'set_charset()', 'set_read_timeout()', etc., these settings
+          will also be reset to pool defaults at 'release()'.
+        - Other changes made on the connection [SESSION] (especially
+          through SQL queries), please manually call 'conn.schedule_close()'
+          method before releasing back to the pool.
 
         ### Example (context manager):
         >>> async with pool.acquire() as conn:
@@ -892,7 +983,8 @@ class Pool:
         This method only tries to acquire existing free connections
         in FIFO (First-In-First-Out) order. Recycling and socket
         'eof' checks are performed here, and invalid connections
-        are closed and removed.
+        are closed and removed. Also, 'autocommit', 'used_decimal',
+        'decode_bit' and 'decode_json' will be reset to pool settings.
 
         #### This method returns `None` if no free connection available.
         """
@@ -912,9 +1004,21 @@ class Pool:
                 continue
             # Invalid connection
             reader = conn._reader
-            if reader._eof or reader.at_eof() or reader.exception() is not None:
+            if reader._eof or reader.exception() is not None:
                 await conn.close()
                 continue
+            # Reset connection
+            # . autocommit
+            if conn.get_autocommit() != self._autocommit:
+                try:
+                    await conn.set_autocommit(self._autocommit)
+                except:  # noqa
+                    await conn.close()
+                    continue
+            # . decode
+            conn._use_decimal = self._use_decimal
+            conn._decode_bit = self._decode_bit
+            conn._decode_json = self._decode_json
             # Track in-use
             set_add(self._used_conns, conn)
             return conn
@@ -955,7 +1059,7 @@ class Pool:
         self._acqr += 1
         conn: PoolConnection = None
         try:
-            # . create
+            # . connect
             conn = PoolConnection(
                 self._id,
                 self._host,
@@ -970,7 +1074,7 @@ class Pool:
                 self._wait_timeout,
                 self._bind_address,
                 self._unix_socket,
-                self._autocommit_mode,
+                self._autocommit_mode if self._closed else int(self._autocommit),
                 self._local_infile,
                 self._max_allowed_packet,
                 self._sql_mode,
@@ -982,13 +1086,14 @@ class Pool:
                 self._auth_plugin,
                 self._server_public_key,
                 self._use_decimal,
+                self._decode_bit,
                 self._decode_json,
                 self._loop,
             )
             await conn.connect()
             # . initial setup
             if self._closed:
-                self._autocommit_value = conn.get_autocommit()
+                self._autocommit = conn.get_autocommit()
                 self._server_protocol_version = conn._server_protocol_version
                 self._server_info = conn._server_info
                 self._server_version = conn.get_server_version()
@@ -1038,16 +1143,15 @@ class Pool:
         """Release a connection back to the pool.
 
         ### Pool Connection Consistency:
-        - In order to keep consistency of the connections in the pool,
-          the follwoing settings will be automatically reset to pool
-          defaults when released back as free: 'autocommit', 'used_decimal'
-          and 'decode_json'.
-        - If user changes 'charset', 'read_timeout', 'write_timeout'
-          or 'wait_timeout' through connection built-in methods, such
-          as 'set_charset()', 'set_read_timeout()', etc., these settings
-          will also be reset to pool defaults at release.
-        - For other setting changes made on the connection (especially
-          with SQL queries), please manually call 'conn.schedule_close()'
+        - To maintain consistency, connection 'autocommit', 'used_decimal',
+          'decode_bit' and 'decode_json' will be reset to pool settings
+          when 'acquire()' from the pool.
+        - If user changes 'charset', 'read_timeout', 'write_timeout' or
+          'wait_timeout' through connection built-in methods, such as
+          'set_charset()', 'set_read_timeout()', etc., these settings
+          will also be reset to pool defaults at 'release()'.
+        - Other changes made on the connection [SESSION] (especially
+          through SQL queries), please manually call 'conn.schedule_close()'
           method before releasing back to the pool.
 
         ### Arguments:
@@ -1075,24 +1179,12 @@ class Pool:
         if conn.closed():
             return await notify()
 
-        # Close scheduled / in transaction / closing
+        # Scheduled close / in transaction / closing
         if conn._close_scheduled or conn.get_transaction_status() or self._closing:
             await conn.close()
             return await notify()
 
         # Reset connection
-        # . autocommit
-        if conn.get_autocommit() != self._autocommit_value:
-            try:
-                await conn.set_autocommit(self._autocommit_value)
-            except:  # noqa
-                await conn.close()
-                return await notify()
-        # . decode
-        if conn._use_decimal != self._use_decimal:
-            conn._use_decimal = self._use_decimal
-        if conn._decode_json != self._decode_json:
-            conn._decode_json = self._decode_json
         # . charset
         if conn._charset_changed:
             try:
@@ -1101,7 +1193,7 @@ class Pool:
             except:  # noqa
                 await conn.close()
                 return await notify()
-        # . timeouts
+        # . read timeout
         if conn._read_timeout_changed:
             try:
                 await conn.set_read_timeout(self._read_timeout)
@@ -1109,6 +1201,7 @@ class Pool:
             except:  # noqa
                 await conn.close()
                 return await notify()
+        # . write timeout
         if conn._write_timeout_changed:
             try:
                 await conn.set_write_timeout(self._write_timeout)
@@ -1116,6 +1209,7 @@ class Pool:
             except:  # noqa
                 await conn.close()
                 return await notify()
+        # . wait timeout
         if conn._wait_timeout_changed:
             try:
                 await conn.set_wait_timeout(self._wait_timeout)

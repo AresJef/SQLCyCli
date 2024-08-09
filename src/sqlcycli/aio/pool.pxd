@@ -53,7 +53,7 @@ cdef class Pool:
         # . client
         str _bind_address, _unix_socket
         object _autocommit_mode
-        bint _autocommit_value
+        bint _autocommit
         object _local_infile, _max_allowed_packet
         str _sql_mode, _init_command
         object _cursor, _client_flag
@@ -64,7 +64,7 @@ cdef class Pool:
         AuthPlugin _auth_plugin
         bytes _server_public_key
         # . decode
-        bint _use_decimal, _decode_json
+        bint _use_decimal, _decode_bit, _decode_json
         
     # Setup
     cdef inline bint _setup(self, object min_size, object max_size, object recycle, object loop) except -1
@@ -76,6 +76,10 @@ cdef class Pool:
     cpdef bint set_recycle(self, object size) except -1
     cdef inline PoolConnection _get_free_conn(self)
     cdef inline bint _add_free_conn(self, object conn) except -1
+    cpdef bint set_autocommit(self, bint value) except -1
+    cpdef bint set_use_decimal(self, bint value) except -1
+    cpdef bint set_decode_bit(self, bint value) except -1
+    cpdef bint set_decode_json(self, bint value) except -1
     # Acquire / Fill / Release
     cpdef PoolConnectionManager acquire(self)
     # Close
