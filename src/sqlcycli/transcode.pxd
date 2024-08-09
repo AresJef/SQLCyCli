@@ -158,9 +158,8 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
 cdef inline hms microseconds_to_hms(long long microseconds) except *:
     """Convert microseconds to HMS `<'struct:hms'>`."""
     cdef unsigned int hour, minute, second, microsecond
-
     if microseconds <= 0:
-        return hms(0, 0, 0, 0)
+        return hms(0, 0, 0, 0)  # exit
 
     microseconds = microseconds % US_DAY
     hour = microseconds // US_HOUR
@@ -187,34 +186,30 @@ cdef inline long long arr_getitem_1d_ll(np.ndarray arr, np.npy_intp i):
     cdef long long* item = <long long*>PyArray_GETPTR1(arr, i)
     return item[0]
 
-cdef inline bint is_arr_double_finite_1d(np.ndarray arr, np.npy_intp s_i) except -1:
+cdef inline bint is_arr_float_finite_1d(np.ndarray arr, np.npy_intp s_i) except -1:
     """Check if all items for 1-dimensional ndarray[double] is finite `<'bool'>`."""
     cdef:
-        int dtype = PyArray_TYPE(arr)
+        int npy_type = PyArray_TYPE(arr)
         double* d_ptr
         float* f_ptr
-
     # Check float64
-    if dtype == np.NPY_TYPES.NPY_FLOAT64:
+    if npy_type == np.NPY_TYPES.NPY_FLOAT64:
         d_ptr = <double*> PyArray_DATA(arr)
         for i in range(s_i):
             if not isfinite(d_ptr[i]):
                 return False
         return True
-        
-    # Cast others to float32
-    if dtype != np.NPY_TYPES.NPY_FLOAT32:
+    # Cast: float16 -> float32
+    if npy_type == np.NPY_TYPES.NPY_FLOAT16:
         arr = PyArray_Cast(arr, np.NPY_TYPES.NPY_FLOAT32)
-        dtype = np.NPY_TYPES.NPY_FLOAT32
-
+        npy_type = np.NPY_TYPES.NPY_FLOAT32
     # Check float32
-    if dtype == np.NPY_TYPES.NPY_FLOAT32:
+    if npy_type == np.NPY_TYPES.NPY_FLOAT32:
         f_ptr = <float*> PyArray_DATA(arr)
         for i in range(s_i):
             if not isfinite(f_ptr[i]):
                 return False
         return True
-
     # Invalid dtype
     raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
@@ -234,36 +229,32 @@ cdef inline long long arr_getitem_2d_ll(np.ndarray arr, np.npy_intp i, np.npy_in
     cdef long long* item = <long long*>PyArray_GETPTR2(arr, i, j)
     return item[0]
 
-cdef inline bint is_arr_double_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_intp s_j) except -1:
+cdef inline bint is_arr_float_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_intp s_j) except -1:
     """Check if all items for 2-dimensional ndarray[double] is finite `<'bool'>`."""
     cdef:
-        int dtype = PyArray_TYPE(arr)
+        int npy_type = PyArray_TYPE(arr)
         double* d_ptr
         float* f_ptr
-
     # Check float64
-    if dtype == np.NPY_TYPES.NPY_FLOAT64:
+    if npy_type == np.NPY_TYPES.NPY_FLOAT64:
         d_ptr = <double*> PyArray_DATA(arr)
         for i in range(s_i):
             for j in range(s_j):
                 if not isfinite(d_ptr[i * s_j + j]):
                     return False
         return True
-        
-    # Cast others to float32
-    if dtype != np.NPY_TYPES.NPY_FLOAT32:
+    # Cast: float16 -> float32
+    if npy_type == np.NPY_TYPES.NPY_FLOAT16:
         arr = PyArray_Cast(arr, np.NPY_TYPES.NPY_FLOAT32)
-        dtype = np.NPY_TYPES.NPY_FLOAT32
-
+        npy_type = np.NPY_TYPES.NPY_FLOAT32
     # Check float32
-    if dtype == np.NPY_TYPES.NPY_FLOAT32:
+    if npy_type == np.NPY_TYPES.NPY_FLOAT32:
         f_ptr = <float*> PyArray_DATA(arr)
         for i in range(s_i):
             for j in range(s_j):
                 if not isfinite(f_ptr[i * s_j + j]):
                     return False
         return True
-
     # Invalid dtype
     raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
@@ -344,10 +335,36 @@ cdef inline long double chars_to_double(char* data):
     """Convert 'data' `<'char*'>` to `<'long double'>`."""
     return strtold(data, NULL)
 
+cdef inline unsigned long long unpack_uint64_big_endian(char* data, unsigned long long pos):
+    """Read (unpack) unsigned 64-bit integer from 'data' at givent 'pos' `<'int'>`.
+    
+    Note: The data is assumed to be in big-endian format.
+    """
+    cdef: 
+        unsigned long long v0 = <unsigned char> data[pos + 7]
+        unsigned long long v1 = <unsigned char> data[pos + 6] 
+        unsigned long long v2 = <unsigned char> data[pos + 5] 
+        unsigned long long v3 = <unsigned char> data[pos + 4] 
+        unsigned long long v4 = <unsigned char> data[pos + 3] 
+        unsigned long long v5 = <unsigned char> data[pos + 2] 
+        unsigned long long v6 = <unsigned char> data[pos + 1] 
+        unsigned long long v7 = <unsigned char> data[pos]
+    return v0 | (v1 << 8) | (v2 << 16) | (v3 << 24) | (v4 << 32) | (v5 << 40) | (v6 << 48) | (v7 << 56)
+
+# Custom types
+cdef class _CustomType:
+    cdef object _value
+
+cdef class BIT(_CustomType):
+    pass
+
+cdef class JSON(_CustomType):
+    pass
+
 # Escape
-cpdef object escape(object value, bint many=?, bint itemize=?)
+cpdef object escape(object value, bint itemize=?, bint many=?)
 
 # Decode
 cpdef object decode(
-    bytes value, unsigned int field_type, char* encoding, 
-    bint is_binary, bint use_decimal, bint decode_json)
+    bytes value, unsigned int field_type, char* encoding, bint is_binary, 
+    bint use_decimal, bint decode_bit, bint decode_json)
