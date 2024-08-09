@@ -17,7 +17,6 @@ cdef class MysqlResult:
     cdef:
         # Connection
         BaseConnection _conn
-        bint _use_decimal, _decode_json
         # Packet data
         unsigned long long affected_rows, insert_id
         int server_status
@@ -58,10 +57,10 @@ cdef class Cursor:
     # Init
     cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
-    cpdef unsigned long long execute(self, str sql, object args=?, bint many=?, bint itemize=?)
+    cpdef unsigned long long execute(self, str sql, object args=?, bint itemize=?, bint many=?)
     cpdef unsigned long long executemany(self, str sql, object args=?)
     cpdef object callproc(self, str procname, object args)
-    cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
+    cpdef str mogrify(self, str sql, object args=?, bint itemize=?, bint many=?)
     cdef inline unsigned long long _query_str(self, str sql)
     cdef inline unsigned long long _query_bytes(self, bytes sql)
     cdef inline str _format(self, str sql, object args)
@@ -138,7 +137,7 @@ cdef class BaseConnection:
         AuthPlugin _auth_plugin
         bytes _server_public_key
         # Decode
-        bint _use_decimal, _decode_json
+        bint _use_decimal, _decode_bit, _decode_json
         # Internal
         # . server
         int _server_protocol_version
@@ -176,7 +175,7 @@ cdef class BaseConnection:
     cpdef bint rollback(self) except -1
     cpdef tuple show_warnings(self)
     cpdef bint select_database(self, str db) except -1
-    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
+    cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
     cpdef bytes encode_sql(self, str sql)
     cpdef bint set_charset(self, str charset, object collation=?) except -1
     cpdef bint set_read_timeout(self, object timeout) except -1
@@ -188,13 +187,14 @@ cdef class BaseConnection:
     cdef inline bint _set_timeout(self, str name, object timeout) except -1
     cdef inline unsigned int _get_timeout(self, str name, bint session)
     cpdef bint get_autocommit(self) except -1
-    cpdef bint set_autocommit(self, bint auto) except -1
+    cpdef bint set_autocommit(self, bint value) except -1
     cpdef tuple get_server_version(self)
     cpdef str get_server_vendor(self)
     cpdef unsigned long long get_affected_rows(self)
     cpdef unsigned long long get_insert_id(self)
     cpdef bint get_transaction_status(self) except -1
     cpdef bint set_use_decimal(self, bint value) except -1
+    cpdef bint set_decode_bit(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1
     # Connect / Close
     cpdef bint connect(self) except -1

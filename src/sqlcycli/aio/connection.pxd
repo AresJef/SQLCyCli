@@ -9,7 +9,6 @@ cdef class MysqlResult:
         # Connection
         BaseConnection _conn
         object _local_file
-        bint _use_decimal, _decode_json
         # Packet data
         unsigned long long affected_rows, insert_id
         int server_status
@@ -43,7 +42,7 @@ cdef class Cursor:
     # Setup
     cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
-    cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
+    cpdef str mogrify(self, str sql, object args=?, bint itemize=?, bint many=?)
     cdef inline str _format(self, str sql, object args)
     # Read
     cdef inline dict _convert_row_to_dict(self, tuple row, tuple cols, unsigned long long field_count)
@@ -104,7 +103,7 @@ cdef class BaseConnection:
         AuthPlugin _auth_plugin
         bytes _server_public_key
         # Decode
-        bint _use_decimal, _decode_json
+        bint _use_decimal, _decode_bit, _decode_json
         # Internal
         # . server
         int _server_protocol_version
@@ -137,7 +136,7 @@ cdef class BaseConnection:
     cpdef CursorManager cursor(self, object cursor=?)
     cpdef TransactionManager transaction(self, object cursor=?)
     # Query
-    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
+    cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
     cpdef bytes encode_sql(self, str sql)
     cpdef bint get_autocommit(self) except -1
     cpdef tuple get_server_version(self)
@@ -146,6 +145,7 @@ cdef class BaseConnection:
     cpdef unsigned long long get_insert_id(self)
     cpdef bint get_transaction_status(self) except -1
     cpdef bint set_use_decimal(self, bint value) except -1
+    cpdef bint set_decode_bit(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1
     # Connect / Close
     cpdef bint force_close(self) except -1

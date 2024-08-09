@@ -97,8 +97,6 @@ class MysqlResult:
 
     # Connection
     _conn: BaseConnection
-    _use_decimal: cython.bint
-    _decode_json: cython.bint
     # Packet data
     affected_rows: cython.ulonglong  # Value of 18446744073709551615 means None
     insert_id: cython.ulonglong  # Value of 18446744073709551615 means None
@@ -120,8 +118,6 @@ class MysqlResult:
         """
         # Connection
         self._conn = conn
-        self._use_decimal = conn._use_decimal
-        self._decode_json = conn._decode_json
         # Packet data
         self.affected_rows = 0
         self.insert_id = 0
@@ -301,9 +297,11 @@ class MysqlResult:
     def _read_result_packet_row(self, pkt: MysqlPacket) -> tuple:
         """(cfunc) Read and decode one row of data from the query `<'tuple'>`."""
         # Settings
-        encoding_c: cython.pchar = self._conn._encoding_c
-        use_decimal: cython.bint = self._use_decimal
-        decode_json: cython.bint = self._decode_json
+        conn: BaseConnection = self._conn
+        encoding_c: cython.pchar = conn._encoding_c
+        use_decimal: cython.bint = conn._use_decimal
+        decode_bit: cython.bint = conn._decode_bit
+        decode_json: cython.bint = conn._decode_json
         # Read data
         row: list = []
         field: FieldDescriptorPacket
@@ -320,6 +318,7 @@ class MysqlResult:
                     encoding_c,
                     field._is_binary,
                     use_decimal,
+                    decode_bit,
                     decode_json,
                 )
             else:
@@ -445,17 +444,16 @@ class Cursor:
 
     # Property --------------------------------------------------------------------------------
     @property
-    def executed_sql(self) -> bytes | None:
-        """The last 'sql' executed by the cursor `<'bytes/None'>`.
-
-        Notice the 'sql' is in <'bytes'> type, with all
-        arguments (if any) escaped.
+    def executed_sql(self) -> str | None:
+        """The last 'sql' executed by the cursor `<'str/None'>`.
 
         Returns `None` for operations that do not return rows
         or if the cursor has not had an operation invoked via
         the 'cur.execute*()' method yet.
         """
-        return self._executed_sql
+        if self._executed_sql is None:
+            return None
+        return decode_bytes(self._executed_sql, self._encoding_c)
 
     @property
     def field_count(self) -> int:
@@ -574,100 +572,117 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        many: cython.bint = False,
         itemize: cython.bint = True,
+        many: cython.bint = False,
     ) -> cython.ulonglong:
         """Prepare and execute a query, returns the affected/selected rows `<'int'>`.
 
         :param sql: `<'str'>` The query SQL to execute.
         :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`. Supports:
-            - Python native: int, float, bool, str, None, datetime, date,
-              time, timedelta, struct_time, bytes, bytearray, memoryview,
-              Decimal, dict, list, tuple, set, frozenset.
-            - Library numpy: np.int_, np.uint, np.float_, np.bool_, np.bytes_,
+            - Python native:
+              int, float, bool, str, None, datetime, date, time,
+              timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset, range.
+            - Library [numpy](https://github.com/numpy/numpy):
+              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
               np.str_, np.datetime64, np.timedelta64, np.ndarray.
-            - Library pandas: pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+            - Library [pandas](https://github.com/pandas-dev/pandas):
+              pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
               pd.TimedeltaIndex, pd.Series, pd.DataFrame.
+            - Library [cytimes](https://github.com/AresJef/cyTimes):
+              pydt, pddt.
+            * Note: For single 'NULL' value, use (None,) or [None].
 
-        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
-            - When 'many=True' (itemize is ignored), this method behaves similar to
-              'PyMySQL.Cursor.executemany()'.
-                * 1. 'list' and 'tuple' will be escaped into list of str or tuple[str],
-                  depends on type of the sequence items. Each item represents one row
-                  of the 'args' `<'list[str/tuple[str]]'>`.
-                * 2. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
-                  represents one row of the 'args' `<'list[tuple[str]]'>`.
-                * 3. All other sequences or mappings 'args' will be escaped into tuple
-                  of literal strings `<'tuple[str]'>`.
-                * 4. Single 'args' will be escaped into one literal string `<'str'>`.
-            - When 'many=False', the argument 'itemize' determines how to escape the 'args'.
-
+        ### Escape of 'args'
         :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
-            - When 'many=False' & 'itemize=True' (default), this method behaves
-              similar to 'PyMySQL.Cursor.execute()'.
-                * 1. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
-                  represents one row of the 'args' `<'list[tuple[str]]'>`.
-                * 2. All sequences or mappings 'args' will be escaped into tuple of
-                  literal strings `<'tuple[str]'>`. This includes 'list', 'tuple',
-                  'set', 'frozenset', 'dict', 'np.ndarray', 'pd.Series', etc.
-                * 3. Single 'args' will be escaped into one literal string `<'str'>`.
-            - When 'itemize=False', regardless of 'args' type, it will be escaped into
-              one single literal string `<'str'>`.
+            - When 'itemize=True', the 'args' type determines how to escape.
+                * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
+                  escapes to `<'tuple[str]'>`. The 'sql' should have '%s'
+                  placeholders equal to the tuple length.
+                * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+                  `<'tuple[str]'>`. The 'sql' should have '%s' placeholders
+                  equal to the tuple length.
+                * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+                  to `<'list[tuple[str]]'>`. This function behaves the SAME
+                  as the 'executemany()' method, and the 'sql' should have
+                  '%s' placeholders equal to the tuple (element of list) length.
+                * 4. Single object (such as `int`, `float`, `str`, etc)
+                  escapes to one literal string `<'str'>`. The 'sql' should
+                  have one '%s' placeholder.
+            - When 'itemize=False', regardless of the 'args' type (besides 'None'),
+              all escapes to one single literal string `<'str'>`. The 'sql' should
+              have one '%s' placeholder.
 
-        ### Escape 'args'
-        - For 'args' escaped into <'str'>, it represents a single literal string.
-          The 'sql' should only have one '%s' placeholder.
-        - For 'args' escaped into <'tuple'>, it represents a single row of literal
-          strings. The 'sql' should have '%s' placeholders equal to the tuple length.
-        - For 'args' escaped into <'list'>, it represents multiple rows of literal
-          strings. The 'sql' should have '%s' placeholders equal to the item count
-          in each row.
-        - For more examples about escape 'args', please refer to 'conn.escape()'.
+        :param many: `<'bool'>` Whether to execute multi-row 'args'. Defaults to `False`.
+            - When 'many=True', the argument 'itemize' is ignored. This function
+              behaves the SAME as the 'executemany()' method. For more information
+              and related examples, see 'cur.executemany()'.
 
-        ### Example (many=False, itemize=True) [DEFAULT]
-        >>> cur.execute("INSERT INTO table (name, age) VALUES (%s, %s)", ("John", 25))
+        ### Example (sequence & mapping [flat] | itemize=True):
+        >>> cur.execute(
+                "INSERT INTO table (name, age, height) VALUES (%s, %s, %s)",
+                ["John", 25, 170]  # defalut: itemize=True & many=False,
+            )
+            # escaped as:
+            ("'John'", '25', '170')
             # executed as:
-            "INSERT INTO table (name, age) VALUES ('John', 25)"
+            "INSERT INTO table (name, age, height) VALUES ('John', 25, 170);"
 
-        ### Example (many=True)
-        >>> cur.execute("INSERT INTO table (name) VALUES (%s)", ("John", "Doe"), many=True)
+        ### Example (sequence & mapping [nested] | itemize=True):
+        >>> cur.execute(
+                "SELECT * FROM table WHERE name=%s AND age IN %s",
+                ["John", (25, 26)]  # defalut: itemize=True & many=False,
+            )
+            # escaped as:
+            ("'John'", "('25','26')")
             # executed as:
-            "INSERT INTO table (name) VALUES ('John')"
-            "INSERT INTO table (name) VALUES ('Doe')"
-            # This is for demonstration only, INSERT/REPLACE
-            # statement will be optimized to execute in bulk.
+            "SELECT * FROM table WHERE name='John' AND age IN (25,26);"
 
-        ### Example (many=False, itemize=False)
-        >>> cur.execute("INSERT INTO table (name, age) VALUES %s", ("John", 25), itemize=False)
+        ### Example (sequence & mapping [flat] | itemize=False):
+        >>> cur.execute(
+                "INSERT INTO table (name, age, height) VALUES %s",
+                ["John", 25, 170], itemize=False  # defalut: many=False
+            )
+            # escaped as:
+            "('John',25,170)"
             # executed as:
-            "INSERT INTO table (name, age) VALUES ('John', 25)"
+            "INSERT INTO table (name, age, height) VALUES ('John',25,170);"
+
+        ### Example (sequence & mapping [nested] | itemize=False):
+        >>> cur.execute(
+                "INSERT INTO table (name, age, height) VALUES %s",
+                [["John", 25, 170], ["Doe", 26, 180]], itemize=False  # defalut: many=False
+            )
+            # escaped as:
+            "('John',25,170),('Doe',26,180)"
+            # executed as:
+            "INSERT INTO table (name, age, height) VALUES ('John',25,170),('Doe',26,180);"
+
+        ### Example (single object):
+        >>> cur.execute("INSERT INTO table (name) VALUES (%s)", "John")
+            # escaped as:
+            "'John'"
+            # executed as:
+            "INSERT INTO table (name) VALUES ('John');"
         """
         # Query without args
         if args is None:
             return self._query_str(sql)
-        args = escape(args, many, itemize)
+        args = escape(args, itemize, many)
 
-        # Single row query: one arg
+        # Single row query
         if not many and not itemize:
-            # When 'many=False' & 'itemize=False', the 'args' must be
-            # a single literal string, and the 'sql' should only have
-            # one '%s' placeholder.
+            # When 'many=False' & 'itemize=False', the escaped
+            # 'args' can only be a single literal <'str'>.
             return self._query_str(self._format(sql, args))
-        dtype = type(args)
-        if dtype is str:
-            # The 'args' is a single literal string, and the 'sql'
-            # should only have one '%s' placeholder.
-            return self._query_str(self._format(sql, args))
-
-        # Single row query: one row
-        if dtype is tuple:
-            # The 'args' is a tuple of literal strings, and the 'sql'
-            # should have '%s' placeholders eqaul to tuple length.
+        if type(args) is not list:
+            # If the escaped 'args' is not a list, it must be
+            # either a <'str'> or <'tuple[str]'>, which should
+            # also bind to the 'sql' directly.
             return self._query_str(self._format(sql, args))
 
         # Multi-rows query
-        # The 'args' now on can only be a list of str/tuple[str], and
-        # the 'sql' should have '%s' placeholders eqaul list item length.
+        # The escaped 'args' now on can only be a <'list[str/tuple]'>.
         rows: cython.ulonglong = 0
         m = INSERT_VALUES_RE.match(sql)
         # . bulk INSERT/REPLACE not matched: execute row by row
@@ -724,28 +739,99 @@ class Cursor:
         returns the affected/selected rows `<'int'>`.
 
         :param sql: `<'str'>` The query SQL to execute.
-        :param args: `<'Any'>` Sequences or mappings to bound to the SQL. Defaults to `None`.
+        :param args: `<'Any'>` Sequences or mappings to bound to the SQL. Defaults to `None`. Supports:
+            - Python native:
+              int, float, bool, str, None, datetime, date, time,
+              timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset, range.
+            - Library [numpy](https://github.com/numpy/numpy):
+              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
+              np.str_, np.datetime64, np.timedelta64, np.ndarray.
+            - Library [pandas](https://github.com/pandas-dev/pandas):
+              pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+              pd.TimedeltaIndex, pd.Series, pd.DataFrame.
+            - Library [cytimes](https://github.com/AresJef/cyTimes):
+              pydt, pddt.
 
-        #### Compliance with PEP-0249.
-        - Equivalent to 'cur.execute(sql, args, many=True)'.
-        - For more information, please refer to 'cur.execute()' method.
+        ### Escape of 'args'
+        * 1. Sequence and Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes
+          to `<'list[str/tuple[str]]'>`. Each element represents one row of the
+          'args', and the 'sql' should have '%s' placeholders equal to the item
+          count in each row.
+        * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to `<'list[str]'>`.
+          The the 'sql' should have one '%s' placeholder.
+        * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes to `<'list[tuple[str]]'>`.
+          The 'sql' should have '%s' placeholders equal to the tuple (element of list) length.
+        * 4. Single object (such as `int`, `float`, `str`, etc) escapes to one
+          literal string `<'str'>`. This function behaves the SAME as the
+          'execute()' method, and the 'sql' should have one '%s' placeholder.
 
-        ### Example
+        ### Example (sequence & mapping [flat]):
         >>> cur.executemany(
-                "INSERT INTO table (name, age) VALUES (%s %s)",
-                (["John", 25], ["Doe", 26])
+                "INSERT INTO table (name) VALUES (%s)",
+                ["John", "Doe"],
             )
+            # escaped as:
+            ["'John'", "'Doe'"]
             # executed as:
-            "INSERT INTO table (name) VALUES ('John', 25)"
-            "INSERT INTO table (name) VALUES ('Doe', 26)"
-            # This is for demonstration only, INSERT/REPLACE
-            # statement will be optimized to execute in bulk.
+            "INSERT INTO table (name) VALUES ('John'),('Doe');"
+
+        ### Example (sequence & mapping [nested]):
+        >>> cur.executemany(
+                "INSERT INTO table (name, age) VALUES (%s, %s)",
+                [["John", 25], ["Doe", 26]],
+            )
+            # escaped as:
+            [("'John'", "25"), ("'Doe'", "26")]
+            # executed as:
+            "INSERT INTO table (name, age) VALUES ('John', 25),('Doe', 26);"
+
+        ### Example (pd.Series):
+        >>> cur.executemany(
+                "INSERT INTO table (age) VALUES (%s)",
+                pd.Series([25, 26]),
+            )
+            # escaped as:
+            ["25", "26"]
+            # executed as:
+            "INSERT INTO table (age) VALUES (25),(26);"
+
+        ### Example (1D ndarray):
+        >>> cur.executemany(
+                "INSERT INTO table (age) VALUES (%s)",
+                np.array([25, 26]),
+            )
+            # escaped as:
+            ["25", "26"]
+            # executed as:
+            "INSERT INTO table (age) VALUES (25),(26);"
+
+        ### Example (pd.DataFrame):
+        >>> cur.executemany(
+                "INSERT INTO table (name, age) VALUES (%s, %s)",
+                pd.DataFrame({"name": ["John", "Doe"], "age": [25, 26]}),
+            )
+            # escaped as:
+            [("'John'", "25"), ("'Doe'", "26")]
+            # executed as:
+            "INSERT INTO table (name, age) VALUES ('John', 25),('Doe', 26);"
+
+        ### Example (2D ndarray):
+        >>> cur.executemany(
+                "INSERT INTO table (age, height) VALUES (%s, %s)",
+                np.array([[25, 170], [26, 180]]),
+            )
+            # escaped as:
+            [("25", "170"), ("26", "180")]
+            # executed as:
+            "INSERT INTO table (age, height) VALUES (25, 170),(26, 180);"
         """
         return self.execute(sql, args, True, True)
 
     @cython.ccall
     def callproc(self, procname: str, args: tuple | list) -> object:
-        """Execute stored procedure procname with args.
+        """Execute stored procedure 'procname' with 'args'
+        and returns the original arguments.
 
         :param procname: `<'str'>` Name of procedure to execute on server.
         :param args: `<'list/tuple'>` Sequence of parameters to use with procedure.
@@ -774,7 +860,7 @@ class Cursor:
         if args is None:
             _args: tuple = ()
         else:
-            items = escape(args, False, True)
+            items = escape(args, True, False)
             if type(items) is not tuple:
                 raise errors.InvalidCursorArgsError(
                     "Invalid 'args' for 'callproc()' method, "
@@ -807,69 +893,48 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        many: cython.bint = False,
         itemize: cython.bint = True,
+        many: cython.bint = False,
     ) -> str:
         """Bound the 'args' to the 'sql' and returns the `exact*` string that
         will be sent to the database by calling the execute*() method `<'str'>`.
 
         :param sql: `<'str'>` The query SQL to mogrify.
         :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`.
-        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
         :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+        :param many: `<'bool'>` Whether to execute multi-row 'args'. Defaults to `False`.
 
-        ### Arguments 'many' & 'itemize'
+        ### Explanation
         - When 'many=False' & 'itemize=True' (default), this method behaves
           similar to 'PyMySQL.Cursor.mogrify()'.
-        - When 'many=True' & 'args' is multi-row data, only the 'first' row
-          [item] of the args will be bound to the sql for cleaner illustration
-          `[excat*]`.
-        - For more information about these two arguments, please refer to
-          'conn.escape()' method.
-
-        ### Example (many=False, itemize=True) [DEFAULT]
-        >>> cur.mogrify("INSERT INTO table (name, age) VALUES (%s, %s)", ("John", 25))
-        >>> "INSERT INTO table (name, age) VALUES ('John', 25)"
-
-        ### Example (many=True)
-        >>> cur.mogrify("INSERT INTO table (name) VALUES (%s)", ("John", "Doe"), many=True)
-        >>> "INSERT INTO table (name) VALUES ('John')"
-            # Only the first row "John" will be bound to the sql.
-
-        ### Example (many=False, itemize=False)
-        >>> cur.mogrify("INSERT INTO table (name, age) VALUES %s", ("John", 25), itemize=False)
-        >>> "INSERT INTO table (name, age) VALUES ('John', 25)"
+        - For multi-row 'args', ONLY the 'first' row [item] will be bound
+          to the sql and returned (cleaner illustration `not [excat*]`).
+        - For more information about the arguments, please refer to
+          'cur.execute()' method.
         """
         # Query without args
         if args is None:
             return sql
-        args = escape(args, many, itemize)
+        args = escape(args, itemize, many)
 
-        # Single row query: one arg
+        # Single row query
         if not many and not itemize:
-            # When 'many=False' & 'itemize=False', the 'args' must be
-            # a single literal string, and the 'sql' should only have
-            # one '%s' placeholder.
+            # When 'many=False' & 'itemize=False', the escaped
+            # 'args' can only be a single literal <'str'>.
             return self._format(sql, args)
-        dtype = type(args)
-        if dtype is str:
-            # The 'args' is a single literal string, and the 'sql'
-            # should only have one '%s' placeholder.
-            return self._format(sql, args)
-
-        # Single row query: one row
-        if dtype is tuple:
-            # The 'args' is a tuple of literal strings, and the 'sql'
-            # should have '%s' placeholders eqaul to tuple length.
+        if type(args) is not list:
+            # If the escaped 'args' is not a list, it must be
+            # either a <'str'> or <'tuple[str]'>, which should
+            # also bind to the 'sql' directly.
             return self._format(sql, args)
 
         # Multi-row query
-        # The 'args' now on can only be a list of str/tuple[str], and
-        # the 'sql' should have '%s' placeholders eqaul list item length.
+        # The escaped 'args' now on can only be a <'list[str/tuple]'>.
+        # Only the 'first' row [item] of the args will be bound to the sql.
         if len(args) == 0:
             return self._format(sql, ())
-        # . format only the 1st row
-        return self._format(sql, args[0])
+        else:
+            return self._format(sql, args[0])
 
     @cython.cfunc
     @cython.inline(True)
@@ -1180,7 +1245,7 @@ class Cursor:
         cols: tuple,
         field_count: cython.ulonglong,
     ) -> dict:
-        """(cfunc) Convert one row (tuple) into a dictionary `<'dict'>`."""
+        """(cfunc) Convert one row (tuple) to a dictionary `<'dict'>`."""
         return {cols[i]: row[i] for i in range(field_count)}
 
     # . rest
@@ -1527,7 +1592,7 @@ class DfCursor(Cursor):
     def fetchall(self) -> DataFrame:
         """Fetch all (remaining) rows of the query result `<'DataFrame'>`.
 
-        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available. 
+        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
         """
         return self._fetchall_df()
 
@@ -1774,6 +1839,7 @@ class BaseConnection:
     _server_public_key: bytes
     # Decode
     _use_decimal: cython.bint
+    _decode_bit: cython.bint
     _decode_json: cython.bint
     # Internal
     # . server
@@ -1824,6 +1890,7 @@ class BaseConnection:
         auth_plugin: AuthPlugin | None,
         server_public_key: bytes | None,
         use_decimal: bool,
+        decode_bit: bool,
         decode_json: bool,
     ):
         """The socket connection to the server.
@@ -1857,8 +1924,9 @@ class BaseConnection:
         :param ssl_ctx: `<ssl.SSLContext/None>` The SSL context for the connection.
         :param auth_plugin: `<'AuthPlugin/None'>` The authentication plugin handlers.
         :param server_public_key: `<'bytes/None'>` The public key for the server authentication.
-        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>.
-        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string.
+        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>.
+        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes.
+        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string.
         """
         # . internal
         self._setup_internal()
@@ -1879,7 +1947,7 @@ class BaseConnection:
         self._bind_address = bind_address
         self._unix_socket = unix_socket
         self._autocommit_mode = autocommit_mode
-        self._local_infile = local_infile
+        self._local_infile = bool(local_infile)
         self._max_allowed_packet = max_allowed_packet
         self._sql_mode = sql_mode
         self._init_command = init_command
@@ -1892,8 +1960,9 @@ class BaseConnection:
         self._auth_plugin = auth_plugin
         self._server_public_key = server_public_key
         # . decode
-        self._use_decimal = use_decimal
-        self._decode_json = decode_json
+        self._use_decimal = bool(use_decimal)
+        self._decode_bit = bool(decode_bit)
+        self._decode_json = bool(decode_json)
 
     # Setup -----------------------------------------------------------------------------------
     @cython.cfunc
@@ -2169,18 +2238,26 @@ class BaseConnection:
     # . decode
     @property
     def use_decimal(self) -> bool:
-        """Whether to use <'decimal.DECIMAL'> to represent
+        """Whether to use <'DECIMAL'> to represent
         DECIMAL column data `<'bool'>`.
 
         If `False`, use <'float'> instead.
         """
         return self._use_decimal
+    
+    @property
+    def decode_bit(self) -> bool:
+        """Whether to decode BIT column data to integer `<'bool'>`.
+        
+        If `False`, keep as the original bytes.
+        """
+        return self._decode_bit
 
     @property
     def decode_json(self) -> bool:
-        """Whether to decode JSON column data `<'bool'>`.
+        """Whether to deserialize JSON column data `<'bool'>`.
 
-        If `False`, keep as original json string.
+        If `False`, keep as the original JSON string.
         """
         return self._decode_json
 
@@ -2311,102 +2388,67 @@ class BaseConnection:
     def escape_args(
         self,
         args: Any,
-        many: cython.bint = False,
         itemize: cython.bint = True,
+        many: cython.bint = False,
     ) -> object:
-        """Escape arguments into formatable object(s) `<'str/tuple/list[str/tuple]'>`.
+        """Escape 'args' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
         ### Arguments
-        :param args: `<'Any'>` The arguments to escape, supports:
-            - Python native: int, float, bool, str, None, datetime, date,
-              time, timedelta, struct_time, bytes, bytearray, memoryview,
-              Decimal, dict, list, tuple, set, frozenset.
-            - Library numpy: np.int_, np.uint, np.float_, np.bool_, np.bytes_,
+        :param args: `<'object'>` The object to escape, supports:
+            - Python native:
+              int, float, bool, str, None, datetime, date, time,
+              timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset, range.
+            - Library [numpy](https://github.com/numpy/numpy):
+              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
               np.str_, np.datetime64, np.timedelta64, np.ndarray.
-            - Library pandas: pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+            - Library [pandas](https://github.com/pandas-dev/pandas):
+              pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
               pd.TimedeltaIndex, pd.Series, pd.DataFrame.
-
-        :param many: `<'bool'>` Wheter to escape 'args' into multi-rows. Defaults to `False`.
-            - When 'many=True', the argument 'itemize' is ignored.
-                * 1. 'list' and 'tuple' will be escaped into list of str or tuple[str],
-                  depends on type of the sequence items. Each item represents one row
-                  of the 'args' `<'list[str/tuple[str]]'>`.
-                * 2. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
-                  represents one row of the 'args' `<'list[tuple[str]]'>`.
-                * 3. All other sequences or mappings 'args' will be escaped into tuple
-                  of literal strings `<'tuple[str]'>`.
-                * 4. Single 'args' will be escaped into one literal string `<'str'>`.
-            - When 'many=False', the argument 'itemize' determines how to escape the 'args'.
+            - Library [cytimes](https://github.com/AresJef/cyTimes):
+              pydt, pddt.
 
         :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
             - When 'itemize=True', the 'args' type determines how to escape.
-                * 1. 'DataFrame' will be escaped into list of tuple[str]. Each tuple
-                  represents one row of the 'args' `<'list[tuple[str]]'>`.
-                * 2. All sequences or mappings 'args' will be escaped into tuple of
-                  literal strings `<'tuple[str]'>`. This includes 'list', 'tuple',
-                  'set', 'frozenset', 'dict', 'np.ndarray', 'pd.Series', etc.
-                * 3. Single 'args' will be escaped into one literal string `<'str'>`.
-            - When 'itemize=False', regardless of the 'args' type, it will be escaped into
-              one single literal string `<'str'>`.
+                * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
+                  escapes to `<'tuple[str]'>`.
+                * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+                  `<'tuple[str]'>`.
+                * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+                  to `<'list[tuple[str]]'>`. Each tuple represents one row
+                  of the 'args' .
+                * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+                  to one literal string `<'str'>`.
+            - When 'itemize=False', regardless of the 'args' type, all
+              escapes to one single literal string `<'str'>`.
+
+        :param many: `<'bool'>` Wheter to escape 'args' as multi-rows. Defaults to `False`.
+            * When 'many=True', the argument 'itemize' is ignored.
+            * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
+              escapes to `<'list[str/tuple[str]]'>`. Each element represents
+              one row of the 'args'.
+            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+              `<'list[str]'>`. Each element represents one row of the 'args'.
+            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+              to `<'list[tuple[str]]'>`. Each tuple represents one row
+              of the 'args' .
+            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+              to one literal string `<'str'>`.
 
         ### Exceptions
         :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
 
-        ### Returns:
+        ### Returns
         - If returns a <'str'>, it represents a single literal string.
-          The 'sql' should only have one '%s' placeholder.
+        The 'sql' should only have one '%s' placeholder.
         - If returns a <'tuple'>, it represents a single row of literal
-          strings. The 'sql' should have '%s' placeholders equal to the
-          tuple length.
+        strings. The 'sql' should have '%s' placeholders equal to the
+        tuple length.
         - If returns a <'list'>, it represents multiple rows of literal
-          strings. The 'sql' should have '%s' placeholders equal to the
-          item count in each row.
-
-        ### Example (list or tuple)
-        >>> escape([(1, 2), (3, 4)], many=True)
-        >>> [("1", "2"), ("3", "4")]  # list[tuple[str]]
-            # many=True, [optional] itemize=True
-        >>> escape([(1, 2), (3, 4)], many=False, itemize=True)
-        >>> ("(1,2)", "(3,4)")        # tuple[str]
-            # many=False, itemize=True
-        >>> escape([(1, 2), (3, 4)], many=False, itemize=False)
-        >>> "(1,2),(3,4)"             # str
-            # many=False, itemize=False
-
-        ### Example (set [sequence])
-        >>> escape({(1, 2), (3, 4)}, many=True)
-        >>> ("(1,2)", "(3,4)")        # tuple[str]
-            # many=True, [optional] itemize=True
-        >>> escape({(1, 2), (3, 4)}, many=False, itemize=True)
-        >>> ("(1,2)", "(3,4)")        # tuple[str]
-            # many=False, itemize=True
-        >>> escape({(1, 2), (3, 4)}, many=False, itemize=False)
-        >>> "(1,2),(3,4)"             # str
-            # many=False, itemize=False
-
-        ### Example (DataFrame)
-        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=True)
-        >>> [('1', '3'), ('2', '4')]  # list[tuple[str]]
-            # many=True, [optional] itemize=True
-        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=False, itemize=True)
-        >>> [('1', '3'), ('2', '4')]  # list[tuple[str]]
-            # many=False, itemize=True
-        >>> escape(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), many=False, itemize=False)
-        >>> "(1,3),(2,4)"             # str
-            # many=False, itemize=False
-
-        ### Example (single item)
-        >>> escape(1, many=True)
-        >>> "1"                       # str
-            # many=True, [optional] itemize=True
-        >>> escape(1, many=False, itemize=True)
-        >>> "1"                       # str
-            # many=False, itemize=True
-        >>> escape(1, many=False, itemize=False)
-        >>> "1"                       # str
-            # many=False, itemize=False
+        string(s). The 'sql' should have '%s' placeholders equal to the
+        item count in each row.
         """
-        return escape(args, many, itemize)
+        return escape(args, itemize, many)
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
@@ -2583,20 +2625,20 @@ class BaseConnection:
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
-    def set_autocommit(self, auto: cython.bint) -> cython.bint:
+    def set_autocommit(self, value: cython.bint) -> cython.bint:
         """Set the 'autocommit' mode of the connection (SESSION).
 
-        :param auto: `<'bool'>` Enable/Disable autocommit.
+        :param value: `<'bool'>` Enable/Disable autocommit.
             - `True` to operate in autocommit (non-transactional) mode.
             - `False` to operate in manual commit (transactional) mode.
         """
-        if auto != self.get_autocommit():
+        if value != self.get_autocommit():
             self._execute_command(
                 _COMMAND.COM_QUERY,
-                b"SET AUTOCOMMIT = 1" if auto else b"SET AUTOCOMMIT = 0",
+                b"SET AUTOCOMMIT = 1" if value else b"SET AUTOCOMMIT = 0",
             )
             self._read_ok_packet()
-            self._autocommit_mode = auto
+            self._autocommit_mode = value
         return True
 
     # . server
@@ -2658,24 +2700,31 @@ class BaseConnection:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_use_decimal(self, value: cython.bint) -> cython.bint:
-        """Set whether to use `<'decimal.DECIMAL'> to
-        represent DECIMAL column data.
+        """Set whether to use `<'DECIMAL'> to represent DECIMAL column data.
 
         :param value: `<'bool'>` True to use <'DECIMAL>', else <'float'>.
         """
-        if self._use_decimal != value:
-            self._use_decimal = value
+        self._use_decimal = value
+        return True
+
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def set_decode_bit(self, value: cython.bint) -> cython.bint:
+        """Set whether to decode BIT column data to integer.
+        
+        :param value: `<'bool'>` True to decode BIT column, else keep as original bytes.
+        """
+        self._decode_bit = value
         return True
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_decode_json(self, value: cython.bint) -> cython.bint:
-        """Set whether to decode JSON column data.
+        """Set whether to deserialize JSON column data.
 
-        :param value: `<'bool'>` True to decode, else False.
+        :param value: `<'bool'>` True to deserialize JSON column, else keep as original JSON string.
         """
-        if self._decode_json != value:
-            self._decode_json = value
+        self._decode_json = value
         return True
 
     # Connect / Close -------------------------------------------------------------------------
@@ -3368,7 +3417,7 @@ class BaseConnection:
     # Read ------------------------------------------------------------------------------------
     @cython.ccall
     def next_result(self, unbuffered: cython.bint = False) -> cython.ulonglong:
-        """Go to the next query result, and returns 
+        """Go to the next query result, and returns
         the affected/selected rows `<'int'>`.
 
         :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
@@ -3572,6 +3621,7 @@ class Connection(BaseConnection):
         auth_plugin: dict[str | bytes, type] | AuthPlugin | None = None,
         server_public_key: bytes | None = None,
         use_decimal: bool = False,
+        decode_bit: bool = False,
         decode_json: bool = False,
     ):
         """
@@ -3611,8 +3661,9 @@ class Connection(BaseConnection):
             - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
         :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-        :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-        :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string. Defaults to `False`.
+        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
         """
         # . internal
         self._setup_internal()
@@ -3698,4 +3749,5 @@ class Connection(BaseConnection):
         )
         # . decode
         self._use_decimal = bool(use_decimal)
+        self._decode_bit = bool(decode_bit)
         self._decode_json = bool(decode_json)
