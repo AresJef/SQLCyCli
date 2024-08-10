@@ -92,7 +92,7 @@ FN_MYSQLCLI_STR2LIT: Callable = string_literal
 @cython.inline(True)
 def _orjson_dumps(obj: object) -> str:
     """(cfunc) Serialize python object to JSON string `<'str'>`.
-    
+
     Based on [orjson](https://github.com/ijl/orjson) `'dumps()'` function.
     """
     return decode_bytes_utf8(FN_ORJSON_DUMPS(obj))  # type: ignore
@@ -112,7 +112,7 @@ def _orjson_dumps_numpy(obj: object) -> str:
 @cython.inline(True)
 def _bytes_to_literal(obj: object) -> object:
     """(cfunc) Escape bytes object to literal `<'bytes'>`.
-    
+
     Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
     `'string_literal()'` function.
     """
@@ -123,7 +123,7 @@ def _bytes_to_literal(obj: object) -> object:
 @cython.inline(True)
 def _string_to_literal(obj: object, encoding: cython.pchar) -> str:
     """(cfunc) Escape string object to literal `<'str'>`.
-     
+
     Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
     `'string_literal()'` function.
     """
@@ -270,7 +270,8 @@ def _escape_float64(data: object) -> str:
     >>> "123.456"  # str
     """
     # For numpy.float64, Python built-in `str()`
-    # function performs faster than orjson.
+    # function performs faster than orjson for most small
+    # float numbers (with less than 6 decimal places).
     if isfinite(data):
         return str(data)
     raise ValueError("Float value '%s' is not supported." % data)
