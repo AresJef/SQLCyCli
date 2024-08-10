@@ -631,7 +631,7 @@ class Cursor:
         # Single query: no args
         if args is None:
             return await self._query_str(sql)
-        args = escape(args, itemize, many)
+        args = escape(args, self._encoding_c, itemize, many)
 
         # Single row query
         if not many and not itemize:
@@ -821,7 +821,7 @@ class Cursor:
         if args is None:
             _args: tuple = ()
         else:
-            items = escape(args, True, False)
+            items = escape(args, self._encoding_c, True, False)
             if type(items) is not tuple:
                 raise errors.InvalidCursorArgsError(
                     "Invalid 'args' for 'callproc()' method, "
@@ -876,7 +876,7 @@ class Cursor:
         # Query without args
         if args is None:
             return sql
-        args = escape(args, itemize, many)
+        args = escape(args, self._encoding_c, itemize, many)
 
         # Single row query
         if not many and not itemize:
@@ -2391,7 +2391,7 @@ class BaseConnection:
         string(s). The 'sql' should have '%s' placeholders equal to the
         item count in each row.
         """
-        return escape(args, itemize, many)
+        return escape(args, self._encoding_c, itemize, many)
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
@@ -3608,12 +3608,13 @@ class Connection(BaseConnection):
         # fmt: off
         # . charset
         self._setup_charset(utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET))
+        encoding: cython.pchar = self._encoding_c
         # . basic
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535) 
-        self._user = utils.validate_arg_bytes(user, "user", self._encoding_c, sync_conn.DEFAULT_USER)
+        self._user = utils.validate_arg_bytes(user, "user", encoding, sync_conn.DEFAULT_USER)
         self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
-        self._database = utils.validate_arg_bytes(database, "database", self._encoding_c, None)
+        self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
             connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
@@ -3627,7 +3628,7 @@ class Connection(BaseConnection):
         self._local_infile = bool(local_infile)
         self._max_allowed_packet = utils.validate_max_allowed_packet(
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
-        self._sql_mode = utils.validate_sql_mode(sql_mode)
+        self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = utils.validate_cursor(cursor, Cursor)
         self._setup_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))

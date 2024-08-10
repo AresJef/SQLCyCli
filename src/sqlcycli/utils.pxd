@@ -471,14 +471,16 @@ cdef inline unsigned int validate_max_allowed_packet(object max_allowed_packet, 
         )
     return value
 
-cdef inline str validate_sql_mode(object sql_mode):
+cdef inline str validate_sql_mode(object sql_mode, char* encoding):
     """Validate if the 'sql_mode' argument is valid `<'str'>`."""
     # Argument is None
     if sql_mode is None:
         return None
     # Argument is a string
     if isinstance(sql_mode, str):
-        return escape(sql_mode) if str_len(sql_mode) > 0 else None
+        if str_len(sql_mode) > 0:
+            return escape(sql_mode, encoding, False, False)
+        return None
     # Invalid data type
     raise errors.InvalidConnectionArgsError(
         "Invalid 'sql_mode' argument: %r, expects <'str'> instead of %s." 

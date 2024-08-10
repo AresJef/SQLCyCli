@@ -436,13 +436,13 @@ class Pool:
         # fmt: off
         # . charset
         self._charset = utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET)
-        encoding_c: cython.pchar = self._charset._encoding_c
+        encoding: cython.pchar = self._charset._encoding_c
         # . basic
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
-        self._user = utils.validate_arg_bytes(user, "user", encoding_c, sync_conn.DEFAULT_USER)
+        self._user = utils.validate_arg_bytes(user, "user", encoding, sync_conn.DEFAULT_USER)
         self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
-        self._database = utils.validate_arg_bytes(database, "database", encoding_c, None)
+        self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
             connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
@@ -456,7 +456,7 @@ class Pool:
         self._local_infile = bool(local_infile)
         self._max_allowed_packet = utils.validate_max_allowed_packet(
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
-        self._sql_mode = utils.validate_sql_mode(sql_mode)
+        self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = utils.validate_cursor(cursor, Cursor)
         self._client_flag = utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX)
