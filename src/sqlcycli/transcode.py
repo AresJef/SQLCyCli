@@ -249,12 +249,13 @@ def _escape_float(data: object) -> str:
     >>> _escape_float(123.456)
     >>> "123.456"  # str
     """
-    # For normal native Python float numbers, orjson performs
-    # faster than Python built-in `str()` function.
+    # For normal native Python float numbers, orjson 
+    # performs faster than Python built-in `str()` 
+    # function.
     if isnormal(data):
         return _orjson_dumps(data)
-    # For numpy float numbers such as np.float64, use
-    # Python built-in `str()` function for escaping.
+    # For other float values, we fallback to Python
+    # built-in `str()` approach.
     return _escape_float64(data)
 
 
