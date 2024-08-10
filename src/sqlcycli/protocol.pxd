@@ -2,9 +2,9 @@
 
 # Constants
 cdef:
-    unsigned int NULL_COLUMN
-    unsigned int UNSIGNED_CHAR_COLUMN, UNSIGNED_SHORT_COLUMN
-    unsigned int UNSIGNED_INT24_COLUMN, UNSIGNED_INT64_COLUMN
+    unsigned char NULL_COLUMN
+    unsigned char UNSIGNED_CHAR_COLUMN, UNSIGNED_SHORT_COLUMN
+    unsigned char UNSIGNED_INT24_COLUMN, UNSIGNED_INT64_COLUMN
 
 # MySQL Packet
 cdef class MysqlPacket:

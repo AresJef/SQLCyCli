@@ -16,11 +16,11 @@ from sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS
 __all__ = ["MysqlPacket", "FieldDescriptorPacket"]
 
 # Constants -----------------------------------------------------------------------------------
-NULL_COLUMN: cython.uint = 251
-UNSIGNED_CHAR_COLUMN: cython.uint = 251
-UNSIGNED_SHORT_COLUMN: cython.uint = 252
-UNSIGNED_INT24_COLUMN: cython.uint = 253
-UNSIGNED_INT64_COLUMN: cython.uint = 254
+NULL_COLUMN: cython.uchar = 251
+UNSIGNED_CHAR_COLUMN: cython.uchar = 251
+UNSIGNED_SHORT_COLUMN: cython.uchar = 252
+UNSIGNED_INT24_COLUMN: cython.uchar = 253
+UNSIGNED_INT64_COLUMN: cython.uchar = 254
 
 
 # MySQL Packet --------------------------------------------------------------------------------
