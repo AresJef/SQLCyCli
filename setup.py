@@ -92,7 +92,7 @@ else:
         extension("connection.py", True, "-Wno-unreachable-code"),
         extension("errors.py", True, "-Wno-unreachable-code"),
         extension("protocol.py", True, "-Wno-unreachable-code"),
-        extension("transcode.py", True, "-Wno-unreachable-code"),
+        extension("transcode.py", True, "-Wno-unreachable-code", "-Wno-unused-function"),
         extension("typeref.py", False),
         extension("utils.py", True, "-Wno-unreachable-code"),
     ]
