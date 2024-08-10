@@ -57,23 +57,23 @@ The following result comes from [benchmark](./src/benchmark.py):
 ```
 # Unit: second | Lower is better
 name        type    rows    insert-per-row  insert-bulk select-per-row  select-all
-mysqlclient sync    50000   1.730551        0.417242    1.738128        0.119030
-SQLCyCli    sync    50000   2.342858        0.291653    2.491601        0.063667
-PyMySQL     sync    50000   2.759374        0.424672    4.538553        0.328897
-SQLCyCli    async   50000   3.619818        0.292900    4.608713        0.143482
-aiomysql    async   50000   3.762054        0.404407    5.547093        0.331927
-asyncmy     async   50000   4.026993        0.416270    5.996335        0.324749
+mysqlclient sync    50000   1.738263        0.430990    1.726277        0.117284
+SQLCyCli    sync    50000   2.239658        0.293476    2.341073        0.062193
+PyMySQL     sync    50000   2.662151        0.414243    4.245126        0.327544
+SQLCyCli    async   50000   3.421401        0.276260    4.336240        0.139700
+aiomysql    async   50000   3.579845        0.396187    5.151401        0.322439
+asyncmy     async   50000   3.793308        0.409774    5.477049        0.318582
 ```
 
 ```
 # Unit: second | Lower is better
 name        type    rows    update-per-row  update-all  delete-per-row  delete-all
-mysqlclient sync    50000   1.823490        0.349495    1.585233        0.108128
-SQLCyCli    sync    50000   2.478617        0.357437    2.240017        0.111638
-PyMySQL     sync    50000   2.845172        0.358968    2.533066        0.111986
-SQLCyCli    async   50000   3.651250        0.363093    3.625302        0.110497
-aiomysql    async   50000   3.880559        0.358837    3.671028        0.105743
-asyncmy     async   50000   3.999616        0.361256    3.801010        0.106062
+mysqlclient sync    50000   1.768599        0.356437    1.571645        0.108843
+SQLCyCli    sync    50000   2.282858        0.368871    2.105368        0.113834
+PyMySQL     sync    50000   2.560405        0.346608    2.307289        0.105239
+SQLCyCli    async   50000   3.475850        0.346580    3.335821        0.105670
+aiomysql    async   50000   3.574864        0.347389    3.261974        0.105169
+asyncmy     async   50000   3.762817        0.344875    3.575200        0.106150
 ```
 
 ### Usage
