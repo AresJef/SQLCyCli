@@ -4,8 +4,8 @@ from libc.math cimport isfinite
 from libc.stdlib cimport strtoll, strtoull, strtold
 from cpython.bytes cimport PyBytes_GET_SIZE as bytes_len
 from cpython.bytes cimport PyBytes_AS_STRING as bytes_to_chars
-from cpython.bytearray cimport PyByteArray_AsString, PyByteArray_GET_SIZE
-from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8, PyUnicode_Replace
+from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8
+from cpython.unicode cimport PyUnicode_Replace, PyUnicode_AsEncodedString
 cimport numpy as np
 from numpy cimport PyArray_TYPE, PyArray_Cast, PyArray_DATA
 from numpy cimport PyArray_GETITEM, PyArray_GETPTR1, PyArray_GETPTR2
@@ -41,14 +41,10 @@ ctypedef struct hms:
     unsigned int microsecond
 
 # Utils
-cdef inline str replace_bracket(str value, Py_ssize_t maxcount):
-    """Specifically designed to replace string '[...]' into '(...)' `<'str'>`.
-    Both '[' and ']' are replaced by '(' and ')' once respectively.
-    """
-    return PyUnicode_Replace(
-        PyUnicode_Replace(value, "[", "(", maxcount), 
-        "]", ")", maxcount
-    )
+cdef inline object encode_str(object obj, char* encoding):
+    """Encode string to bytes using 'encoding' with 
+    'surrogateescape' error handling `<'bytes'>`."""
+    return PyUnicode_AsEncodedString(obj, encoding, "surrogateescape")
 
 cdef inline str decode_bytes(object value, char* encoding):
     """Decode bytes to string using 'encoding' with "surrogateescape" error handling `<'str'>`."""
@@ -70,19 +66,12 @@ cdef inline str decode_bytes_utf8(object value):
     cdef Py_ssize_t size = bytes_len(value)
     return PyUnicode_DecodeUTF8(s, size, "surrogateescape")
 
-cdef inline str decode_bytearray_ascii(object value):
-    """Decode bytearray to string using 'ascii' encoding 
-    with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* s = PyByteArray_AsString(value)
-    cdef Py_ssize_t size = PyByteArray_GET_SIZE(value)
-    return PyUnicode_Decode(s, size, "ascii", "surrogateescape")
-
-cdef inline str decode_bytearray_utf8(object value):
-    """Decode bytearray to string using 'utf-8' encoding 
-    with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* s = PyByteArray_AsString(value)
-    cdef Py_ssize_t size = PyByteArray_GET_SIZE(value)
-    return PyUnicode_DecodeUTF8(s, size, "surrogateescape")
+cdef inline str replace_bracket(str value, Py_ssize_t maxcount):
+    """Replace '[' and ']' with '(' and ')' respectively `<'str'>`."""
+    return PyUnicode_Replace(PyUnicode_Replace(
+        value, "[", "(", maxcount
+        ), "]", ")", maxcount
+    )
 
 cdef inline bint is_leapyear(unsigned int year) except -1:
     """Determine whether the given 'year' is a leap year `<'bool'>`."""
@@ -362,7 +351,7 @@ cdef class JSON(_CustomType):
     pass
 
 # Escape
-cpdef object escape(object value, bint itemize=?, bint many=?)
+cpdef object escape(object value, char* encoding, bint itemize=?, bint many=?)
 
 # Decode
 cpdef object decode(
