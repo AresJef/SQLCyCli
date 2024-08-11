@@ -79,7 +79,7 @@ cdef inline bint is_leapyear(unsigned int year) except -1:
         return False
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
-cdef inline unsigned int days_bf_month(unsigned int year, unsigned int month) except -1:
+cdef inline unsigned int days_bf_month(unsigned int year, unsigned int month):
     """Calculate the number of days between the 1st day
     of the given 'year' and the 1st day of the 'month' `<'int'>`."""
     cdef unsigned int days
@@ -295,7 +295,7 @@ cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end)
     cdef bytes buffer = data[start:end]
     return strtoll(buffer, NULL, 10)
 
-cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end) except -1:
+cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
     """Parse microsecond fraction from 'data' `<'char*'>` from 'start' to 'end' `<'int'>`."""
     # Validate fraction
     cdef Py_ssize_t size = end - start

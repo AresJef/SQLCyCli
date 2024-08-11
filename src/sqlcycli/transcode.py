@@ -249,33 +249,14 @@ def _escape_float(data: object) -> str:
     >>> _escape_float(123.456)
     >>> "123.456"  # str
     """
-    # For normal native Python float numbers, orjson 
-    # performs faster than Python built-in `str()` 
+    # For normal native Python float numbers, orjson
+    # performs faster than Python built-in `str()`
     # function.
     if isnormal(data):
         return _orjson_dumps(data)
-    # For other float values, we fallback to Python
-    # built-in `str()` approach.
+    # For other float values, we fallback to use
+    # Python built-in `str()` approach.
     return _escape_float64(data)
-
-
-@cython.cfunc
-@cython.inline(True)
-def _escape_float64(data: object) -> str:
-    """(cfunc) Escape numpy.float_ 'data' to literal `<'str'>`.
-
-    :raises `<'ValueError'>`: If float value is invalid.
-
-    ### Example:
-    >>> _escape_float64(np.float64(123.456))
-    >>> "123.456"  # str
-    """
-    # For numpy.float64, Python built-in `str()`
-    # function performs faster than orjson for most small
-    # float numbers (with less than 6 decimal places).
-    if isfinite(data):
-        return str(data)
-    raise ValueError("Float value '%s' is not supported." % data)
 
 
 @cython.cfunc
@@ -337,39 +318,6 @@ def _escape_datetime(data: object) -> str:
             datetime.PyDateTime_DATE_GET_SECOND(data),
             microsecond,
         )
-
-
-@cython.cfunc
-@cython.inline(True)
-@cython.cdivision(True)
-def _escape_datetime64(data: object) -> str:
-    """(cfunc) Escape numpy.datetime64 'data' to literal `<'str'>`.
-
-    ### Example:
-    >>> _escape_datetime64(np.datetime64('2021-01-01T12:00:00.001'))
-    >>> "'2021-01-01 12:00:00.00100'"  # str
-    """
-    # Add back epoch seconds
-    microseconds: cython.longlong = dt64_to_microseconds(data) + EPOCH_US  # type: ignore
-    microseconds = min(max(microseconds, DT_MIN_US), DT_MAX_US)
-    # Calculate ymd
-    ymd = ordinal_to_ymd(microseconds // US_DAY)  # type: ignore
-    # Calculate hms
-    hms = microseconds_to_hms(microseconds)  # type: ignore
-    # Escape
-    # fmt: off
-    microsecond: cython.uint = hms.microsecond
-    if microsecond == 0:
-        return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
-            ymd.year, ymd.month, ymd.day, 
-            hms.hour, hms.minute, hms.second,
-        )
-    else:
-        return "'%04d-%02d-%02d %02d:%02d:%02d.%06d'" % (
-            ymd.year, ymd.month, ymd.day, 
-            hms.hour, hms.minute, hms.second, microsecond,
-        )
-    # fmt: on
 
 
 @cython.cfunc
@@ -498,45 +446,6 @@ def _escape_timedelta(data: object) -> str:
             return "'-00:00:%02d.%06d'" % (seconds, us)
         else:
             return "'-00:00:00.%06d'" % us
-
-
-@cython.cfunc
-@cython.inline(True)
-@cython.cdivision(True)
-def _escape_timedelta64(data: object) -> str:
-    """(cfunc) Escape numpy.timedelta64 'data' to literal `<'str'>`.
-
-    ### Example:
-    >>> _escape_timedelta64(np.timedelta64('12:00:00.000100'))
-    >>> "'12:00:00.000100'"  # str
-    """
-    us: cython.longlong = td64_to_microseconds(data)  # type: ignore
-    return _escape_timedelta64_fr_us(us)
-
-
-@cython.cfunc
-@cython.inline(True)
-@cython.cdivision(True)
-def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
-    """(cfunc) Escape numpy.timedelta64 microseconds to literal `<'str'>`."""
-    negate: cython.bint = us < 0
-    us = abs(us)
-    hours = us // US_HOUR
-    us %= US_HOUR
-    minutes = us // 60_000_000
-    us %= 60_000_000
-    seconds = us // 1_000_000
-    us %= 1_000_000
-    if us == 0:
-        if negate:
-            return "'-%02d:%02d:%02d'" % (hours, minutes, seconds)
-        else:
-            return "'%02d:%02d:%02d'" % (hours, minutes, seconds)
-    else:
-        if negate:
-            return "'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
-        else:
-            return "'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
 
 
 # . Bytes types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -779,7 +688,98 @@ def _escape_dict(data: dict, encoding: cython.pchar) -> str:
     return res if read_char(res, 0) == "(" else "(" + res + ")"
 
 
-# . Numpy ndarray - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# . NumPy types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+@cython.cfunc
+@cython.inline(True)
+def _escape_float64(data: object) -> str:
+    """(cfunc) Escape numpy.float_ 'data' to literal `<'str'>`.
+
+    :raises `<'ValueError'>`: If float value is invalid.
+
+    ### Example:
+    >>> _escape_float64(np.float64(123.456))
+    >>> "123.456"  # str
+    """
+    # For numpy.float64, Python built-in `str()`
+    # function performs faster than orjson for most small
+    # float numbers (with less than 6 decimal places).
+    if isfinite(data):
+        return str(data)
+    raise ValueError("Float value '%s' is not supported." % data)
+
+
+@cython.cfunc
+@cython.inline(True)
+@cython.cdivision(True)
+def _escape_datetime64(data: object) -> str:
+    """(cfunc) Escape numpy.datetime64 'data' to literal `<'str'>`.
+
+    ### Example:
+    >>> _escape_datetime64(np.datetime64('2021-01-01T12:00:00.001'))
+    >>> "'2021-01-01 12:00:00.00100'"  # str
+    """
+    # Add back epoch seconds
+    microseconds: cython.longlong = dt64_to_microseconds(data) + EPOCH_US  # type: ignore
+    microseconds = min(max(microseconds, DT_MIN_US), DT_MAX_US)
+    # Calculate ymd
+    ymd = ordinal_to_ymd(microseconds // US_DAY)  # type: ignore
+    # Calculate hms
+    hms = microseconds_to_hms(microseconds)  # type: ignore
+    # Escape
+    # fmt: off
+    microsecond: cython.uint = hms.microsecond
+    if microsecond == 0:
+        return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
+            ymd.year, ymd.month, ymd.day, 
+            hms.hour, hms.minute, hms.second,
+        )
+    else:
+        return "'%04d-%02d-%02d %02d:%02d:%02d.%06d'" % (
+            ymd.year, ymd.month, ymd.day, 
+            hms.hour, hms.minute, hms.second, microsecond,
+        )
+    # fmt: on
+
+
+@cython.cfunc
+@cython.inline(True)
+@cython.cdivision(True)
+def _escape_timedelta64(data: object) -> str:
+    """(cfunc) Escape numpy.timedelta64 'data' to literal `<'str'>`.
+
+    ### Example:
+    >>> _escape_timedelta64(np.timedelta64('12:00:00.000100'))
+    >>> "'12:00:00.000100'"  # str
+    """
+    us: cython.longlong = td64_to_microseconds(data)  # type: ignore
+    return _escape_timedelta64_fr_us(us)
+
+
+@cython.cfunc
+@cython.inline(True)
+@cython.cdivision(True)
+def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
+    """(cfunc) Escape numpy.timedelta64 microseconds to literal `<'str'>`."""
+    negate: cython.bint = us < 0
+    us = abs(us)
+    hours = us // US_HOUR
+    us %= US_HOUR
+    minutes = us // 60_000_000
+    us %= 60_000_000
+    seconds = us // 1_000_000
+    us %= 1_000_000
+    if us == 0:
+        if negate:
+            return "'-%02d:%02d:%02d'" % (hours, minutes, seconds)
+        else:
+            return "'%02d:%02d:%02d'" % (hours, minutes, seconds)
+    else:
+        if negate:
+            return "'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
+        else:
+            return "'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
+
+
 @cython.cfunc
 @cython.inline(True)
 def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
@@ -1226,7 +1226,7 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
-# . Pandas Series - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_series(data: Series, encoding: cython.pchar) -> str:
@@ -1243,7 +1243,6 @@ def _escape_series(data: Series, encoding: cython.pchar) -> str:
     return _escape_ndarray(arr, encoding)
 
 
-# . Pandas DataFrame - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
@@ -1292,12 +1291,12 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
     # . <'str'>
     if dtype is str:
         return _escape_str(data, encoding)
-    # . <'float'>
-    if dtype is float:
-        return _escape_float(data)
     # . <'int'>
     if dtype is int:
         return str(data)  # _escape_int
+    # . <'float'>
+    if dtype is float:
+        return _escape_float(data)
     # . <'bool'>
     if dtype is bool:
         return _escape_bool(data)
@@ -1328,9 +1327,6 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
     # . <'bytes'>
     if dtype is bytes:
         return _escape_bytes(data)
-    # . <'bytearray'>
-    if dtype is bytearray:
-        return _escape_bytearray(data)
 
     # Sequence Types
     # . <'tuple'>
@@ -1399,6 +1395,9 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
         return _escape_struct_time(data)
 
     # Bytes Types
+    # . <'bytearray'>
+    if dtype is bytearray:
+        return _escape_bytearray(data)
     # . <'memoryview'>
     if dtype is memoryview:
         return _escape_memoryview(data)
@@ -1470,12 +1469,12 @@ def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
     # . subclass of <'str'>
     if isinstance(data, str):
         return _escape_str(data, encoding)
-    # . subclass of <'float'>
-    if isinstance(data, float):
-        return _escape_float(data)
     # . subclass of <'int'>
     if isinstance(data, int):
         return str(data)  # _escape_int
+    # . subclass of <'float'>
+    if isinstance(data, float):
+        return _escape_float(data)
     # . subclass of <'bool'>
     if isinstance(data, bool):
         return _escape_bool(data)
@@ -1767,7 +1766,7 @@ def _escape_item_dict(
         return [_escape_item_common(i, encoding, False) for i in data.values()]
 
 
-# . Numpy ndarray - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# . NumPy types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_item_ndarray(
@@ -2286,7 +2285,7 @@ def _escape_item_ndarray_unicode(
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
 
-# . Pandas Series - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_item_series(
@@ -2308,7 +2307,6 @@ def _escape_item_series(
     return _escape_item_ndarray(arr, encoding, many)
 
 
-# . Pandas DataFrame - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
 def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
@@ -2368,12 +2366,12 @@ def _escape_item_common(
     # . <'str'>
     if dtype is str:
         return _escape_str(data, encoding)
-    # . <'float'>
-    if dtype is float:
-        return _escape_float(data)
     # . <'int'>
     if dtype is int:
         return str(data)  # _escape_int
+    # . <'float'>
+    if dtype is float:
+        return _escape_float(data)
     # . <'bool'>
     if dtype is bool:
         return _escape_bool(data)
@@ -2404,9 +2402,6 @@ def _escape_item_common(
     # . <'bytes'>
     if dtype is bytes:
         return _escape_bytes(data)
-    # . <'bytearray'>
-    if dtype is bytearray:
-        return _escape_bytearray(data)
 
     # Sequence Types
     # . <'list'>
@@ -2481,6 +2476,9 @@ def _escape_item_uncommon(
         return _escape_struct_time(data)
 
     # Bytes Types
+    # . <'bytearray'>
+    if dtype is bytearray:
+        return _escape_bytearray(data)
     # . <'memoryview'>
     if dtype is memoryview:
         return _escape_memoryview(data)
@@ -2558,12 +2556,12 @@ def _escape_item_subclass(
     # . subclass of <'str'>
     if isinstance(data, str):
         return _escape_str(data, encoding)
-    # . subclass of <'float'>
-    if isinstance(data, float):
-        return _escape_float(data)
     # . subclass of <'int'>
     if isinstance(data, int):
         return str(data)  # _escape_int
+    # . subclass of <'float'>
+    if isinstance(data, float):
+        return _escape_float(data)
     # . subclass of <'bool'>
     if isinstance(data, bool):
         return _escape_bool(data)

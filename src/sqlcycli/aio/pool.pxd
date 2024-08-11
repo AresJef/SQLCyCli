@@ -69,9 +69,9 @@ cdef class Pool:
     # Setup
     cdef inline bint _setup(self, object min_size, object max_size, object recycle, object loop) except -1
     # Pool
-    cpdef unsigned int get_free(self) except -1
-    cpdef unsigned int get_used(self) except -1
-    cpdef unsigned int get_total(self) except -1
+    cpdef unsigned int get_free(self)
+    cpdef unsigned int get_used(self)
+    cpdef unsigned int get_total(self)
     cpdef bint set_min_size(self, unsigned int size) except -1
     cpdef bint set_recycle(self, object size) except -1
     cdef inline PoolConnection _get_free_conn(self)

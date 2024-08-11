@@ -776,13 +776,11 @@ class Pool:
     # Pool ------------------------------------------------------------------------------------
     # . pool
     @cython.ccall
-    @cython.exceptval(-1, check=False)
     def get_free(self) -> cython.uint:
         """Get the number of free connections in the pool `<'int'>`."""
         return self._free
 
     @cython.ccall
-    @cython.exceptval(-1, check=False)
     def get_used(self) -> cython.uint:
         """Get the number of connections that are in use `<'int'>`."""
         if self._used_conns is None:
@@ -790,7 +788,6 @@ class Pool:
         return set_len(self._used_conns)
 
     @cython.ccall
-    @cython.exceptval(-1, check=False)
     def get_total(self) -> cython.uint:
         """Get the total number of connections in the pool `<'int'>`."""
         return self._acqr + self._free + self.get_used()
