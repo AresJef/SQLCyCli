@@ -26,18 +26,18 @@ cdef inline bytes gen_length_encoded_integer(unsigned long long i):
     if i < 0xFB:  # 251 (1 byte)
         buffer[0] = i & 0xFF
         return PyBytes_FromStringAndSize(buffer, 1)
-    elif i < 65_536:  # 1 << 16 (3 bytes)
+    elif i < 65_536:  # 1 << 16 (2 bytes)
         buffer[0] = 0xFC  # 252
         buffer[1] = i & 0xFF
         buffer[2] = (i >> 8) & 0xFF
         return PyBytes_FromStringAndSize(buffer, 3)
-    elif i < 16_777_216: # 1 << 24 (4 bytes)
+    elif i < 16_777_216: # 1 << 24 (3 bytes)
         buffer[0] = 0xFD  # 253
         buffer[1] = i & 0xFF 
         buffer[2] = (i >> 8) & 0xFF 
         buffer[3] = (i >> 16) & 0xFF
         return PyBytes_FromStringAndSize(buffer, 4)
-    else: # 1 << 64 (9 bytes)
+    else: # 1 << 64 (8 bytes)
         buffer[0] = 0xFE  # 254
         buffer[1] = i & 0xFF
         buffer[2] = (i >> 8) & 0xFF 
