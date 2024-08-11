@@ -22,32 +22,32 @@ cdef inline object encode_str(object obj, char* encoding):
 cdef inline bytes gen_length_encoded_integer(unsigned long long i):
     """Generate 'Length Coded Integer' for MySQL `<'bytes'>."""
     # https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-    cdef char output[9]
+    cdef char buffer[9]
     if i < 0xFB:  # 251 (1 byte)
-        output[0] = <char> i
-        return PyBytes_FromStringAndSize(output, 1)
+        buffer[0] = i & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 1)
     elif i < 65_536:  # 1 << 16 (3 bytes)
-        output[0] = 0xFC  # 252
-        output[1] = i & 0xFF  # 255
-        output[2] = i >> 8
-        return PyBytes_FromStringAndSize(output, 3)
+        buffer[0] = 0xFC  # 252
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 3)
     elif i < 16_777_216: # 1 << 24 (4 bytes)
-        output[0] = 0xFD  # 0xFD
-        output[1] = i & 0xFF  # 0xFF
-        output[2] = (i >> 8) & 0xFF  # 0xFF
-        output[3] = i >> 16
-        return PyBytes_FromStringAndSize(output, 4)
+        buffer[0] = 0xFD  # 253
+        buffer[1] = i & 0xFF 
+        buffer[2] = (i >> 8) & 0xFF 
+        buffer[3] = (i >> 16) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 4)
     else: # 1 << 64 (9 bytes)
-        output[0] = 0xFE  # 254
-        output[1] = i & 0xFF  # 255
-        output[2] = (i >> 8) & 0xFF  # 255
-        output[3] = (i >> 16) & 0xFF  # 255
-        output[4] = (i >> 24) & 0xFF  # 255
-        output[5] = (i >> 32) & 0xFF  # 255
-        output[6] = (i >> 40) & 0xFF  # 255
-        output[7] = (i >> 48) & 0xFF  # 255
-        output[8] = i >> 56
-        return PyBytes_FromStringAndSize(output, 9)
+        buffer[0] = 0xFE  # 254
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF 
+        buffer[3] = (i >> 16) & 0xFF 
+        buffer[4] = (i >> 24) & 0xFF 
+        buffer[5] = (i >> 32) & 0xFF 
+        buffer[6] = (i >> 40) & 0xFF 
+        buffer[7] = (i >> 48) & 0xFF 
+        buffer[8] = (i >> 56) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 9)
 
 cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
     """Find the next NULL-terminated string in the data `<'int'>`."""
@@ -58,158 +58,128 @@ cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
     return loc - ptr + pos
 
 # Utils: Pack custom
-cdef inline bytes pack_I24B(unsigned int i, unsigned j):
+cdef inline bytes pack_I24B(unsigned int i, unsigned char j):
     """Manually pack 'struct.pack("<I[int24]B", i, j)' `<'bytes'>`"""
-    cdef:
-        unsigned char v0 = i & 0xFF
-        unsigned char v1 = (i >> 8) & 0xFF
-        unsigned char v2 = (i >> 16) & 0xFF
-        unsigned char v3 = j & 0xFF
-        char data[4]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    return PyBytes_FromStringAndSize(data, 4)
+    cdef char buffer[4]
+    buffer[0] = i & 0xFF
+    buffer[1] = (i >> 8) & 0xFF
+    buffer[2] = (i >> 16) & 0xFF
+    buffer[3] = j
+    return PyBytes_FromStringAndSize(buffer, 4)
 
-cdef inline bytes pack_IB(unsigned int i, unsigned j):
+cdef inline bytes pack_IB(unsigned int i, unsigned char j):
     """Manually pack 'struct.pack("<I[int24]B", i, j)' `<'bytes'>`"""
-    cdef:
-        unsigned char v0 = i & 0xFF
-        unsigned char v1 = (i >> 8) & 0xFF
-        unsigned char v2 = (i >> 16) & 0xFF
-        unsigned char v3 = (i >> 24) & 0xFF
-        unsigned char v4 = j & 0xFF
-        char data[5]
-    data[0], data[1], data[2], data[3], data[4] = v0, v1, v2, v3, v4
-    return PyBytes_FromStringAndSize(data, 5)
+    cdef char buffer[5]
+    buffer[0] = i & 0xFF
+    buffer[1] = (i >> 8) & 0xFF
+    buffer[2] = (i >> 16) & 0xFF
+    buffer[3] = (i >> 24) & 0xFF
+    buffer[4] = j
+    return PyBytes_FromStringAndSize(buffer, 5)
 
-cdef inline bytes pack_IIB23s(unsigned int i, unsigned int j, unsigned int k):
+cdef inline bytes pack_IIB23s(unsigned int i, unsigned int j, unsigned char k):
     """Manually pack 'struct.pack("<IIB23s", i, j, k, b"")' `<'bytes'>`"""
-    cdef:
-        unsigned char v0 = i & 0xFF
-        unsigned char v1 = (i >> 8) & 0xFF
-        unsigned char v2 = (i >> 16) & 0xFF
-        unsigned char v3 = (i >> 24) & 0xFF
-        unsigned char v4 = j & 0xFF
-        unsigned char v5 = (j >> 8) & 0xFF
-        unsigned char v6 = (j >> 16) & 0xFF
-        unsigned char v7 = (j >> 24) & 0xFF
-        unsigned char v8 = k & 0xFF
-        char data[32]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    data[4], data[5], data[6], data[7] = v4, v5, v6, v7
-    data[8] = v8
+    cdef char buffer[32]
+    buffer[0] = i & 0xFF
+    buffer[1] = (i >> 8) & 0xFF
+    buffer[2] = (i >> 16) & 0xFF
+    buffer[3] = (i >> 24) & 0xFF
+    buffer[4] = j & 0xFF
+    buffer[5] = (j >> 8) & 0xFF
+    buffer[6] = (j >> 16) & 0xFF
+    buffer[7] = (j >> 24) & 0xFF
+    buffer[8] = k
     for i in range(23):
-        data[i + 9] = 0
-    return PyBytes_FromStringAndSize(data, 32)
+        buffer[i + 9] = 0
+    return PyBytes_FromStringAndSize(buffer, 32)
 
 # Utils: Pack unsigned integers
 cdef inline bytes pack_uint8(unsigned int value):
     """Pack unsigned 8-bit integer 'value' into 1-bytes `<'bytes'>`."""
-    cdef:
-        unsigned char v0 = value & 0xFF
-        char data[1]
-    data[0] = v0
-    return PyBytes_FromStringAndSize(data, 1)
+    cdef char buffer[1]
+    buffer[0] = value & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_uint16(unsigned int value):
     """Pack unsigned 16-bit integer 'value' into 2-bytes `<'bytes'>`."""
-    cdef: 
-        unsigned char v0 = value & 0xFF
-        unsigned char v1 = (value >> 8) & 0xFF
-        char data[2]
-    data[0], data[1] = v0, v1
-    return PyBytes_FromStringAndSize(data, 2)
+    cdef char buffer[2]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_uint24(unsigned int value):
     """Pack unsigned 24-bit integer 'value' into 3-bytes `<'bytes'>`."""
-    cdef: 
-        unsigned char v0 = value & 0xFF
-        unsigned char v1 = (value >> 8) & 0xFF
-        unsigned char v2 = (value >> 16) & 0xFF
-        char data[3]
-    data[0], data[1], data[2] = v0, v1, v2
-    return PyBytes_FromStringAndSize(data, 3)
+    cdef char buffer[3]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_uint32(unsigned long long value):
     """Pack unsigned 32-bit integer 'value' into 4-bytes `<'bytes'>`."""
-    cdef:
-        unsigned char v0 = value & 0xFF
-        unsigned char v1 = (value >> 8) & 0xFF
-        unsigned char v2 = (value >> 16) & 0xFF
-        unsigned char v3 = (value >> 24) & 0xFF
-        char data[4]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    return PyBytes_FromStringAndSize(data, 4)
+    cdef char buffer[4]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    buffer[3] = (value >> 24) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_uint64(unsigned long long value):
     """Pack unsigned 64-bit integer 'value' into 8-bytes `<'bytes'>`."""
-    cdef:
-        unsigned char v0 = value & 0xFF
-        unsigned char v1 = (value >> 8) & 0xFF
-        unsigned char v2 = (value >> 16) & 0xFF
-        unsigned char v3 = (value >> 24) & 0xFF
-        unsigned char v4 = (value >> 32) & 0xFF
-        unsigned char v5 = (value >> 40) & 0xFF
-        unsigned char v6 = (value >> 48) & 0xFF
-        unsigned char v7 = (value >> 56) & 0xFF
-        char data[8]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    data[4], data[5], data[6], data[7] = v4, v5, v6, v7
-    return PyBytes_FromStringAndSize(data, 8)
+    cdef char buffer[8]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    buffer[3] = (value >> 24) & 0xFF
+    buffer[4] = (value >> 32) & 0xFF
+    buffer[5] = (value >> 40) & 0xFF
+    buffer[6] = (value >> 48) & 0xFF
+    buffer[7] = (value >> 56) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 8)
 
 # Utils: Pack signed integer
 cdef inline bytes pack_int8(int value):
     """Pack signed 8-bit integer 'value' into 1-bytes `<'bytes'>`."""
-    cdef:
-        signed char v0 = value & 0xFF
-        char data[1]
-    data[0] = v0
-    return PyBytes_FromStringAndSize(data, 1)
+    cdef char buffer[1]
+    buffer[0] = value & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_int16(int value):
     """Pack signed 16-bit integer 'value' into 2-bytes `<'bytes'>`."""
-    cdef: 
-        signed char v0 = value & 0xFF
-        signed char v1 = (value >> 8) & 0xFF
-        char data[2]
-    data[0], data[1] = v0, v1
-    return PyBytes_FromStringAndSize(data, 2)
+    cdef char buffer[2]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_int24(int value):
     """Pack signed 24-bit integer 'value' into 3-bytes `<'bytes'>`."""
-    cdef: 
-        signed char v0 = value & 0xFF
-        signed char v1 = (value >> 8) & 0xFF
-        signed char v2 = (value >> 16) & 0xFF
-        char data[3]
-    data[0], data[1], data[2] = v0, v1, v2
-    return PyBytes_FromStringAndSize(data, 3)
+    cdef char buffer[3]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_int32(long long value):
     """Pack signed 32-bit integer 'value' into 4-bytes `<'bytes'>`."""
-    cdef:
-        signed char v0 = value & 0xFF
-        signed char v1 = (value >> 8) & 0xFF
-        signed char v2 = (value >> 16) & 0xFF
-        signed char v3 = (value >> 24) & 0xFF
-        char data[4]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    return PyBytes_FromStringAndSize(data, 4)
+    cdef char buffer[4]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    buffer[3] = (value >> 24) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_int64(long long value):
     """Pack signed 64-bit integer 'value' into 8-bytes `<'bytes'>`."""
-    cdef:
-        signed char v0 = value & 0xFF
-        signed char v1 = (value >> 8) & 0xFF
-        signed char v2 = (value >> 16) & 0xFF
-        signed char v3 = (value >> 24) & 0xFF
-        signed char v4 = (value >> 32) & 0xFF
-        signed char v5 = (value >> 40) & 0xFF
-        signed char v6 = (value >> 48) & 0xFF
-        signed char v7 = (value >> 56) & 0xFF
-        char data[8]
-    data[0], data[1], data[2], data[3] = v0, v1, v2, v3
-    data[4], data[5], data[6], data[7] = v4, v5, v6, v7
-    return PyBytes_FromStringAndSize(data, 8)
+    cdef char buffer[8]
+    buffer[0] = value & 0xFF
+    buffer[1] = (value >> 8) & 0xFF
+    buffer[2] = (value >> 16) & 0xFF
+    buffer[3] = (value >> 24) & 0xFF
+    buffer[4] = (value >> 32) & 0xFF
+    buffer[5] = (value >> 40) & 0xFF
+    buffer[6] = (value >> 48) & 0xFF
+    buffer[7] = (value >> 56) & 0xFF
+    return PyBytes_FromStringAndSize(buffer, 8)
 
 # Utils: Unpack unsigned integer
 cdef inline unsigned char unpack_uint8(char* data, unsigned long long pos):
