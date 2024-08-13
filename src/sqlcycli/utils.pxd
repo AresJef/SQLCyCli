@@ -1,6 +1,5 @@
 # cython: language_level=3
 from libc.string cimport strchr
-from libc.limits cimport INT_MAX, UINT_MAX, LLONG_MAX, ULLONG_MAX
 from cpython.bytes cimport PyBytes_FromStringAndSize
 from cpython.bytes cimport PyBytes_GET_SIZE as bytes_len
 from cpython.unicode cimport PyUnicode_AsUTF8String
@@ -15,7 +14,7 @@ from sqlcycli import errors
 
 # Utils: c-string 
 cdef inline object encode_str(object obj, char* encoding):
-    """Encode string to bytes using 'encoding' with 
+    """Encode string to bytes using 'encoding' with
     'surrogateescape' error handling `<'bytes'>`."""
     return str_encode(obj, encoding, "surrogateescape")
 
@@ -33,19 +32,19 @@ cdef inline bytes gen_length_encoded_integer(unsigned long long i):
         return PyBytes_FromStringAndSize(buffer, 3)
     elif i < 16_777_216: # 1 << 24 (3 bytes)
         buffer[0] = 0xFD  # 253
-        buffer[1] = i & 0xFF 
-        buffer[2] = (i >> 8) & 0xFF 
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF
         buffer[3] = (i >> 16) & 0xFF
         return PyBytes_FromStringAndSize(buffer, 4)
     else: # 1 << 64 (8 bytes)
         buffer[0] = 0xFE  # 254
         buffer[1] = i & 0xFF
-        buffer[2] = (i >> 8) & 0xFF 
-        buffer[3] = (i >> 16) & 0xFF 
-        buffer[4] = (i >> 24) & 0xFF 
-        buffer[5] = (i >> 32) & 0xFF 
-        buffer[6] = (i >> 40) & 0xFF 
-        buffer[7] = (i >> 48) & 0xFF 
+        buffer[2] = (i >> 8) & 0xFF
+        buffer[3] = (i >> 16) & 0xFF
+        buffer[4] = (i >> 24) & 0xFF
+        buffer[5] = (i >> 32) & 0xFF
+        buffer[6] = (i >> 40) & 0xFF
+        buffer[7] = (i >> 48) & 0xFF
         buffer[8] = (i >> 56) & 0xFF
         return PyBytes_FromStringAndSize(buffer, 9)
 
@@ -148,13 +147,13 @@ cdef inline bytes pack_uint64(unsigned long long value):
 
 # Utils: Unpack unsigned integer
 cdef inline unsigned char unpack_uint8(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 8-bit integer from 'data' 
+    """Unpack (read) unsigned 8-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     return <unsigned char> data[pos]
 
 cdef inline unsigned short unpack_uint16(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 16-bit integer from 'data' 
+    """Unpack (read) unsigned 16-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -164,7 +163,7 @@ cdef inline unsigned short unpack_uint16(char* data, unsigned long long pos):
     return res
 
 cdef inline unsigned int unpack_uint24(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 24-bit integer from 'data' 
+    """Unpack (read) unsigned 24-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -175,7 +174,7 @@ cdef inline unsigned int unpack_uint24(char* data, unsigned long long pos):
     return res
 
 cdef inline unsigned int unpack_uint32(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 32-bit integer from 'data' 
+    """Unpack (read) unsigned 32-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -187,7 +186,7 @@ cdef inline unsigned int unpack_uint32(char* data, unsigned long long pos):
     return res
 
 cdef inline unsigned long long unpack_uint64(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 64-bit integer from 'data' 
+    """Unpack (read) unsigned 64-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -200,7 +199,7 @@ cdef inline unsigned long long unpack_uint64(char* data, unsigned long long pos)
         unsigned long long p6 = <unsigned char> data[pos + 6]
         unsigned long long p7 = <unsigned char> data[pos + 7]
         unsigned long long res = (
-            p0 | (p1 << 8) | (p2 << 16) | (p3 << 24) | (p4 << 32) 
+            p0 | (p1 << 8) | (p2 << 16) | (p3 << 24) | (p4 << 32)
             | (p5 << 40) | (p6 << 48) | (p7 << 56) )
     return res
 
@@ -452,7 +451,7 @@ cdef inline str validate_sql_mode(object sql_mode, char* encoding):
         return None
     # Invalid data type
     raise errors.InvalidConnectionArgsError(
-        "Invalid 'sql_mode' argument: %r, expects <'str'> instead of %s." 
+        "Invalid 'sql_mode' argument: %r, expects <'str'> instead of %s."
         % (sql_mode, type(sql_mode))
     )
 

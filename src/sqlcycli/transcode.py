@@ -10,6 +10,7 @@ from cython.cimports.cpython import datetime  # type: ignore
 from cython.cimports.cpython.list import PyList_AsTuple as list_to_tuple  # type: ignore
 from cython.cimports.cpython.tuple import PyTuple_GET_ITEM as tuple_getitem  # type: ignore
 from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_READ_CHAR as read_char  # type: ignore
@@ -2750,11 +2751,11 @@ def _decode_int(value: bytes) -> object:
     >>> _decode_int(b'-9223372036854775808')
     >>> -9223372036854775808
     """
-    c_value: cython.pchar = value
-    if c_value[0] == 45:  # negative "-" sign
-        return chars_to_long(c_value)  # type: ignore
+    chs: cython.pchar = bytes_to_chars(value)
+    if chs[0] == 45:  # negative "-" sign
+        return chars_to_ll(chs)  # type: ignore
     else:
-        return chars_to_ulong(c_value)  # type: ignore
+        return chars_to_ull(chs)  # type: ignore
 
 
 @cython.cfunc
@@ -2850,10 +2851,10 @@ def _decode_timedelta(value: bytes) -> object:
     length: cython.Py_ssize_t = bytes_len(value)
     if length == 0:
         return None  # eixt
-    c_value: cython.pchar = value
+    chs: cython.pchar = bytes_to_chars(value)
 
     # Parse negate and setup position
-    ch: cython.Py_UCS4 = c_value[0]
+    ch: cython.Py_UCS4 = chs[0]
     if ch == "-":
         negate: cython.int = -1
         start: cython.Py_ssize_t = 1
@@ -2865,11 +2866,11 @@ def _decode_timedelta(value: bytes) -> object:
     # Parse HH
     hh: cython.int = -1
     while idx < length:
-        ch = c_value[idx]
+        ch = chs[idx]
         idx += 1
         if ch == ":":
             try:
-                hh = slice_to_int(c_value, start, idx)  # type: ignore
+                hh = slice_to_int(chs, start, idx)  # type: ignore
             except Exception:
                 return None  # exit: invalid HH
             start = idx
@@ -2880,11 +2881,11 @@ def _decode_timedelta(value: bytes) -> object:
     # Parse MM
     mm: cython.int = -1
     while idx < length:
-        ch = c_value[idx]
+        ch = chs[idx]
         idx += 1
         if ch == ":":
             try:
-                mm = slice_to_int(c_value, start, idx)  # type: ignore
+                mm = slice_to_int(chs, start, idx)  # type: ignore
             except Exception:
                 return None  # exit: invalid MM
             start = idx
@@ -2896,24 +2897,24 @@ def _decode_timedelta(value: bytes) -> object:
     ss: cython.int = -1
     us: cython.int = 0
     while idx < length:
-        ch = c_value[idx]
+        ch = chs[idx]
         idx += 1
         if ch == ".":
             # . parse SS
             try:
-                ss = slice_to_int(c_value, start, idx)  # type: ignore
+                ss = slice_to_int(chs, start, idx)  # type: ignore
             except Exception:
                 return None  # exit: invalid SS
             # . parse US
             try:
-                us = parse_us_fraction(c_value, idx, length)  # type: ignore
+                us = parse_us_fraction(chs, idx, length)  # type: ignore
             except Exception:
                 return None  # exit: invalid us
             break
     # There is not fraction, and SS is the last component
     if ss == -1:
         try:
-            ss = slice_to_int(c_value, start, idx)  # type: ignore
+            ss = slice_to_int(chs, start, idx)  # type: ignore
         except Exception:
             return None
     if not 0 <= ss <= 59:

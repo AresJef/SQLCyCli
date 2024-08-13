@@ -2,6 +2,7 @@
 cimport cython
 from libc.math cimport isfinite
 from libc.stdlib cimport strtoll, strtoull, strtold
+from cpython.bytes cimport PyBytes_FromStringAndSize
 from cpython.bytes cimport PyBytes_GET_SIZE as bytes_len
 from cpython.bytes cimport PyBytes_AS_STRING as bytes_to_chars
 from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8
@@ -42,29 +43,26 @@ ctypedef struct hms:
 
 # Utils
 cdef inline object encode_str(object obj, char* encoding):
-    """Encode string to bytes using 'encoding' with 
+    """Encode string to bytes using 'encoding' with
     'surrogateescape' error handling `<'bytes'>`."""
     return PyUnicode_AsEncodedString(obj, encoding, "surrogateescape")
 
 cdef inline str decode_bytes(object value, char* encoding):
     """Decode bytes to string using 'encoding' with "surrogateescape" error handling `<'str'>`."""
-    cdef char* s = bytes_to_chars(value)
-    cdef Py_ssize_t size = bytes_len(value)
-    return PyUnicode_Decode(s, size, encoding, "surrogateescape")
+    cdef char* chs = bytes_to_chars(value)
+    return PyUnicode_Decode(chs, bytes_len(value), encoding, "surrogateescape")
 
 cdef inline str decode_bytes_ascii(object value):
-    """Decode bytes to string using 'ascii' encoding 
+    """Decode bytes to string using 'ascii' encoding
     with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* s = bytes_to_chars(value)
-    cdef Py_ssize_t size = bytes_len(value)
-    return PyUnicode_Decode(s, size, "ascii", "surrogateescape")
+    cdef char* chs = bytes_to_chars(value)
+    return PyUnicode_Decode(chs, bytes_len(value), "ascii", "surrogateescape")
 
 cdef inline str decode_bytes_utf8(object value):
-    """Decode bytes to string using 'utf-8' encoding 
+    """Decode bytes to string using 'utf-8' encoding
     with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* s = bytes_to_chars(value)
-    cdef Py_ssize_t size = bytes_len(value)
-    return PyUnicode_DecodeUTF8(s, size, "surrogateescape")
+    cdef char* chs = bytes_to_chars(value)
+    return PyUnicode_DecodeUTF8(chs, bytes_len(value), "surrogateescape")
 
 cdef inline str replace_bracket(str value, Py_ssize_t maxcount):
     """Replace '[' and ']' with '(' and ')' respectively `<'str'>`."""
@@ -98,7 +96,7 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
     # from that boundary to n.  Life is much clearer if we subtract 1 from
     # n first -- then the values of n at 400-year boundaries are exactly
     # those divisible by _DI400Y:
-    cdef: 
+    cdef:
         unsigned int n = min(max(ordinal, 1), 3_652_059) - 1
         unsigned int n400 = n // 146_097
         unsigned int year, month, days_bf
@@ -285,6 +283,10 @@ cdef inline long long td64_to_microseconds(object td64):
     """Convert numpy.timedelta64 to total microseconds `<'long long'>`."""
     return nptime_to_microseconds(np.get_timedelta64_value(td64), np.get_datetime64_unit(td64))
 
+cdef inline char* slice_to_chars(char* data, Py_ssize_t start, Py_ssize_t size):
+    """Slice data `<'char*'>` from 'start' to 'start + size' `<'char*'>`."""
+    return bytes_to_chars(PyBytes_FromStringAndSize(data + start, size))
+
 cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end):
     """Slice data `<'char*'>` from 'start' to 'end', and convert to `<'long long'>`."""
     # Validate integer
@@ -292,8 +294,7 @@ cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end)
     if size < 1:
         raise ValueError("Invalid integer from slice.")
     # Slice & Convert to long long
-    cdef bytes buffer = data[start:end]
-    return strtoll(buffer, NULL, 10)
+    return strtoll(slice_to_chars(data, start, size), NULL, 10)
 
 cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
     """Parse microsecond fraction from 'data' `<'char*'>` from 'start' to 'end' `<'int'>`."""
@@ -301,22 +302,20 @@ cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
     cdef Py_ssize_t size = end - start
     if size > 6:
         size = 6
-        end = start + 6
     elif size < 1:
         raise ValueError("Invalid microsecond fraction.")
     # Slice & Convert to int
-    cdef bytes buffer = data[start:end]
-    cdef int res = strtoll(buffer, NULL, 10)
+    cdef int res = strtoll(slice_to_chars(data, start, size), NULL, 10)
     # Adjust fraction
     if size < 6:
         res *= US_FRACTION_CORRECTION[size - 1]
     return res
 
-cdef inline long long chars_to_long(char* data):
+cdef inline long long chars_to_ll(char* data):
     """Convert 'data' `<'char*'>` to `<'long long'>`."""
     return strtoll(data, NULL, 10)
 
-cdef inline unsigned long long chars_to_ulong(char* data):
+cdef inline unsigned long long chars_to_ull(char* data):
     """Convert 'data' `<'char*'>` to `<'unsigned long long'>`."""
     return strtoull(data, NULL, 10)
 
@@ -329,16 +328,20 @@ cdef inline unsigned long long unpack_uint64_big_endian(char* data, unsigned lon
     
     Note: The data is assumed to be in big-endian format.
     """
-    cdef: 
+    cdef:
         unsigned long long v0 = <unsigned char> data[pos + 7]
-        unsigned long long v1 = <unsigned char> data[pos + 6] 
-        unsigned long long v2 = <unsigned char> data[pos + 5] 
-        unsigned long long v3 = <unsigned char> data[pos + 4] 
-        unsigned long long v4 = <unsigned char> data[pos + 3] 
-        unsigned long long v5 = <unsigned char> data[pos + 2] 
-        unsigned long long v6 = <unsigned char> data[pos + 1] 
+        unsigned long long v1 = <unsigned char> data[pos + 6]
+        unsigned long long v2 = <unsigned char> data[pos + 5]
+        unsigned long long v3 = <unsigned char> data[pos + 4]
+        unsigned long long v4 = <unsigned char> data[pos + 3]
+        unsigned long long v5 = <unsigned char> data[pos + 2]
+        unsigned long long v6 = <unsigned char> data[pos + 1]
         unsigned long long v7 = <unsigned char> data[pos]
-    return v0 | (v1 << 8) | (v2 << 16) | (v3 << 24) | (v4 << 32) | (v5 << 40) | (v6 << 48) | (v7 << 56)
+        unsigned long long res = (
+            v0 | (v1 << 8) | (v2 << 16) | (v3 << 24) | (v4 << 32)
+            | (v5 << 40) | (v6 << 48) | (v7 << 56)
+        )
+    return res
 
 # Custom types
 cdef class _CustomType:
@@ -355,5 +358,5 @@ cpdef object escape(object value, char* encoding, bint itemize=?, bint many=?)
 
 # Decode
 cpdef object decode(
-    bytes value, unsigned int field_type, char* encoding, bint is_binary, 
+    bytes value, unsigned int field_type, char* encoding, bint is_binary,
     bint use_decimal, bint decode_bit, bint decode_json)

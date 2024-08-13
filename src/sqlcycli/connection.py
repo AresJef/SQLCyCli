@@ -13,6 +13,7 @@ from cython.cimports.cpython.tuple import PyTuple_GetSlice as tuple_slice  # typ
 from cython.cimports.cpython.tuple import PyTuple_GetItem as tuple_getitem  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
 from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
@@ -3517,7 +3518,7 @@ class BaseConnection:
         buffer: bytearray = bytearray()
         while True:
             data: bytes = self._read_bytes(4)
-            packet_header: cython.pchar = data
+            packet_header: cython.pchar = bytes_to_chars(data)
             btrl: cython.uint = utils.unpack_uint16(packet_header, 0)
             btrh: cython.uint = utils.unpack_uint8(packet_header, 2)
             packet_number: cython.uint = utils.unpack_uint8(packet_header, 3)

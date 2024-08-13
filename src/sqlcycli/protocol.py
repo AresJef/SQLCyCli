@@ -5,6 +5,7 @@
 # Cython imports
 import cython
 from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
 from cython.cimports.sqlcycli import errors, utils  # type: ignore
 from cython.cimports.sqlcycli.transcode import decode_bytes  # type: ignore
 from cython.cimports.sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS  # type: ignore
@@ -57,8 +58,8 @@ class MysqlPacket:
         """
         # Raw Data
         self._data = data
-        self._data_c = data
-        self._encoding = encoding
+        self._data_c = bytes_to_chars(data)
+        self._encoding = bytes_to_chars(encoding)
         self._size = bytes_len(data)
         self._pos = 0
         # Packet Data
@@ -443,8 +444,8 @@ class MysqlPacket:
 
 @cython.cclass
 class FieldDescriptorPacket(MysqlPacket):
-    """Represents the MySQL response packet which 
-    contains column's metadata in the result. Parsing 
+    """Represents the MySQL response packet which
+    contains column's metadata in the result. Parsing
     is done automatically.
     """
 
