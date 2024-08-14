@@ -3,8 +3,10 @@
 # Constants
 cdef:
     unsigned char NULL_COLUMN
-    unsigned char UNSIGNED_CHAR_COLUMN, UNSIGNED_SHORT_COLUMN
-    unsigned char UNSIGNED_INT24_COLUMN, UNSIGNED_INT64_COLUMN
+    unsigned char UNSIGNED_CHAR_COLUMN
+    unsigned char UNSIGNED_SHORT_COLUMN
+    unsigned char UNSIGNED_INT24_COLUMN
+    unsigned char UNSIGNED_INT64_COLUMN
 
 # MySQL Packet
 cdef class MysqlPacket:
@@ -13,14 +15,18 @@ cdef class MysqlPacket:
         bytes _data
         char* _data_c
         char* _encoding
-        unsigned long long _size, _pos
+        unsigned long long _size
+        unsigned long long _pos
         # . packet data
-        unsigned long long _affected_rows, _insert_id
+        unsigned long long _affected_rows
+        unsigned long long _insert_id
         int _server_status
         unsigned int _warning_count
         bint _has_next
-        bytes _message, _filename
-        bytes _plugin_name, _salt
+        bytes _message
+        bytes _filename
+        bytes _plugin_name
+        bytes _salt
     # Read Data
     cdef inline bytes read_all_data(self)
     cdef inline bytes read(self, unsigned long long size)
@@ -55,10 +61,16 @@ cdef class FieldDescriptorPacket(MysqlPacket):
     cdef:
         # . packet data
         bytes _catalog
-        str _db, _table, _table_org, _column, _column_org
+        str _db
+        str _table
+        str _table_org
+        str _column
+        str _column_org
         unsigned int _charsetnr
         unsigned long long _length
-        unsigned int _type_code, _flags, _scale
+        unsigned int _type_code
+        unsigned int _flags
+        unsigned int _scale
         bint _is_binary
     # Read Packet
     cpdef tuple description(self)

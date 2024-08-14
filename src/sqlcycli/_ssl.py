@@ -11,6 +11,10 @@ from os import PathLike
 from typing import Literal
 from sqlcycli import errors
 
+__all__ = ["SSL_ENABLED", "SSL", "is_ssl", "is_ssl_ctx"]
+
+
+# Constants -----------------------------------------------------------------------------------
 try:
     import ssl as _py_ssl
 
@@ -18,8 +22,6 @@ try:
 except ImportError:
     SSL_ENABLED: bool = False
 SSL_ENABLED_C: cython.bint = SSL_ENABLED
-
-__all__ = ["SSL_ENABLED", "SSL", "is_ssl", "is_ssl_ctx"]
 
 
 # Utils ---------------------------------------------------------------------------------------
@@ -47,7 +49,7 @@ class SSL:
 
     ### Notice
     Please access the generated <'SSLContext'> through `context` attribute.
-    If Python `ssl` module is not available, a `RuntimeWarning` will be 
+    If Python `ssl` module is not available, a `RuntimeWarning` will be
     issued and the context attribute will be `None`.
     """
 
@@ -80,7 +82,7 @@ class SSL:
 
         ### Notice
         Please access the final <'SSLContext'> through `context` attribute.
-        If Python `ssl` module is not available, a `RuntimeWarning` will be 
+        If Python `ssl` module is not available, a `RuntimeWarning` will be
         issued and the context attribute will be `None`.
 
         ### Arguments

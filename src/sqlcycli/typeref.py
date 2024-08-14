@@ -37,11 +37,11 @@ BOOL_: type[np.bool_] = np.bool_
 BYTES_: type[np.bytes_] = np.bytes_
 RECORD: type[np.record] = np.record
 # . pandas types
-DATAFRAME: type[DataFrame] = DataFrame
 SERIES: type[Series] = Series
+DATAFRAME: type[DataFrame] = DataFrame
 TIMESTAMP: type[Timestamp] = Timestamp
-DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTA: type[Timedelta] = Timedelta
+DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTAINDEX: type[TimedeltaIndex] = TimedeltaIndex
 # . cytimes types
 try:

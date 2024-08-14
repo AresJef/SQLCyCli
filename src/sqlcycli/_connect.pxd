@@ -8,10 +8,12 @@ cdef object validate_async_cursor(object cursor)
 cdef class ConnectionManager:
     cdef:
         # . connection
-        object _conn_sync, _conn_async
+        object _conn_sync
+        object _conn_async
         # . arguments
         dict _kwargs
-        object _cursor, _loop
+        object _cursor
+        object _loop
 
 cpdef ConnectionManager connect(
     object host=?,

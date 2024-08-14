@@ -22,15 +22,19 @@ cdef class Pool:
     cdef:
         # Pool
         # . counting
-        unsigned int _acqr, _free
+        unsigned int _acqr
+        unsigned int _free
         # . internal
-        unsigned int _min_size, _max_size
+        unsigned int _min_size
+        unsigned int _max_size
         long long _recycle
         Py_ssize_t _id
         object _free_conns
         set _used_conns
-        object _loop, _condition
-        bint _closing, _closed
+        object _loop
+        object _condition
+        bint _closing
+        bint _closed
         # . server
         int _server_protocol_version
         str _server_info
@@ -42,7 +46,9 @@ cdef class Pool:
         # . basic
         str _host
         object _port
-        bytes _user, _password, _database
+        bytes _user
+        bytes _password
+        bytes _database
         # . charset
         Charset _charset
         # . timeouts
@@ -51,12 +57,16 @@ cdef class Pool:
         object _write_timeout
         object _wait_timeout
         # . client
-        str _bind_address, _unix_socket
+        str _bind_address
+        str _unix_socket
         object _autocommit_mode
         bint _autocommit
-        object _local_infile, _max_allowed_packet
-        str _sql_mode, _init_command
-        object _cursor, _client_flag
+        object _local_infile
+        object _max_allowed_packet
+        str _sql_mode
+        str _init_command
+        object _cursor
+        object _client_flag
         str _program_name
         # . ssl
         object _ssl_ctx
@@ -64,7 +74,9 @@ cdef class Pool:
         AuthPlugin _auth_plugin
         bytes _server_public_key
         # . decode
-        bint _use_decimal, _decode_bit, _decode_json
+        bint _use_decimal
+        bint _decode_bit
+        bint _decode_json
         
     # Setup
     cdef inline bint _setup(self, object min_size, object max_size, object recycle, object loop) except -1

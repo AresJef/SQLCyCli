@@ -4,7 +4,8 @@
 cdef class Charset:
     cdef:
         int _id
-        str _name, _collation
+        str _name
+        str _collation
         bytes _encoding
         char* _encoding_c
         bint _is_default
@@ -12,7 +13,11 @@ cdef class Charset:
     cpdef bint is_binary(self)
 
 cdef class Charsets:
-    cdef dict _by_id, _by_name, _by_collation, _by_name_n_collation
+    cdef: 
+        dict _by_id
+        dict _by_name
+        dict _by_collation
+        dict _by_name_n_collation
     # Add Charset
     cpdef bint add(self, Charset charset) except -1
     cdef inline bint _add_by_id(self, Charset charset) except -1

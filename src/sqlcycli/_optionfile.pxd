@@ -4,10 +4,22 @@ from sqlcycli._ssl cimport SSL # type: ignore
 # MysqlOption
 cdef class OptionFile:
     cdef:
+        # . file
         object _opt_file
+        str _opt_group
+        # . basic
+        str _host
         int _port
-        str _opt_group, _host, _user, _password, _database 
-        str _charset, _bind_address, _unix_socket, _max_allowed_packet
+        str _user
+        str _password
+        str _database 
+        # . charset
+        str _charset
+        # . client
+        str _bind_address
+        str _unix_socket
+        str _max_allowed_packet
+        # . ssl
         SSL _ssl
     # Methods
     cdef inline bint _load_options(self) except -1

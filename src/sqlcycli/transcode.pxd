@@ -13,21 +13,30 @@ from numpy cimport PyArray_GETITEM, PyArray_GETPTR1, PyArray_GETPTR2
 
 # Constants
 cdef:
+    # orjson options
+    object OPT_SERIALIZE_NUMPY
     # . translate table
-    list STR_ESCAPE_TABLE, DT64_JSON_TABLE
+    list STR_ESCAPE_TABLE
+    list DT64_JSON_TABLE
     # . time units
     unsigned int[13] DAYS_BR_MONTH
-    long long US_DAY, US_HOUR, EPOCH_US, DT_MAX_US, DT_MIN_US
+    long long US_DAY
+    long long US_HOUR
+    long long EPOCH_US
+    long long DT_MAX_US
+    long long DT_MIN_US
     # . datetime
-    unsigned int[5] US_FRACTION_CORRECTION
+    unsigned int[5] US_FRAC_CORRECTION
     # . ndarray dtype
-    np.ndarray _arr
-    char NDARRAY_DTYPE_OBJECT, NDARRAY_DTYPE_BOOL, NDARRAY_DTYPE_FLOAT
-    char NDARRAY_DTYPE_INT, NDARRAY_DTYPE_UINT
-    char NDARRAY_DTYPE_DT64, NDARRAY_DTYPE_TD64
-    char NDARRAY_DTYPE_BYTES, NDARRAY_DTYPE_UNICODE
-    # . functions
-    object FN_ORJSON_LOADS, FN_ORJSON_DUMPS, FN_ORJSON_OPT_NUMPY, FN_MYSQLCLI_STR2LIT
+    char NDARRAY_OBJECT
+    char NDARRAY_INT
+    char NDARRAY_UINT
+    char NDARRAY_FLOAT
+    char NDARRAY_BOOL
+    char NDARRAY_DT64
+    char NDARRAY_TD64
+    char NDARRAY_BYTES
+    char NDARRAY_UNICODE
 
 # Struct
 ctypedef struct ymd:
@@ -308,7 +317,7 @@ cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
     cdef int res = strtoll(slice_to_chars(data, start, size), NULL, 10)
     # Adjust fraction
     if size < 6:
-        res *= US_FRACTION_CORRECTION[size - 1]
+        res *= US_FRAC_CORRECTION[size - 1]
     return res
 
 cdef inline long long chars_to_ll(char* data):

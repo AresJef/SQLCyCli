@@ -5,12 +5,16 @@ from sqlcycli.protocol cimport MysqlPacket, FieldDescriptorPacket
 
 # Constant
 cdef:
-    str DEFAULT_USER, DEFUALT_CHARSET
+    str DEFAULT_USER
+    str DEFUALT_CHARSET
     int MAX_CONNECT_TIMEOUT
-    int DEFALUT_MAX_ALLOWED_PACKET, MAXIMUM_MAX_ALLOWED_PACKET
+    int DEFALUT_MAX_ALLOWED_PACKET
+    int MAXIMUM_MAX_ALLOWED_PACKET
     bytes DEFAULT_CONNECT_ATTRS
     unsigned int MAX_PACKET_LENGTH
-    object INSERT_VALUES_RE, SERVER_VERSION_RE
+    unsigned int MAX_STATEMENT_LENGTH
+    object INSERT_VALUES_RE
+    object SERVER_VERSION_RE
 
 # Result
 cdef class MysqlResult:
@@ -18,14 +22,16 @@ cdef class MysqlResult:
         # Connection
         BaseConnection _conn
         # Packet data
-        unsigned long long affected_rows, insert_id
+        unsigned long long affected_rows
+        unsigned long long insert_id
         int server_status
         unsigned int warning_count
         bint has_next
         bytes message
         # Field data
         unsigned long long field_count
-        tuple fields, rows
+        tuple fields
+        tuple rows
         # Unbuffered
         bint unbuffered_active
     # Methods
@@ -50,8 +56,12 @@ cdef class Cursor:
         unsigned long long _arraysize
         MysqlResult _result
         unsigned long long _field_count
-        tuple _fields, _rows, _columns
-        unsigned long long _affected_rows, _row_idx, _row_size
+        tuple _fields
+        tuple _rows
+        tuple _columns
+        unsigned long long _affected_rows
+        unsigned long long _row_idx
+        unsigned long long _row_size
         unsigned long long _insert_id
         unsigned int _warning_count
     # Init
@@ -107,9 +117,12 @@ cdef class BaseConnection:
         # Basic
         str _host
         object _port
-        bytes _user, _password, _database
+        bytes _user
+        bytes _password
+        bytes _database
         # Charset
-        str _charset, _collation
+        str _charset
+        str _collation
         unsigned int _charset_id
         bytes _encoding
         char* _encoding_c
@@ -123,11 +136,13 @@ cdef class BaseConnection:
         object _wait_timeout
         bint _wait_timeout_changed
         # Client
-        str _bind_address, _unix_socket
+        str _bind_address
+        str _unix_socket
         int _autocommit_mode
         bint _local_infile
         unsigned int _max_allowed_packet
-        str _sql_mode, _init_command
+        str _sql_mode
+        str _init_command
         object _cursor
         unsigned int _client_flag
         bytes _connect_attrs
@@ -137,7 +152,9 @@ cdef class BaseConnection:
         AuthPlugin _auth_plugin
         bytes _server_public_key
         # Decode
-        bint _use_decimal, _decode_bit, _decode_json
+        bint _use_decimal
+        bint _decode_bit
+        bint _decode_json
         # Internal
         # . server
         int _server_protocol_version
@@ -152,13 +169,14 @@ cdef class BaseConnection:
         str _server_auth_plugin_name
         # . client
         double _last_used_time
-        bint _closed, _secure
+        bint _secure
         str _close_reason
         # . query
         MysqlResult _result
         unsigned int _next_seq_id
         # . transport
-        object _reader, _writer
+        object _reader
+        object _writer
     # Setup
     cdef inline bint _setup_charset(self, Charset charset) except -1
     cdef inline bint _setup_client_flag(self, unsigned int client_flag) except -1

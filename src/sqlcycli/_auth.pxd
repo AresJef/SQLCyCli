@@ -9,9 +9,13 @@ cdef:
 # Auth Plugin
 cdef class AuthPlugin:
     cdef:
-        object _mysql_native_password, _caching_sha2_password
-        object _sha256_password, _client_ed25519, _mysql_old_password
-        object _mysql_clear_password, _dialog
+        object _mysql_native_password
+        object _caching_sha2_password
+        object _sha256_password
+        object _client_ed25519
+        object _mysql_old_password
+        object _mysql_clear_password
+        object _dialog
         dict _plugins
     # Methods
     cpdef object get(self, bytes plugin_name)

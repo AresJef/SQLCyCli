@@ -23,11 +23,11 @@ np.import_umath()
 datetime.import_datetime()
 
 # Python imports
-from typing import Callable, Iterable
+from typing import Iterable
 import datetime, numpy as np
 from pandas import Series, DataFrame
-from MySQLdb._mysql import string_literal
-from orjson import loads, dumps, OPT_SERIALIZE_NUMPY
+from MySQLdb._mysql import string_literal as _string_literal
+from orjson import loads as _loads, dumps as _dumps, OPT_SERIALIZE_NUMPY
 from sqlcycli.constants import _FIELD_TYPE
 from sqlcycli import typeref, errors
 
@@ -60,35 +60,30 @@ DT_MAX_US: cython.longlong = 315_537_983_999_999_999
 DT_MIN_US: cython.longlong = 86_400_000_000
 # fmt: on
 # . datetime
-US_FRACTION_CORRECTION: cython.uint[5] = [100000, 10000, 1000, 100, 10]
+US_FRAC_CORRECTION: cython.uint[5] = [100000, 10000, 1000, 100, 10]
 # . ndarray dtype
-_arr: np.ndarray = np.array(None, dtype=object)
-NDARRAY_DTYPE_OBJECT: cython.char = _arr.descr.kind  # 'O'
-_arr: np.ndarray = np.array(1, dtype=np.bool_)
-NDARRAY_DTYPE_BOOL: cython.char = _arr.descr.kind  # 'b'
-_arr: np.ndarray = np.array(1.1, dtype=np.float64)
-NDARRAY_DTYPE_FLOAT: cython.char = _arr.descr.kind  # 'f'
-_arr: np.ndarray = np.array(1, dtype=np.int64)
-NDARRAY_DTYPE_INT: cython.char = _arr.descr.kind  # 'i'
-_arr: np.ndarray = np.array(1, dtype=np.uint64)
-NDARRAY_DTYPE_UINT: cython.char = _arr.descr.kind  # 'u'
-_arr: np.ndarray = np.array(1, dtype="datetime64[ns]")
-NDARRAY_DTYPE_DT64: cython.char = _arr.descr.kind  # 'M'
-_arr: np.ndarray = np.array(1, dtype="timedelta64[ns]")
-NDARRAY_DTYPE_TD64: cython.char = _arr.descr.kind  # 'm'
-_arr: np.ndarray = np.array(b"", dtype="S")
-NDARRAY_DTYPE_BYTES: cython.char = _arr.descr.kind  # 'S'
-_arr: np.ndarray = np.array("", dtype="U")
-NDARRAY_DTYPE_UNICODE: cython.char = _arr.descr.kind  # 'U'
-_arr: np.ndarray = None
-# . functions
-FN_ORJSON_LOADS: Callable = loads
-FN_ORJSON_DUMPS: Callable = dumps
-FN_ORJSON_OPT_NUMPY: object = OPT_SERIALIZE_NUMPY
-FN_MYSQLCLI_STR2LIT: Callable = string_literal
+NDARRAY_OBJECT: cython.char = ord(np.array(None, dtype="O").dtype.kind)  # "O"
+NDARRAY_INT: cython.char = ord(np.array(1, dtype=np.int64).dtype.kind)  # "i"
+NDARRAY_UINT: cython.char = ord(np.array(1, dtype=np.uint64).dtype.kind)  # "u"
+NDARRAY_FLOAT: cython.char = ord(np.array(0.1, dtype=np.float64).dtype.kind)  # "f"
+NDARRAY_BOOL: cython.char = ord(np.array(True, dtype=bool).dtype.kind)  # "b"
+NDARRAY_DT64: cython.char = ord(np.array(1, dtype="datetime64[ns]").dtype.kind)  # "M"
+NDARRAY_TD64: cython.char = ord(np.array(1, dtype="timedelta64[ns]").dtype.kind)  # "m"
+NDARRAY_BYTES: cython.char = ord(np.array(b"1", dtype="S").dtype.kind)  # "S"
+NDARRAY_UNICODE: cython.char = ord(np.array("1", dtype="U").dtype.kind)  # "U"
 
 
-# Orjson dumps --------------------------------------------------------------------------------
+# Utils ---------------------------------------------------------------------------------------
+@cython.cfunc
+@cython.inline(True)
+def _orjson_loads(data: object) -> object:
+    """(cfunc) Deserialize JSON string to python `<'object'>`.
+
+    Based on [orjson](https://github.com/ijl/orjson) `'loads()'` function.
+    """
+    return _loads(data)
+
+
 @cython.cfunc
 @cython.inline(True)
 def _orjson_dumps(obj: object) -> str:
@@ -96,7 +91,7 @@ def _orjson_dumps(obj: object) -> str:
 
     Based on [orjson](https://github.com/ijl/orjson) `'dumps()'` function.
     """
-    return decode_bytes_utf8(FN_ORJSON_DUMPS(obj))  # type: ignore
+    return decode_bytes_utf8(_dumps(obj))  # type: ignore
 
 
 @cython.cfunc
@@ -106,7 +101,7 @@ def _orjson_dumps_numpy(obj: object) -> str:
 
     Based on [orjson](https://github.com/ijl/orjson) `'dumps()'` function.
     """
-    return decode_bytes_utf8(FN_ORJSON_DUMPS(obj, option=FN_ORJSON_OPT_NUMPY))  # type: ignore
+    return decode_bytes_utf8(_dumps(obj, option=OPT_SERIALIZE_NUMPY))  # type: ignore
 
 
 @cython.cfunc
@@ -117,7 +112,7 @@ def _bytes_to_literal(obj: object) -> object:
     Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
     `'string_literal()'` function.
     """
-    return FN_MYSQLCLI_STR2LIT(obj)
+    return _string_literal(obj)
 
 
 @cython.cfunc
@@ -128,7 +123,7 @@ def _string_to_literal(obj: object, encoding: cython.pchar) -> str:
     Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
     `'string_literal()'` function.
     """
-    return decode_bytes(FN_MYSQLCLI_STR2LIT(encode_str(obj, encoding)), encoding)  # type: ignore
+    return decode_bytes(_string_literal(encode_str(obj, encoding)), encoding)  # type: ignore
 
 
 # Custom types ================================================================================
@@ -551,10 +546,7 @@ def _escape_json(data: JSON, encoding: cython.pchar) -> str:
     >>> "'{\\"key\\":\\"value\\"}'"  # str
     """
     try:
-        return decode_bytes(  # type: ignore
-            _bytes_to_literal(FN_ORJSON_DUMPS(data._value)),
-            encoding,
-        )
+        return decode_bytes(_bytes_to_literal(_dumps(data._value)), encoding)  # type: ignore
     except Exception as err:
         raise ValueError(
             "Invalid JSON value %s\n%r." % (type(data._value), data._value)
@@ -798,34 +790,35 @@ def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
     # Get ndarray dtype
     dtype: cython.char = data.descr.kind
 
+    # Serialize ndarray
     # . ndarray[object]
-    if dtype == NDARRAY_DTYPE_OBJECT:
+    if dtype == NDARRAY_OBJECT:
         return _escape_ndarray_object(data, encoding)
-    # . ndarray[float]
-    if dtype == NDARRAY_DTYPE_FLOAT:
-        return _escape_ndarray_float(data)
     # . ndarray[int]
-    if dtype == NDARRAY_DTYPE_INT:
+    if dtype == NDARRAY_INT:
         return _escape_ndarray_int(data)
     # . ndarray[uint]
-    if dtype == NDARRAY_DTYPE_UINT:
+    if dtype == NDARRAY_UINT:
         return _escape_ndarray_int(data)
+    # . ndarray[float]
+    if dtype == NDARRAY_FLOAT:
+        return _escape_ndarray_float(data)
     # . ndarray[bool]
-    if dtype == NDARRAY_DTYPE_BOOL:
+    if dtype == NDARRAY_BOOL:
         return _escape_ndarray_bool(data)
     # . ndarray[datetime64]
-    if dtype == NDARRAY_DTYPE_DT64:
+    if dtype == NDARRAY_DT64:
         return _escape_ndarray_dt64(data)
     # . ndarray[timedelta64]
-    if dtype == NDARRAY_DTYPE_TD64:
+    if dtype == NDARRAY_TD64:
         return _escape_ndarray_td64(data)
     # . ndarray[bytes]
-    if dtype == NDARRAY_DTYPE_BYTES:
+    if dtype == NDARRAY_BYTES:
         return _escape_ndarray_bytes(data)
     # . ndarray[str]
-    if dtype == NDARRAY_DTYPE_UNICODE:
+    if dtype == NDARRAY_UNICODE:
         return _escape_ndarray_unicode(data, encoding)
-    # # . invalid dtype
+    # . invalid dtype
     raise TypeError("Unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
 
 
@@ -847,11 +840,9 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -865,7 +856,8 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -879,6 +871,49 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         ]
         # fmt: on
         return ",".join(l_i)
+    # invalid
+    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+
+
+@cython.cfunc
+@cython.inline(True)
+def _escape_ndarray_int(arr: np.ndarray) -> str:
+    """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
+
+    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
+
+    ### Example (1-dimension):
+    >>> _escape_ndarray_int(np.array([-1, -2, -3], dtype=int))
+    >>> "(-1,-2,-3)"  # str
+
+    ### Example (2-dimension):
+    >>> _escape_ndarray_int(np.array(
+        [[1, 2], [3, 4]], dtype=np.uint64))
+    >>> "(1,2),(3,4)"  # str
+    """
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    # 1-dimensional
+    if ndim == 1:
+        s_i: cython.Py_ssize_t = shape[0]
+        # . empty ndarray
+        if s_i == 0:
+            return "()"  # exit
+        # . escape to literal
+        res = _orjson_dumps_numpy(arr)
+        return replace_bracket(res, 1)  # type: ignore
+    # 2-dimensional
+    if ndim == 2:
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return "()"  # exit
+        # . escape to literal
+        res = _orjson_dumps_numpy(arr)
+        if read_char(res, 1) == "[":
+            res = str_substr(res, 1, str_len(res) - 1)
+        return replace_bracket(res, -1)  # type: ignore
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -903,11 +938,9 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -919,57 +952,14 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
         return replace_bracket(res, 1)  # type: ignore
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
         # . check if value is finite
         if not is_arr_float_finite_2d(arr, s_i, s_j):  # type: ignore
             raise ValueError("Float value 'nan' & 'inf' not supported.")
-        # . escape to literal
-        res = _orjson_dumps_numpy(arr)
-        if read_char(res, 1) == "[":
-            res = str_substr(res, 1, str_len(res) - 1)
-        return replace_bracket(res, -1)  # type: ignore
-    # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
-
-
-@cython.cfunc
-@cython.inline(True)
-def _escape_ndarray_int(arr: np.ndarray) -> str:
-    """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
-
-    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
-
-    ### Example (1-dimension):
-    >>> _escape_ndarray_int(np.array([-1, -2, -3], dtype=int))
-    >>> "(-1,-2,-3)"  # str
-
-    ### Example (2-dimension):
-    >>> _escape_ndarray_int(np.array(
-        [[1, 2], [3, 4]], dtype=np.uint64))
-    >>> "(1,2),(3,4)"  # str
-    """
-    ndim: cython.Py_ssize_t = arr.ndim
-    shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
-    # 1-dimensional
-    if ndim == 1:
-        s_i, s_j = shape[0], 0
-        # . empty ndarray
-        if s_i == 0:
-            return "()"  # exit
-        # . escape to literal
-        res = _orjson_dumps_numpy(arr)
-        return replace_bracket(res, 1)  # type: ignore
-    # 2-dimensional
-    if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
-        # . empty ndarray
-        if s_j == 0:
-            return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
         if read_char(res, 1) == "[":
@@ -997,11 +987,9 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -1010,7 +998,8 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
         return replace_bracket(res, 1)  # type: ignore
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -1044,11 +1033,9 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
     # datetime format.
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -1057,7 +1044,8 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
         return res.translate(DT64_JSON_TABLE)
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -1089,11 +1077,9 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -1108,7 +1094,8 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -1146,11 +1133,9 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -1159,7 +1144,8 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -1191,11 +1177,9 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return "()"  # exit
@@ -1209,7 +1193,8 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return "()"  # exit
@@ -1422,7 +1407,7 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
         return _escape_sequence(data, encoding)
 
-    # Numpy Types
+    # NumPy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
         return _escape_ndarray(data, encoding)
@@ -1795,31 +1780,31 @@ def _escape_item_ndarray(
     dtype: cython.char = data.descr.kind
 
     # . ndarray[object]
-    if dtype == NDARRAY_DTYPE_OBJECT:
+    if dtype == NDARRAY_OBJECT:
         return _escape_item_ndarray_object(data, encoding, many)
-    # . ndarray[float]
-    if dtype == NDARRAY_DTYPE_FLOAT:
-        return _escape_item_ndarray_float(data, many)
     # . ndarray[int]
-    if dtype == NDARRAY_DTYPE_INT:
+    if dtype == NDARRAY_INT:
         return _escape_item_ndarray_int(data, many)
     # . ndarray[uint]
-    if dtype == NDARRAY_DTYPE_UINT:
+    if dtype == NDARRAY_UINT:
         return _escape_item_ndarray_int(data, many)
+    # . ndarray[float]
+    if dtype == NDARRAY_FLOAT:
+        return _escape_item_ndarray_float(data, many)
     # . ndarray[bool]
-    if dtype == NDARRAY_DTYPE_BOOL:
+    if dtype == NDARRAY_BOOL:
         return _escape_item_ndarray_bool(data, many)
     # . ndarray[datetime64]
-    if dtype == NDARRAY_DTYPE_DT64:
+    if dtype == NDARRAY_DT64:
         return _escape_item_ndarray_dt64(data, many)
     # . ndarray[timedelta64]
-    if dtype == NDARRAY_DTYPE_TD64:
+    if dtype == NDARRAY_TD64:
         return _escape_item_ndarray_td64(data, many)
     # . ndarray[bytes]
-    if dtype == NDARRAY_DTYPE_BYTES:
+    if dtype == NDARRAY_BYTES:
         return _escape_item_ndarray_bytes(data, many)
     # . ndarray[str]
-    if dtype == NDARRAY_DTYPE_UNICODE:
+    if dtype == NDARRAY_UNICODE:
         return _escape_item_ndarray_unicode(data, encoding, many)
     # . invalid dtype
     raise TypeError("Unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
@@ -1852,11 +1837,9 @@ def _escape_item_ndarray_object(
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -1875,7 +1858,8 @@ def _escape_item_ndarray_object(
             # fmt: on
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -1888,6 +1872,54 @@ def _escape_item_ndarray_object(
             for i in range(s_i)
         ]
         # fmt: on
+    # invalid
+    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+
+
+@cython.cfunc
+@cython.inline(True)
+def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
+    """(cfunc) Escape items of numpy.ndarray 'arr' to
+    sequence(s) of literals `<'tuple/list'>`.
+
+    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
+
+    ### Example (1-dimension | many=False)
+    >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), False)
+    >>> ("-1", "0", "1")  # tuple[str]
+
+    ### Example (1-dimension | many=True)
+    >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), True)
+    >>> ["-1", "0", "1"]  # list[str]
+
+    ### Example (2-dimension | many [ignored])
+    >>> _escape_item_ndarray_int(np.array(
+        [[0, 1], [2, 3]], dtype=np.uint))
+    >>> [("0", "1"), ("2", "3")]  # list[tupe[str]]
+    """
+    ndim: cython.Py_ssize_t = arr.ndim
+    shape = arr.shape
+    # 1-dimensional
+    if ndim == 1:
+        s_i: cython.Py_ssize_t = shape[0]
+        # . empty ndarray
+        if s_i == 0:
+            return ()  # exit
+        # . escape items to literals
+        res = _orjson_dumps_numpy(arr)
+        l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
+        return list_to_tuple(l_i) if not many else l_i
+    # 2-dimensional
+    if ndim == 2:
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
+        # . empty ndarray
+        if s_j == 0:
+            return []  # exit
+        # . escape items to literals
+        res = _orjson_dumps_numpy(arr)
+        l_i = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
+        return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -1917,11 +1949,9 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -1934,62 +1964,14 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
         return list_to_tuple(l_i) if not many else l_i
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
         # . check if value is finite
         if not is_arr_float_finite_2d(arr, s_i, s_j):  # type: ignore
             raise ValueError("Float value 'nan' & 'inf' is not supported.")
-        # . escape items to literals
-        res = _orjson_dumps_numpy(arr)
-        l_i = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
-        return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
-    # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
-
-
-@cython.cfunc
-@cython.inline(True)
-def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
-    """(cfunc) Escape items of numpy.ndarray 'arr' to
-    sequence(s) of literals `<'tuple/list'>`.
-
-    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
-
-    ### Example (1-dimension | many=False)
-    >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), False)
-    >>> ("-1", "0", "1")  # tuple[str]
-
-    ### Example (1-dimension | many=True)
-    >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), True)
-    >>> ["-1", "0", "1"]  # list[str]
-
-    ### Example (2-dimension | many [ignored])
-    >>> _escape_item_ndarray_int(np.array(
-        [[0, 1], [2, 3]], dtype=np.uint))
-    >>> [("0", "1"), ("2", "3")]  # list[tupe[str]]
-    """
-    ndim: cython.Py_ssize_t = arr.ndim
-    shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
-    # 1-dimensional
-    if ndim == 1:
-        s_i, s_j = shape[0], 0
-        # . empty ndarray
-        if s_i == 0:
-            return ()  # exit
-        # . escape items to literals
-        res = _orjson_dumps_numpy(arr)
-        l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
-        return list_to_tuple(l_i) if not many else l_i
-    # 2-dimensional
-    if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
-        # . empty ndarray
-        if s_j == 0:
-            return []  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         l_i = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
@@ -2021,11 +2003,9 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -2036,7 +2016,8 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
             return ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(s_i)]  # type: ignore
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -2078,11 +2059,9 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
     # datetime format.
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -2093,7 +2072,8 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
         return list_to_tuple(l_i) if not many else l_i
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -2129,11 +2109,9 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -2148,7 +2126,8 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
         return list_to_tuple(l_i) if not many else l_i
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -2191,11 +2170,9 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -2206,7 +2183,8 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
             return [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -2246,11 +2224,9 @@ def _escape_item_ndarray_unicode(
     """
     ndim: cython.Py_ssize_t = arr.ndim
     shape = arr.shape
-    s_i: cython.Py_ssize_t
-    s_j: cython.Py_ssize_t
     # 1-dimensional
     if ndim == 1:
-        s_i, s_j = shape[0], 0
+        s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
             return ()  # exit
@@ -2269,7 +2245,8 @@ def _escape_item_ndarray_unicode(
         # fmt: on
     # 2-dimensional
     if ndim == 2:
-        s_i, s_j = shape[0], shape[1]
+        s_i: cython.Py_ssize_t = shape[0]
+        s_j: cython.Py_ssize_t = shape[1]
         # . empty ndarray
         if s_j == 0:
             return []  # exit
@@ -2503,7 +2480,7 @@ def _escape_item_uncommon(
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
         return _escape_item_sequence(data, encoding, many)
 
-    # Numpy Types
+    # NumPy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
         return _escape_item_ndarray(data, encoding, many)
@@ -2975,7 +2952,7 @@ def _decode_json(
     >>> {"a": 1, "b": 2, "c": 3}
     """
     val = decode_bytes(value, encoding)  # type: ignore
-    return FN_ORJSON_LOADS(val) if decode_json else val
+    return _orjson_loads(val) if decode_json else val
 
 
 # Decode Function -----------------------------------------------------------------------------
