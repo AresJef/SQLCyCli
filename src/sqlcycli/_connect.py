@@ -31,7 +31,8 @@ __all__ = ["connect", "ConnectionManager", "create_pool", "PoolManager"]
 @cython.cfunc
 @cython.inline(True)
 def validate_sync_cursor(cursor: Any) -> object:
-    """(cfunc) Validate and map the given 'cursor' to the correct sync `<'Cursor'>`."""
+    """(cfunc) Validate and map the given 'cursor'
+    argument to the correct sync `<'Cursor'>`."""
     if cursor is None:
         return None
     if type(cursor) is type:
@@ -50,14 +51,16 @@ def validate_sync_cursor(cursor: Any) -> object:
         if cursor is aio.SSDfCursor:
             return SSDfCursor
     raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' %r, must be type of %r." % (cursor, Cursor)
+        "Invalid 'cursor' argument: %r. "
+        "Must be type [class] of %r." % (cursor, Cursor)
     )
 
 
 @cython.cfunc
 @cython.inline(True)
 def validate_async_cursor(cursor: Any) -> object:
-    """(cfunc) Validate and map the given 'cursor' to the correct async `<'Cursor'>`."""
+    """(cfunc) Validate and map the given 'cursor'
+    argument to the correct async `<'aio.Cursor'>`."""
     if cursor is None:
         return None
     if type(cursor) is type:
@@ -76,7 +79,8 @@ def validate_async_cursor(cursor: Any) -> object:
         if cursor is SSDfCursor:
             return aio.SSDfCursor
     raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' %r, must be type of %r." % (cursor, aio.Cursor)
+        "Invalid 'cursor' argument: %r. "
+        "Must be type [class] of %r." % (cursor, aio.Cursor)
     )
 
 
