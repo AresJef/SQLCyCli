@@ -37,7 +37,7 @@ sudo apt-get install pkg-config python3-dev default-libmysqlclient-dev build-ess
 ### Features
 
 - Written in [Cython](https://cython.org/) for optimal performance (especially for SELECT/INSERT query).
-- All classes and methods are well documented and static typed.
+- All classes and methods are well documented and type annotated.
 - Supports both `Sync` and `Async` connection to the server.
 - API Compatiable with [PyMySQL](https://github.com/PyMySQL/PyMySQL) and [aiomysql](https://github.com/aio-libs/aiomysql).
 - Support conversion (escape) for most of the native python types, and objects from libaray [numpy](https://github.com/numpy/numpy) and [pandas](https://github.com/pandas-dev/pandas). Does `NOT` support custom conversion (escape).
