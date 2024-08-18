@@ -2,11 +2,10 @@
 cimport cython
 from libc.math cimport isfinite
 from libc.stdlib cimport strtoll, strtoull, strtold
-from cpython.bytes cimport PyBytes_FromStringAndSize
-from cpython.bytes cimport PyBytes_GET_SIZE as bytes_len
-from cpython.bytes cimport PyBytes_AS_STRING as bytes_to_chars
-from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8
-from cpython.unicode cimport PyUnicode_Replace, PyUnicode_AsEncodedString
+from cpython.bytes cimport PyBytes_Size as bytes_len
+from cpython.bytes cimport PyBytes_AsString as bytes_to_chars
+from cpython.unicode cimport PyUnicode_Translate, PyUnicode_AsEncodedString
+from cpython.unicode cimport PyUnicode_Decode, PyUnicode_DecodeUTF8, PyUnicode_DecodeASCII
 cimport numpy as np
 from numpy cimport PyArray_TYPE, PyArray_Cast, PyArray_DATA
 from numpy cimport PyArray_GETITEM, PyArray_GETPTR1, PyArray_GETPTR2
@@ -18,13 +17,14 @@ cdef:
     # . translate table
     list STR_ESCAPE_TABLE
     list DT64_JSON_TABLE
+    list BRACKET_TABLE
     # . time units
     unsigned int[13] DAYS_BR_MONTH
-    long long US_DAY
-    long long US_HOUR
-    long long EPOCH_US
-    long long DT_MAX_US
-    long long DT_MIN_US
+    unsigned long long US_DAY
+    unsigned long long US_HOUR
+    unsigned long long EPOCH_US
+    unsigned long long DT_MAX_US
+    unsigned long long DT_MIN_US
     # . datetime
     unsigned int[5] US_FRAC_CORRECTION
     # . ndarray dtype
@@ -50,52 +50,89 @@ ctypedef struct hms:
     unsigned int second
     unsigned int microsecond
 
-# Utils
-cdef inline object encode_str(object obj, char* encoding):
+# Utils: string
+cdef inline bytes encode_str(object obj, char* encoding):
     """Encode string to bytes using 'encoding' with
     'surrogateescape' error handling `<'bytes'>`."""
     return PyUnicode_AsEncodedString(obj, encoding, "surrogateescape")
 
-cdef inline str decode_bytes(object value, char* encoding):
+cdef inline str decode_bytes(object data, char* encoding):
     """Decode bytes to string using 'encoding' with "surrogateescape" error handling `<'str'>`."""
-    cdef char* chs = bytes_to_chars(value)
-    return PyUnicode_Decode(chs, bytes_len(value), encoding, "surrogateescape")
+    return PyUnicode_Decode(bytes_to_chars(data), bytes_len(data), encoding, "surrogateescape")
 
-cdef inline str decode_bytes_ascii(object value):
-    """Decode bytes to string using 'ascii' encoding
-    with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* chs = bytes_to_chars(value)
-    return PyUnicode_Decode(chs, bytes_len(value), "ascii", "surrogateescape")
-
-cdef inline str decode_bytes_utf8(object value):
+cdef inline str decode_bytes_utf8(object data):
     """Decode bytes to string using 'utf-8' encoding
     with 'surrogateescape' error handling `<'str'>`."""
-    cdef char* chs = bytes_to_chars(value)
-    return PyUnicode_DecodeUTF8(chs, bytes_len(value), "surrogateescape")
+    return PyUnicode_DecodeUTF8(bytes_to_chars(data), bytes_len(data), "surrogateescape")
 
-cdef inline str replace_bracket(str value, Py_ssize_t maxcount):
-    """Replace '[' and ']' with '(' and ')' respectively `<'str'>`."""
-    return PyUnicode_Replace(PyUnicode_Replace(
-        value, "[", "(", maxcount
-        ), "]", ")", maxcount
-    )
+cdef inline str decode_bytes_ascii(object data):
+    """Decode bytes to string using 'ascii' encoding
+    with 'surrogateescape' error handling `<'str'>`."""
+    return PyUnicode_DecodeASCII(bytes_to_chars(data), bytes_len(data), "surrogateescape")
 
+cdef inline str translate_str(object value, list table):
+    """Translate string with the given 'table' `<'str'>`."""
+    return PyUnicode_Translate(value, table, NULL)
+
+cdef inline char* slice_to_chars(char* data, Py_ssize_t start, Py_ssize_t end):
+    """Slice data `<'char*'>` from 'start' to 'end' `<'char*'>`."""
+    if end - start < 1:
+        raise ValueError("Invalid slice size: [start]%d -> [end]%d." % (start, end))
+    return data[start:end]
+
+cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end):
+    """Slice data `<'char*'>` from 'start' to 'end', and convert to `<'long long'>`."""
+    return strtoll(slice_to_chars(data, start, end), NULL, 10)
+
+cdef inline long long chars_to_ll(char* data):
+    """Convert 'data' `<'char*'>` to `<'long long'>`."""
+    return strtoll(data, NULL, 10)
+
+cdef inline unsigned long long chars_to_ull(char* data):
+    """Convert 'data' `<'char*'>` to `<'unsigned long long'>`."""
+    return strtoull(data, NULL, 10)
+
+cdef inline long double chars_to_ld(char* data):
+    """Convert 'data' `<'char*'>` to `<'long double'>`."""
+    return strtold(data, NULL)
+
+# Utils: Unpack unsigned integer
+cdef inline unsigned long long unpack_uint64_big_endian(char* data, unsigned long long pos):
+    """Read (unpack) unsigned 64-bit integer from 'data' at givent 'pos' `<'int'>`.
+    
+    Note: The data is assumed to be in big-endian format.
+    """
+    cdef:
+        unsigned long long v0 = <unsigned char> data[pos + 7]
+        unsigned long long v1 = <unsigned char> data[pos + 6]
+        unsigned long long v2 = <unsigned char> data[pos + 5]
+        unsigned long long v3 = <unsigned char> data[pos + 4]
+        unsigned long long v4 = <unsigned char> data[pos + 3]
+        unsigned long long v5 = <unsigned char> data[pos + 2]
+        unsigned long long v6 = <unsigned char> data[pos + 1]
+        unsigned long long v7 = <unsigned char> data[pos]
+        unsigned long long res = (
+            v0 | (v1 << 8) | (v2 << 16) | (v3 << 24) | (v4 << 32)
+            | (v5 << 40) | (v6 << 48) | (v7 << 56)
+        )
+    return res
+
+# Utils: date&time
 cdef inline bint is_leapyear(unsigned int year) except -1:
     """Determine whether the given 'year' is a leap year `<'bool'>`."""
     if year == 0:
         return False
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
-cdef inline unsigned int days_bf_month(unsigned int year, unsigned int month):
+cdef inline unsigned int days_bf_month(unsigned int year, unsigned int month) except -1:
     """Calculate the number of days between the 1st day
     of the given 'year' and the 1st day of the 'month' `<'int'>`."""
     cdef unsigned int days
     if month <= 2:
         return 31 if month == 2 else 0
-    days = DAYS_BR_MONTH[min(month, 12) -1]
-    if is_leapyear(year):
-        days += 1
-    return days
+    else:
+        days = DAYS_BR_MONTH[min(month, 12) -1]
+        return days + 1 if is_leapyear(year) else days
 
 cdef inline ymd ordinal_to_ymd(int ordinal) except *:
     """Convert ordinal to YMD `<'struct:ymd'>`."""
@@ -151,21 +188,37 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
     return ymd(year, month, n)  # type: ignore
 
 @cython.cdivision(True)
-cdef inline hms microseconds_to_hms(long long microseconds) except *:
+cdef inline hms microseconds_to_hms(unsigned long long us) except *:
     """Convert microseconds to HMS `<'struct:hms'>`."""
-    cdef unsigned int hour, minute, second, microsecond
-    if microseconds <= 0:
+    if us == 0:
         return hms(0, 0, 0, 0)  # exit
 
-    microseconds = microseconds % US_DAY
-    hour = microseconds // US_HOUR
-    microseconds = microseconds % US_HOUR
-    minute = microseconds // 60_000_000
-    microseconds = microseconds % 60_000_000
-    second = microseconds // 1_000_000
-    microsecond = microseconds % 1_000_000
-    return hms(hour, minute, second, microsecond)
+    cdef unsigned int hour, minute, second
+    us = us % US_DAY
+    hour = us // US_HOUR
+    us = us % US_HOUR
+    minute = us // 60_000_000
+    us = us % 60_000_000
+    second = us // 1_000_000
+    us %= 1_000_000
+    return hms(hour, minute, second, us)
 
+cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
+    """Parse microsecond fraction from 'data' `<'char*'>` from 'start' to 'end' `<'int'>`."""
+    # Validate fraction
+    cdef Py_ssize_t size = end - start
+    if size > 6:
+        size = 6
+    elif size < 1:
+        raise ValueError("Invalid microsecond fraction.")
+    # Slice & Convert to int
+    cdef int res = strtoll(data[start:start+size], NULL, 10)
+    # Adjust fraction
+    if size < 6:
+        res *= US_FRAC_CORRECTION[size - 1]
+    return res
+
+# Utils: ndarray 1-dimensional
 cdef inline object arr_getitem_1d(np.ndarray arr, np.npy_intp i):
     """Get item from 1-dimensional numpy ndarray as `<'object'>`."""
     cdef void* itemptr = <void*>PyArray_GETPTR1(arr, i)
@@ -188,6 +241,7 @@ cdef inline bint is_arr_float_finite_1d(np.ndarray arr, np.npy_intp s_i) except 
         int npy_type = PyArray_TYPE(arr)
         double* d_ptr
         float* f_ptr
+        np.npy_intp i
     # Check float64
     if npy_type == np.NPY_TYPES.NPY_FLOAT64:
         d_ptr = <double*> PyArray_DATA(arr)
@@ -209,6 +263,7 @@ cdef inline bint is_arr_float_finite_1d(np.ndarray arr, np.npy_intp s_i) except 
     # Invalid dtype
     raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
+# Utils: ndarray 2-dimensional
 cdef inline object arr_getitem_2d(np.ndarray arr, np.npy_intp i, np.npy_intp j):
     """Get item from 2-dimensional numpy ndarray as `<'object'>`."""
     cdef void* itemptr = <void*>PyArray_GETPTR2(arr, i, j)
@@ -231,6 +286,7 @@ cdef inline bint is_arr_float_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_
         int npy_type = PyArray_TYPE(arr)
         double* d_ptr
         float* f_ptr
+        np.npy_intp i, j
     # Check float64
     if npy_type == np.NPY_TYPES.NPY_FLOAT64:
         d_ptr = <double*> PyArray_DATA(arr)
@@ -254,8 +310,9 @@ cdef inline bint is_arr_float_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_
     # Invalid dtype
     raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
-cdef inline long long nptime_to_microseconds(np.npy_datetime value, np.NPY_DATETIMEUNIT unit):
-    """Convert numpy.datetime64/timedelta64 value into microseconds `<'long long'>`."""
+# Utils: ndarray nptime
+cdef inline long long nptime_to_microseconds(long long value, np.NPY_DATETIMEUNIT unit):
+    """Convert numpy.datetime64/timedelta64 value to total microseconds `<'long long'>`."""
     # . common units
     if unit == np.NPY_DATETIMEUNIT.NPY_FR_ns:  # nanosecond
         return value // 1_000
@@ -285,72 +342,18 @@ cdef inline long long nptime_to_microseconds(np.npy_datetime value, np.NPY_DATET
     )
 
 cdef inline long long dt64_to_microseconds(object dt64):
-    """Convert numpy.datetime64 to microseconds `<'long long'>`."""
-    return nptime_to_microseconds(np.get_datetime64_value(dt64), np.get_datetime64_unit(dt64))
+    """Convert numpy.datetime64 to total microseconds `<'long long'>`."""
+    return nptime_to_microseconds(
+        np.get_datetime64_value(dt64), 
+        np.get_datetime64_unit(dt64),
+    )
 
 cdef inline long long td64_to_microseconds(object td64):
     """Convert numpy.timedelta64 to total microseconds `<'long long'>`."""
-    return nptime_to_microseconds(np.get_timedelta64_value(td64), np.get_datetime64_unit(td64))
-
-cdef inline char* slice_to_chars(char* data, Py_ssize_t start, Py_ssize_t size):
-    """Slice data `<'char*'>` from 'start' to 'start + size' `<'char*'>`."""
-    return bytes_to_chars(PyBytes_FromStringAndSize(data + start, size))
-
-cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end):
-    """Slice data `<'char*'>` from 'start' to 'end', and convert to `<'long long'>`."""
-    # Validate integer
-    cdef Py_ssize_t size = end - start
-    if size < 1:
-        raise ValueError("Invalid integer from slice.")
-    # Slice & Convert to long long
-    return strtoll(slice_to_chars(data, start, size), NULL, 10)
-
-cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
-    """Parse microsecond fraction from 'data' `<'char*'>` from 'start' to 'end' `<'int'>`."""
-    # Validate fraction
-    cdef Py_ssize_t size = end - start
-    if size > 6:
-        size = 6
-    elif size < 1:
-        raise ValueError("Invalid microsecond fraction.")
-    # Slice & Convert to int
-    cdef int res = strtoll(slice_to_chars(data, start, size), NULL, 10)
-    # Adjust fraction
-    if size < 6:
-        res *= US_FRAC_CORRECTION[size - 1]
-    return res
-
-cdef inline long long chars_to_ll(char* data):
-    """Convert 'data' `<'char*'>` to `<'long long'>`."""
-    return strtoll(data, NULL, 10)
-
-cdef inline unsigned long long chars_to_ull(char* data):
-    """Convert 'data' `<'char*'>` to `<'unsigned long long'>`."""
-    return strtoull(data, NULL, 10)
-
-cdef inline long double chars_to_double(char* data):
-    """Convert 'data' `<'char*'>` to `<'long double'>`."""
-    return strtold(data, NULL)
-
-cdef inline unsigned long long unpack_uint64_big_endian(char* data, unsigned long long pos):
-    """Read (unpack) unsigned 64-bit integer from 'data' at givent 'pos' `<'int'>`.
-    
-    Note: The data is assumed to be in big-endian format.
-    """
-    cdef:
-        unsigned long long v0 = <unsigned char> data[pos + 7]
-        unsigned long long v1 = <unsigned char> data[pos + 6]
-        unsigned long long v2 = <unsigned char> data[pos + 5]
-        unsigned long long v3 = <unsigned char> data[pos + 4]
-        unsigned long long v4 = <unsigned char> data[pos + 3]
-        unsigned long long v5 = <unsigned char> data[pos + 2]
-        unsigned long long v6 = <unsigned char> data[pos + 1]
-        unsigned long long v7 = <unsigned char> data[pos]
-        unsigned long long res = (
-            v0 | (v1 << 8) | (v2 << 16) | (v3 << 24) | (v4 << 32)
-            | (v5 << 40) | (v6 << 48) | (v7 << 56)
-        )
-    return res
+    return nptime_to_microseconds(
+        np.get_timedelta64_value(td64), 
+        np.get_datetime64_unit(td64),
+    )
 
 # Custom types
 cdef class _CustomType:

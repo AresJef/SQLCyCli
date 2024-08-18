@@ -9,8 +9,8 @@ from cython.cimports.libc.math import isnormal, isfinite  # type: ignore
 from cython.cimports.cpython import datetime  # type: ignore
 from cython.cimports.cpython.list import PyList_AsTuple as list_to_tuple  # type: ignore
 from cython.cimports.cpython.tuple import PyTuple_GET_ITEM as tuple_getitem  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_READ_CHAR as read_char  # type: ignore
@@ -50,14 +50,18 @@ DT64_JSON_TABLE[ord("T")] = " "
 DT64_JSON_TABLE[ord('"')] = "'"
 DT64_JSON_TABLE[ord("[")] = "("
 DT64_JSON_TABLE[ord("]")] = ")"
+# Used to replace bracket to parenthesis.
+BRACKET_TABLE: list = [chr(x) for x in range(128)]
+BRACKET_TABLE[ord("[")] = "("
+BRACKET_TABLE[ord("]")] = ")"
 # . time units
 # fmt: off
 DAYS_BR_MONTH: cython.uint[13] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
-US_DAY: cython.longlong = 86_400_000_000
-US_HOUR: cython.longlong = 3_600_000_000
-EPOCH_US: cython.longlong = 62_135_683_200_000_000
-DT_MAX_US: cython.longlong = 315_537_983_999_999_999
-DT_MIN_US: cython.longlong = 86_400_000_000
+US_DAY: cython.ulonglong = 86_400_000_000
+US_HOUR: cython.ulonglong = 3_600_000_000
+EPOCH_US: cython.ulonglong = 62_135_683_200_000_000
+DT_MAX_US: cython.ulonglong = 315_537_983_999_999_999
+DT_MIN_US: cython.ulonglong = 86_400_000_000
 # fmt: on
 # . datetime
 US_FRAC_CORRECTION: cython.uint[5] = [100000, 10000, 1000, 100, 10]
@@ -421,7 +425,7 @@ def _escape_timedelta(data: object) -> str:
 
     # Negative w/t microseconds
     else:
-        us: cython.longlong = abs(seconds * 1_000_000 + microseconds)
+        us: cython.ulonglong = abs(seconds * 1_000_000 + microseconds)
         if us >= US_HOUR:
             hours = us // US_HOUR
             us %= US_HOUR
@@ -712,12 +716,12 @@ def _escape_datetime64(data: object) -> str:
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
     # Add back epoch seconds
-    microseconds: cython.longlong = dt64_to_microseconds(data) + EPOCH_US  # type: ignore
-    microseconds = min(max(microseconds, DT_MIN_US), DT_MAX_US)
+    us: cython.ulonglong = dt64_to_microseconds(data) + EPOCH_US  # type: ignore
+    us = min(max(us, DT_MIN_US), DT_MAX_US)
     # Calculate ymd
-    ymd = ordinal_to_ymd(microseconds // US_DAY)  # type: ignore
+    ymd = ordinal_to_ymd(us // US_DAY)  # type: ignore
     # Calculate hms
-    hms = microseconds_to_hms(microseconds)  # type: ignore
+    hms = microseconds_to_hms(us)  # type: ignore
     # Escape
     # fmt: off
     microsecond: cython.uint = hms.microsecond
@@ -901,7 +905,7 @@ def _escape_ndarray_int(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        return replace_bracket(res, 1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -913,7 +917,7 @@ def _escape_ndarray_int(arr: np.ndarray) -> str:
         res = _orjson_dumps_numpy(arr)
         if read_char(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
-        return replace_bracket(res, -1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -949,7 +953,7 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
             raise ValueError("Float value 'nan' & 'inf' not supported.")
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        return replace_bracket(res, 1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -964,7 +968,7 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
         res = _orjson_dumps_numpy(arr)
         if read_char(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
-        return replace_bracket(res, -1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -995,7 +999,7 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
-        return replace_bracket(res, 1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1007,7 +1011,7 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
         res = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
         if read_char(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
-        return replace_bracket(res, -1)  # type: ignore
+        return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -1041,7 +1045,7 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        return res.translate(DT64_JSON_TABLE)
+        return translate_str(res, DT64_JSON_TABLE)  # type: ignore
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1053,7 +1057,7 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
         res = _orjson_dumps_numpy(arr)
         if read_char(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
-        return res.translate(DT64_JSON_TABLE)
+        return translate_str(res, DT64_JSON_TABLE)  # type: ignore
     # invalid
     raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
 
@@ -2067,8 +2071,8 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
             return ()  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
-        res = str_substr(res, 1, str_len(res) - 1)
-        l_i = str_split(res.translate(DT64_JSON_TABLE), ",", -1)
+        res = translate_str(res, DT64_JSON_TABLE)  # type: ignore
+        l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
         return list_to_tuple(l_i) if not many else l_i
     # 2-dimensional
     if ndim == 2:
@@ -2079,7 +2083,7 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
             return []  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
-        res = res.translate(DT64_JSON_TABLE)
+        res = translate_str(res, DT64_JSON_TABLE)  # type: ignore
         l_i = str_split(str_substr(res, 2, str_len(res) - 2), "),(", -1)
         return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
     # invalid
@@ -2649,7 +2653,7 @@ def escape(
           to one literal string `<'str'>`.
 
     ### Exceptions
-    :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
+    :raises `<'EscapeError'>`: If any error occurs during escaping.
 
     ### Returns
     - If returns a <'str'>, it represents a single literal string.
@@ -2667,7 +2671,7 @@ def escape(
         else:
             return _escape_common(data, encoding)
     except Exception as err:
-        raise errors.EscapeTypeError(
+        raise errors.EscapeError(
             "Failed to escape: %s\n%r\nError: %s" % (type(data), data, err)
         ) from err
 
@@ -2744,7 +2748,7 @@ def _decode_float(value: bytes) -> object:
     >>> _decode_float(b'-3.141592653589793')
     >>> -3.141592653589793
     """
-    return chars_to_double(value)  # type: ignore
+    return chars_to_ld(value)  # type: ignore
 
 
 @cython.cfunc
@@ -2975,6 +2979,7 @@ def decode(
     :param use_decimal `<'bool'>`: Whether to use <'Decimal'> to represent DECIMAL column, `False` use <'float'>.
     :param decode_bit `<'bool'>`: Whether to decode BIT column to integer, `False` keep as original <'bytes'>.
     :param decode_json `<'bool'>`: Whether to deserialize JSON column, `False` keep as original JSON <'str'>.
+    :raise `<'DecodeError'>`: When encountering unknown 'field_type'.    
     """
     # Char / Binary
     if field_type in (
@@ -3045,4 +3050,151 @@ def decode(
     if field_type == _FIELD_TYPE.YEAR:  # YEAR 13
         return _decode_int(value)
     # Unknown
-    raise errors.DecodeTypeError("Unknown FIELD_TYPE: %d." % field_type)
+    raise errors.DecodeError("Unknown 'field_type': %d." % field_type)
+
+
+########## The following functions are for testing purpose only ##########
+def _test_transcode() -> None:
+    _test_encode_decode_utf8()
+    _test_encode_decode_ascii()
+    _test_translate_str()
+    _test_slice_chars()
+    _test_chars_conversion()
+    _test_unpack_uint64_big_endian()
+    _test_date_n_time()
+
+
+def _test_encode_decode_utf8() -> None:
+    val = "中国\n한국어\nにほんご\nEspañol"
+    # encode
+    n = val.encode("utf-8")
+    x = encode_str(val, "utf-8")  # type: ignore
+    assert n == x, f"{n} | {x}"
+    # decode
+    i = n.decode("utf-8")
+    j = decode_bytes(n, "utf-8")  # type: ignore
+    k = decode_bytes_utf8(n)  # type: ignore
+    assert i == j == k == val, f"{i} | {j} | {k} | {val}"
+    print("Pass Encode/Decode UTF-8".ljust(80))
+
+
+def _test_encode_decode_ascii() -> None:
+    val = "hello\nworld"
+    # encode
+    n = val.encode("ascii")
+    x = encode_str(val, "ascii")  # type: ignore
+    assert n == x, f"{n} | {x}"
+    # decode
+    i = n.decode("ascii")
+    j = decode_bytes(n, "ascii")  # type: ignore
+    k = decode_bytes_ascii(n)  # type: ignore
+    assert i == j == k == val, f"{i} | {j} | {k} | {val}"
+    print("Pass Encode/Decode ASCII".ljust(80))
+
+
+def _test_translate_str() -> None:
+    o = str([[1], [1]])
+    n = o.translate(BRACKET_TABLE)
+    b = translate_str(o, BRACKET_TABLE)  # type: ignore
+    assert n == b, f"{n} | {b}"
+    print("Pass Translate Str".ljust(80))
+
+
+def _test_slice_chars() -> None:
+    val: cython.pchar = b"hello1234"
+    # slice to chars
+    n = val[0:5]
+    x: bytes = slice_to_chars(val, 0, 5)  # type: ignore
+    assert n == x, f"{n} | {x}"
+    # slice to int
+    i = int(val[5:8])
+    j = slice_to_int(val, 5, 8)  # type: ignore
+    assert i == j, f"{i} | {j}"
+    print("Pass Slice Chars".ljust(80))
+
+
+def _test_chars_conversion() -> None:
+    val: cython.pchar = b"-1234567890"
+    n = int(val)
+    x = chars_to_ll(val)  # type: ignore
+    assert n == x, f"{n} | {x}"
+
+    val: cython.pchar = b"1234567890"
+    n = int(val)
+    x = chars_to_ull(val)  # type: ignore
+    assert n == x, f"{n} | {x}"
+
+    val: cython.pchar = b"1234.567890"
+    n = float(val)
+    x = chars_to_ld(val)  # type: ignore
+    assert n == x, f"{n} | {x}"
+
+    print("Pass Chars Conversion".ljust(80))
+
+
+def _test_unpack_uint64_big_endian() -> None:
+    import struct
+
+    val = 1234567890
+    s = struct.pack(">Q", 1234567890)
+    n = struct.unpack(">Q", s)[0]
+    x = unpack_uint64_big_endian(s, 0)  # type: ignore
+    assert val == n == x, f"{n} | {x}"
+    print("Pass Unpack Uint64 Big Endian".ljust(80))
+
+    del struct
+
+
+def _test_date_n_time() -> None:
+    import calendar
+    from _pydatetime import _ord2ymd
+
+    for year in range(1, 10_000):
+        n = calendar.isleap(year)
+        x = is_leapyear(year)  # type: ignore
+        assert n == x, f"{n} | {x} - year: {year}"
+
+    for year in (2023, 2024):
+        c = 0
+        for month in range(1, 13):
+            n = calendar.monthrange(year, month)[1]
+            x = days_bf_month(year, month)  # type: ignore
+            assert x == c, f"{x} | {c} - year: {year} month: {month}"
+            c += n
+
+    for ordinal in range(1, 3_652_059):
+        ymd_n = _ord2ymd(ordinal)
+        ymd = ordinal_to_ymd(ordinal)  # type: ignore
+        ymd_x = (ymd.year, ymd.month, ymd.day)
+        assert ymd_n == ymd_x, f"{ymd_n} | {ymd_x} - ordinal: {ordinal}"
+
+    for us, hms_n in [
+        (0, (0, 0, 0, 0)),
+        (1, (0, 0, 0, 1)),
+        (1_000_000, (0, 0, 1, 0)),
+        (60_000_000, (0, 1, 0, 0)),
+        (3_600_000_000, (1, 0, 0, 0)),
+        (3_600_000_001, (1, 0, 0, 1)),
+        (86_400_000_000, (0, 0, 0, 0)),
+        (86_400_000_001, (0, 0, 0, 1)),
+    ]:
+        hms = microseconds_to_hms(us)  # type: ignore
+        x = (hms.hour, hms.minute, hms.second, hms.microsecond)
+        assert hms_n == x, f"{hms_n} | {x} - microseconds: {us}"
+
+    for idx, (frac, cmp) in enumerate(
+        [
+            (b".1xxxxx", 100000),
+            (b".01xxxx", 10000),
+            (b".001xxx", 1000),
+            (b".0001xx", 100),
+            (b".00001x", 10),
+            (b".000001", 1),
+        ]
+    ):
+        n = parse_us_fraction(frac, 1, idx + 2)  # type: ignore
+        assert n == cmp, f"{n} | {cmp} - frac: {frac}"
+
+    print("Pass Date & Time".ljust(80))
+
+    del calendar, _ord2ymd
