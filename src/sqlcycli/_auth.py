@@ -4,8 +4,8 @@
 
 # Cython imports
 import cython
-from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.cpython.bytes import PyBytes_FromStringAndSize as bytes_fr_chars_wlen  # type: ignore
 from cython.cimports.cpython.bytearray import PyByteArray_GET_SIZE as bytearray_len  # type: ignore
 from cython.cimports.cpython.bytearray import PyByteArray_AS_STRING as bytearray_to_chars  # type: ignore
@@ -82,7 +82,7 @@ class AuthPlugin:
             for name, plugin in plugins.items():
                 # . validate plugin name
                 if isinstance(name, str):
-                    name = name.encode("ascii")
+                    name = utils.encode_str(name, "ascii")
                 elif not isinstance(name, bytes):
                     raise errors.InvalidAuthPluginError(
                         "<'%s'>\nAuth plugin name '%s' must be type of <'str/bytes'>, "
@@ -91,8 +91,13 @@ class AuthPlugin:
                 # . validate plugin handler
                 if type(plugin) is not type:
                     raise errors.InvalidAuthPluginError(
-                        "<'%s'>\nAuth plugin handler '%s' must be <class 'type'>, instead of: %s"
-                        % (self.__class__.__name__, name.decode("ascii"), type(plugin))
+                        "<'%s'>\nAuth plugin handler '%s' "
+                        "must be <class 'type'>, instead of: %s"
+                        % (
+                            self.__class__.__name__,
+                            utils.decode_bytes_ascii(name),
+                            type(plugin),
+                        )
                     )
                 _plugins[name] = plugin
             self._mysql_native_password = _plugins.get(b"mysql_native_password")
