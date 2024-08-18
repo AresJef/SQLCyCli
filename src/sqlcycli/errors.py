@@ -222,23 +222,19 @@ class CharsetDuplicatedError(CharsetValueError):
 
 
 # Transcode Exceptions ----------------------------------------------------------------------------
-class TranscodeError(MySQLError):
+class TranscodeError(MySQLTypeError, MySQLValueError):
     """Base class for all exceptions raised by Transcode."""
 
 
-class TranscodeTypeError(TranscodeError, MySQLTypeError):
-    """Raised when a type is invalid."""
+class EncodeError(TranscodeError, NotSupportedError, UnicodeEncodeError):
+    """Raised when an encode error occurs."""
 
 
-class TranscodeValueError(TranscodeError, MySQLValueError):
-    """Raised when a value is invalid."""
-
-
-class EscapeTypeError(TranscodeTypeError, NotSupportedError):
+class EscapeError(TranscodeError, NotSupportedError):
     """Raised when an escape type is not supported."""
 
 
-class DecodeTypeError(TranscodeValueError, NotSupportedError):
+class DecodeError(TranscodeError, NotSupportedError):
     """Raised when a decode type is not supported."""
 
 
