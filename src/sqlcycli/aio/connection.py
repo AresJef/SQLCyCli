@@ -12,15 +12,15 @@ from cython.cimports.cpython.tuple import PyTuple_GET_SIZE as tuple_len  # type:
 from cython.cimports.cpython.tuple import PyTuple_GetSlice as tuple_slice  # type: ignore
 from cython.cimports.cpython.tuple import PyTuple_GetItem as tuple_getitem  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS  # type: ignore
 from cython.cimports.sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket  # type: ignore
-from cython.cimports.sqlcycli.transcode import escape, decode, decode_bytes, decode_bytes_utf8  # type: ignore
+from cython.cimports.sqlcycli.transcode import escape, decode  # type: ignore
 from cython.cimports.sqlcycli import connection as sync_conn, _auth, typeref, utils  # type: ignore
 
 # Python imports
@@ -417,7 +417,7 @@ class Cursor:
         """
         if self._executed_sql is None:
             return None
-        return decode_bytes(self._executed_sql, self._encoding_c)
+        return utils.decode_bytes(self._executed_sql, self._encoding_c)
 
     @property
     def field_count(self) -> int:
@@ -2022,19 +2022,19 @@ class BaseConnection:
         """The username to login as `<'str/None'>`."""
         if self._user is None:
             return None
-        return decode_bytes(self._user, self._encoding_c)
+        return utils.decode_bytes(self._user, self._encoding_c)
 
     @property
     def password(self) -> str:
         """The password for login authentication. `<'str'>`."""
-        return decode_bytes(self._password, "latin1")
+        return utils.decode_bytes_latin1(self._password)
 
     @property
     def database(self) -> str | None:
         """The default database to use by the connection. `<'str/None'>`."""
         if self._database is None:
             return None
-        return decode_bytes(self._database, self._encoding_c)
+        return utils.decode_bytes(self._database, self._encoding_c)
 
     @property
     def charset(self) -> str:
@@ -2049,7 +2049,7 @@ class BaseConnection:
     @property
     def encoding(self) -> str:
         """The 'encoding' of the connection `<'str'>`."""
-        return decode_bytes(self._encoding, "ascii")
+        return utils.decode_bytes_ascii(self._encoding)
 
     @property
     def connect_timeout(self) -> int:
@@ -2881,7 +2881,7 @@ class BaseConnection:
 
         # . server version
         loc: cython.Py_ssize_t = utils.find_null_term(data, 1)
-        self._server_info = decode_bytes(data[1:loc], "latin1")
+        self._server_info = utils.decode_bytes_latin1(data[1:loc])
         self._server_version_major = int(str_split(self._server_info, ".", 1)[0])
         i: cython.Py_ssize_t = loc + 1
 
@@ -2933,7 +2933,7 @@ class BaseConnection:
                 auth_plugin_name: bytes = data[i:length]
             else:
                 auth_plugin_name: bytes = data[i:loc]
-            self._server_auth_plugin_name = decode_bytes_utf8(auth_plugin_name)
+            self._server_auth_plugin_name = utils.decode_bytes_utf8(auth_plugin_name)
 
     async def _request_authentication(self) -> None:
         """(internal) [Handshake] Request authentication."""
@@ -3062,7 +3062,7 @@ class BaseConnection:
                         CR.CR_AUTH_PLUGIN_CANNOT_LOAD,
                         "Authentication plugin '%s' not loaded: "
                         "%r cannot be constructed with connection object."
-                        % (plugin_name.decode("ascii"), plugin_handler),
+                        % (utils.decode_bytes_ascii(plugin_name), plugin_handler),
                     ) from err
                 # . try with custom handler
                 try:
@@ -3074,7 +3074,7 @@ class BaseConnection:
                             CR.CR_AUTH_PLUGIN_CANNOT_LOAD,
                             "Authentication plugin '%s' not loaded: "
                             "%r missing 'authenticate()' method."
-                            % (plugin_name.decode("ascii"), plugin_handler),
+                            % (utils.decode_bytes_ascii(plugin_name), plugin_handler),
                         ) from err
         # Process auth
         if plugin_name == b"caching_sha2_password":
@@ -3105,7 +3105,7 @@ class BaseConnection:
                             CR.CR_AUTH_PLUGIN_CANNOT_LOAD,
                             "Authentication plugin '%s' not loaded: "
                             "%r missing 'prompt()' method."
-                            % (plugin_name.decode("ascii"), plugin_handler),
+                            % (utils.decode_bytes_ascii(plugin_name), plugin_handler),
                         ) from err
                     except TypeError as err:
                         raise errors.AuthenticationError(
@@ -3113,7 +3113,7 @@ class BaseConnection:
                             CR.CR_AUTH_PLUGIN_ERR,
                             "Authentication plugin '%s' didn't respond with string:"
                             "%r returns '%r' to prompt: %r"
-                            % ( plugin_name.decode("ascii"), 
+                            % ( utils.decode_bytes_ascii(plugin_name), 
                                 plugin_handler, resp, prompt ),
                             # fmt: on
                         ) from err
@@ -3121,7 +3121,7 @@ class BaseConnection:
                     raise errors.AuthenticationError(
                         CR.CR_AUTH_PLUGIN_CANNOT_LOAD,
                         "Authentication plugin '%s' not configured."
-                        % plugin_name.decode("ascii"),
+                        % utils.decode_bytes_ascii(plugin_name),
                     )
                 pkt = await self._read_packet()
                 pkt.check_error()
@@ -3132,7 +3132,7 @@ class BaseConnection:
             raise errors.AuthenticationError(
                 CR.CR_AUTH_PLUGIN_CANNOT_LOAD,
                 "Authentication plugin '%s' not configured"
-                % plugin_name.decode("ascii"),
+                % utils.decode_bytes_ascii(plugin_name),
             )
         # Auth: 'mysql_native_password', 'client_ed25519' & 'mysql_clear_password'.
         self._write_packet(data)
@@ -3614,7 +3614,7 @@ class Connection(BaseConnection):
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535) 
         self._user = utils.validate_arg_bytes(user, "user", encoding, sync_conn.DEFAULT_USER)
-        self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
+        self._password = utils.validate_arg_bytes(password, "password", b"latin1", "")
         self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
@@ -3652,7 +3652,7 @@ class Connection(BaseConnection):
         else:
             self._auth_plugin = None
         self._server_public_key = utils.validate_arg_bytes(
-            server_public_key, "server_public_key", "ascii", None
+            server_public_key, "server_public_key", b"ascii", None
         )
         # . decode
         self._use_decimal = bool(use_decimal)

@@ -16,7 +16,6 @@ from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
-from cython.cimports.sqlcycli.transcode import decode_bytes  # type: ignore
 from cython.cimports.sqlcycli import connection as sync_conn, utils  # type: ignore
 
 # Python imports
@@ -441,7 +440,7 @@ class Pool:
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
         self._user = utils.validate_arg_bytes(user, "user", encoding, sync_conn.DEFAULT_USER)
-        self._password = utils.validate_arg_bytes(password, "password", "latin1", "")
+        self._password = utils.validate_arg_bytes(password, "password", b"latin1", "")
         self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
@@ -479,7 +478,7 @@ class Pool:
         else:
             self._auth_plugin = None
         self._server_public_key = utils.validate_arg_bytes(
-            server_public_key, "server_public_key", "ascii", None
+            server_public_key, "server_public_key", b"ascii", None
         )
         # . decode
         self._use_decimal = bool(use_decimal)
@@ -572,19 +571,19 @@ class Pool:
         """The username to login as `<'str/None'>`."""
         if self._user is None:
             return None
-        return decode_bytes(self._user, self._charset._encoding_c)
+        return utils.decode_bytes(self._user, self._charset._encoding_c)
 
     @property
     def password(self) -> str:
         """The password for login authentication. `<'str'>`."""
-        return decode_bytes(self._password, "latin1")
+        return utils.decode_bytes_latin1(self._password)
 
     @property
     def database(self) -> str | None:
         """The default database to use by the connections. `<'str/None'>`."""
         if self._database is None:
             return None
-        return decode_bytes(self._database, self._charset._encoding_c)
+        return utils.decode_bytes(self._database, self._charset._encoding_c)
 
     @property
     def charset(self) -> str:
@@ -599,7 +598,7 @@ class Pool:
     @property
     def encoding(self) -> str:
         """The 'encoding' of the connections `<'str'>`."""
-        return decode_bytes(self._charset._encoding, "ascii")
+        return utils.decode_bytes_ascii(self._charset._encoding)
 
     @property
     def connect_timeout(self) -> int:
