@@ -541,18 +541,18 @@ class TestTranscode(TestCase):
         value = (-1.1, 0.0, np.inf)  # raise error for inf
         for dtype in (float, np.float32, np.float64):
             v1 = np.array(value, dtype=dtype)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", False, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", True, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", True, True)
             v1 = pd.Series(v1)  # pd.Series
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", False, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", True, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", True, True)
         # . 2-dimension: np.ndarray
         value = [(-1.1, 0.0), (1.1, 2.2)]
@@ -566,11 +566,11 @@ class TestTranscode(TestCase):
         value = [(-1.1, 0.0), (1.1, np.inf)]  # raise error for inf
         for dtype in (float, np.float32, np.float64):
             v2 = np.array(value, dtype=dtype)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v2, b"utf8", False, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v2, b"utf8", True, False)
-            with self.assertRaises(errors.EscapeTypeError):
+            with self.assertRaises(errors.EscapeError):
                 escape(v2, b"utf8", True, True)
 
         # Signed integer: 'i'
@@ -769,7 +769,7 @@ class TestTranscode(TestCase):
         # gb18030
         self.assertEqual(escape(val, b"gb18030"), cmp)
         # latin1
-        with self.assertRaises(errors.EscapeTypeError):
+        with self.assertRaises(errors.EscapeError):
             escape(val, b"latin1")
 
         self.log_ended(test)
@@ -793,9 +793,9 @@ class TestTranscode(TestCase):
             (1024, "1024"),
         ):
             self.assertEqual(escape(BIT(val), b"utf8"), cmp)
-        with self.assertRaises(errors.EscapeTypeError):
+        with self.assertRaises(errors.EscapeError):
             escape(BIT(-1), b"utf8")  # negative int
-        with self.assertRaises(errors.EscapeTypeError):
+        with self.assertRaises(errors.EscapeError):
             escape(BIT("apple"), b"utf8")  # not bytes or int
 
         # JSON
@@ -804,7 +804,7 @@ class TestTranscode(TestCase):
             ([1, 1.1, "foo"], "'[1,1.1,\\\"foo\\\"]'"),
         ):
             self.assertEqual(escape(JSON(val), b"utf8"), cmp)
-        with self.assertRaises(errors.EscapeTypeError):
+        with self.assertRaises(errors.EscapeError):
             escape(JSON(pd.Series([1, 2, 3])), b"utf8")
 
         self.log_ended(test)
@@ -4780,3 +4780,9 @@ if __name__ == "__main__":
     ]:
         tester: TestCase = test(HOST, PORT, USER, PSWD)
         tester.test_all()
+
+    from sqlcycli.utils import _test_utils
+    from sqlcycli.transcode import _test_transcode
+
+    _test_utils()
+    _test_transcode()
