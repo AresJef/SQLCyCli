@@ -1,44 +1,46 @@
 # cython: language_level=3
+
 from libc.string cimport strchr
 from cpython.bytes cimport PyBytes_FromStringAndSize
-from cpython.unicode cimport PyUnicode_AsEncodedString
+from cpython.bytes cimport PyBytes_Size as bytes_len
+from cpython.bytes cimport PyBytes_AsString as bytes_to_chars
+from cpython.unicode cimport PyUnicode_AsEncodedString, PyUnicode_Decode
+from cpython.unicode cimport PyUnicode_DecodeUTF8, PyUnicode_DecodeASCII, PyUnicode_DecodeLatin1
 from sqlcycli.charset cimport Charset
 
+# Constants
+cdef:
+    unsigned char NULL_COLUMN  # 251
+    unsigned char UNSIGNED_CHAR_COLUMN  # 251
+    unsigned char UNSIGNED_SHORT_COLUMN  # 252
+    unsigned char UNSIGNED_INT24_COLUMN  # 253
+    unsigned char UNSIGNED_INT64_COLUMN  # 254
+
 # Utils: string
-cdef inline object encode_str(object obj, char* encoding):
-    """Encode string to bytes using 'encoding' with
+cdef inline bytes encode_str(object obj, char* encoding):
+    """Encode string to bytes using the 'encoding' with
     'surrogateescape' error handling `<'bytes'>`."""
     return PyUnicode_AsEncodedString(obj, encoding, "surrogateescape")
 
-cdef inline bytes gen_length_encoded_integer(unsigned long long i):
-    """Generate 'Length Coded Integer' for MySQL `<'bytes'>."""
-    # https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-    cdef char buffer[9]
-    if i < 0xFB:  # 251 (1 byte)
-        buffer[0] = i & 0xFF
-        return PyBytes_FromStringAndSize(buffer, 1)
-    elif i < 65_536:  # 1 << 16 (2 bytes)
-        buffer[0] = 0xFC  # 252
-        buffer[1] = i & 0xFF
-        buffer[2] = (i >> 8) & 0xFF
-        return PyBytes_FromStringAndSize(buffer, 3)
-    elif i < 16_777_216: # 1 << 24 (3 bytes)
-        buffer[0] = 0xFD  # 253
-        buffer[1] = i & 0xFF
-        buffer[2] = (i >> 8) & 0xFF
-        buffer[3] = (i >> 16) & 0xFF
-        return PyBytes_FromStringAndSize(buffer, 4)
-    else: # 1 << 64 (8 bytes)
-        buffer[0] = 0xFE  # 254
-        buffer[1] = i & 0xFF
-        buffer[2] = (i >> 8) & 0xFF
-        buffer[3] = (i >> 16) & 0xFF
-        buffer[4] = (i >> 24) & 0xFF
-        buffer[5] = (i >> 32) & 0xFF
-        buffer[6] = (i >> 40) & 0xFF
-        buffer[7] = (i >> 48) & 0xFF
-        buffer[8] = (i >> 56) & 0xFF
-        return PyBytes_FromStringAndSize(buffer, 9)
+cdef inline str decode_bytes(object data, char* encoding):
+    """Decode bytes to string using the 'encoding' with
+    "surrogateescape" error handling `<'str'>`."""
+    return PyUnicode_Decode(bytes_to_chars(data), bytes_len(data), encoding, "surrogateescape")
+
+cdef inline str decode_bytes_utf8(object data):
+    """Decode bytes to string using 'utf-8' encoding with
+    'surrogateescape' error handling `<'str'>`."""
+    return PyUnicode_DecodeUTF8(bytes_to_chars(data), bytes_len(data), "surrogateescape")
+
+cdef inline str decode_bytes_ascii(object data):
+    """Decode bytes to string using 'ascii' encoding with
+    'surrogateescape' error handling `<'str'>`."""
+    return PyUnicode_DecodeASCII(bytes_to_chars(data), bytes_len(data), "surrogateescape")
+
+cdef inline str decode_bytes_latin1(object data):
+    """Decode bytes to string using 'latin1' encoding with
+    'surrogateescape' error handling `<'str'>`."""
+    return PyUnicode_DecodeLatin1(bytes_to_chars(data), bytes_len(data), "surrogateescape")
 
 cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
     """Find the next NULL-terminated string in the data `<'int'>`."""
@@ -52,7 +54,8 @@ cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
 cdef inline bytes pack_I24B(unsigned int i, unsigned char j):
     """Pack 'I[24bit]B' in little-endian order `<'bytes'>`.
     
-    Equivalent to 'struct.pack("<I[int24]B", i, j)'
+    Equivalent to:
+    >>> struct.pack("<I", i)[:3] + struct.pack("<B", b)
     """
     cdef char buffer[4]
     buffer[0] = i & 0xFF
@@ -64,7 +67,8 @@ cdef inline bytes pack_I24B(unsigned int i, unsigned char j):
 cdef inline bytes pack_IB(unsigned int i, unsigned char j):
     """Pack 'IB' in little-endian order `<'bytes'>`.
 
-    Equivalent to 'struct.pack("<IB", i, j)'
+    Equivalent to: 
+    >>> struct.pack("<IB", i, j)
     """
     cdef char buffer[5]
     buffer[0] = i & 0xFF
@@ -77,7 +81,8 @@ cdef inline bytes pack_IB(unsigned int i, unsigned char j):
 cdef inline bytes pack_IIB23s(unsigned int i, unsigned int j, unsigned char k):
     """Pack 'IIB23s' in little-endian order `<'bytes'>`.
 
-    Equivalent to 'struct.pack("<IIB23s", i, j, k, b"")'
+    Equivalent to: 
+    >>> struct.pack("<IIB23s", i, j, k, b"")
     """
     cdef char buffer[32]
     buffer[0] = i & 0xFF
@@ -93,22 +98,64 @@ cdef inline bytes pack_IIB23s(unsigned int i, unsigned int j, unsigned char k):
         buffer[i + 9] = 0
     return PyBytes_FromStringAndSize(buffer, 32)
 
+cdef inline bytes gen_length_encoded_integer(unsigned long long i):
+    """Generate 'Length Coded Integer' for MySQL `<'bytes'>."""
+    # https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
+    cdef char buffer[9]
+    if i < UNSIGNED_CHAR_COLUMN:  # 251
+        buffer[0] = i & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 1)
+    elif i < 65_536:  # 1 << 16
+        buffer[0] = UNSIGNED_SHORT_COLUMN  # 252
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 3)
+    elif i < 16_777_216: # 1 << 24
+        buffer[0] = UNSIGNED_INT24_COLUMN  # 253
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF
+        buffer[3] = (i >> 16) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 4)
+    else: # 1 << 64
+        buffer[0] = UNSIGNED_INT64_COLUMN  # 254
+        buffer[1] = i & 0xFF
+        buffer[2] = (i >> 8) & 0xFF
+        buffer[3] = (i >> 16) & 0xFF
+        buffer[4] = (i >> 24) & 0xFF
+        buffer[5] = (i >> 32) & 0xFF
+        buffer[6] = (i >> 40) & 0xFF
+        buffer[7] = (i >> 48) & 0xFF
+        buffer[8] = (i >> 56) & 0xFF
+        return PyBytes_FromStringAndSize(buffer, 9)
+
 # Utils: Pack unsigned integers
 cdef inline bytes pack_uint8(unsigned int value):
-    """Pack unsigned 8-bit integer in little-endian order `<'bytes'>`."""
+    """Pack unsigned 8-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<B", value)
+    """
     cdef char buffer[1]
     buffer[0] = value & 0xFF
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_uint16(unsigned int value):
-    """Pack unsigned 16-bit integer in little-endian order `<'bytes'>`."""
+    """Pack unsigned 16-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<H", value)
+    """
     cdef char buffer[2]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_uint24(unsigned int value):
-    """Pack unsigned 24-bit integer in little-endian order `<'bytes'>`."""
+    """Pack unsigned 24-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<I", value)[:3]
+    """
     cdef char buffer[3]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
@@ -116,7 +163,11 @@ cdef inline bytes pack_uint24(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_uint32(unsigned long long value):
-    """Pack unsigned 32-bit integer in little-endian order `<'bytes'>`."""
+    """Pack unsigned 32-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<I", value)
+    """
     cdef char buffer[4]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
@@ -125,7 +176,11 @@ cdef inline bytes pack_uint32(unsigned long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_uint64(unsigned long long value):
-    """Pack unsigned 64-bit integer in little-endian order `<'bytes'>`."""
+    """Pack unsigned 64-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<Q", value)
+    """
     cdef char buffer[8]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
@@ -197,20 +252,32 @@ cdef inline unsigned long long unpack_uint64(char* data, unsigned long long pos)
 
 # Utils: Pack signed integer
 cdef inline bytes pack_int8(int value):
-    """Pack signed 8-bit integer in little-endian order `<'bytes'>`."""
+    """Pack signed 8-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<b", value)
+    """
     cdef char buffer[1]
     buffer[0] = value & 0xFF
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_int16(int value):
-    """Pack signed 16-bit integer in little-endian order `<'bytes'>`."""
+    """Pack signed 16-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<h", value)
+    """
     cdef char buffer[2]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_int24(int value):
-    """Pack signed 24-bit integer in little-endian order `<'bytes'>`."""
+    """Pack signed 24-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<i", value)[:3]
+    """
     cdef char buffer[3]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
@@ -218,7 +285,11 @@ cdef inline bytes pack_int24(int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_int32(long long value):
-    """Pack signed 32-bit integer in little-endian order `<'bytes'>`."""
+    """Pack signed 32-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<i", value)
+    """
     cdef char buffer[4]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
@@ -227,7 +298,11 @@ cdef inline bytes pack_int32(long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_int64(long long value):
-    """Pack signed 64-bit integer in little-endian order `<'bytes'>`."""
+    """Pack signed 64-bit integer in little-endian order `<'bytes'>`.
+    
+    Equivalent to:
+    >>> struct.pack("<q", value)
+    """
     cdef char buffer[8]
     buffer[0] = value & 0xFF
     buffer[1] = (value >> 8) & 0xFF
