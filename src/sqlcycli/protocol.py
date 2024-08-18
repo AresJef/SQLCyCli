@@ -4,10 +4,9 @@
 
 # Cython imports
 import cython
-from cython.cimports.cpython.bytes import PyBytes_GET_SIZE as bytes_len  # type: ignore
-from cython.cimports.cpython.bytes import PyBytes_AS_STRING as bytes_to_chars  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ignore
+from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.sqlcycli import errors, utils  # type: ignore
-from cython.cimports.sqlcycli.transcode import decode_bytes  # type: ignore
 from cython.cimports.sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS  # type: ignore
 
 # Python imports
@@ -15,13 +14,6 @@ from sqlcycli import errors, utils
 from sqlcycli.constants import _FIELD_TYPE, _SERVER_STATUS
 
 __all__ = ["MysqlPacket", "FieldDescriptorPacket"]
-
-# Constants -----------------------------------------------------------------------------------
-NULL_COLUMN: cython.uchar = 251
-UNSIGNED_CHAR_COLUMN: cython.uchar = 251
-UNSIGNED_SHORT_COLUMN: cython.uchar = 252
-UNSIGNED_INT24_COLUMN: cython.uchar = 253
-UNSIGNED_INT64_COLUMN: cython.uchar = 254
 
 
 # MySQL Packet --------------------------------------------------------------------------------
@@ -173,16 +165,16 @@ class MysqlPacket:
         Length Coded Integer can be anywhere from 1 to 9
         bytes depending on the value of the first byte.
         """
-        code: cython.uint = self._read_uint8()
-        if code < UNSIGNED_CHAR_COLUMN:
+        code: cython.uchar = self._read_uint8()
+        if code < utils.UNSIGNED_CHAR_COLUMN:
             return code
-        if code == UNSIGNED_SHORT_COLUMN:
+        if code == utils.UNSIGNED_SHORT_COLUMN:
             return self._read_uint16()
-        if code == NULL_COLUMN:
+        if code == utils.NULL_COLUMN:
             return 0
-        if code == UNSIGNED_INT24_COLUMN:
+        if code == utils.UNSIGNED_INT24_COLUMN:
             return self._read_uint24()
-        if code == UNSIGNED_INT64_COLUMN:
+        if code == utils.UNSIGNED_INT64_COLUMN:
             return self._read_uint64()
         return 0
 
@@ -197,22 +189,22 @@ class MysqlPacket:
         bytes of binary string.
         (For example "cat" would be "3cat".)
         """
-        length: cython.uint = self._read_uint8()
-        if length < UNSIGNED_CHAR_COLUMN:
+        length: cython.uchar = self._read_uint8()
+        if length < utils.UNSIGNED_CHAR_COLUMN:
             return self.read(length)
-        if length == UNSIGNED_SHORT_COLUMN:
+        if length == utils.UNSIGNED_SHORT_COLUMN:
             return self.read(self._read_uint16())
-        if length == NULL_COLUMN:
+        if length == utils.NULL_COLUMN:
             return None
-        if length == UNSIGNED_INT24_COLUMN:
+        if length == utils.UNSIGNED_INT24_COLUMN:
             return self.read(self._read_uint24())
-        if length == UNSIGNED_INT64_COLUMN:
+        if length == utils.UNSIGNED_INT64_COLUMN:
             return self.read(self._read_uint64())
         return None
 
     @cython.cfunc
     @cython.inline(True)
-    def _read_uint8(self) -> cython.uint:
+    def _read_uint8(self) -> cython.uchar:
         """(cfunc) Read the 8-bit unsigned integer from the current packet
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
@@ -221,7 +213,7 @@ class MysqlPacket:
 
     @cython.cfunc
     @cython.inline(True)
-    def _read_uint16(self) -> cython.uint:
+    def _read_uint16(self) -> cython.ushort:
         """(cfunc) Read the 16-bit unsigned integer from the current packet
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
@@ -239,7 +231,7 @@ class MysqlPacket:
 
     @cython.cfunc
     @cython.inline(True)
-    def _read_uint32(self) -> cython.ulonglong:
+    def _read_uint32(self) -> cython.uint:
         """(cfunc) Read the 32-bit unsigned integer from the current packet
         cursor position and advance the cursor forward `<'int'>`."""
         pos: cython.ulonglong = self._pos
@@ -489,11 +481,11 @@ class FieldDescriptorPacket(MysqlPacket):
         # Parse Field Descriptor
         # fmt: off
         self._catalog = self.read_length_encoded_string()
-        self._db = decode_bytes(self.read_length_encoded_string(), self._encoding)
-        self._table = decode_bytes(self.read_length_encoded_string(), self._encoding)
-        self._table_org = decode_bytes(self.read_length_encoded_string(), self._encoding)
-        self._column = decode_bytes(self.read_length_encoded_string(), self._encoding)
-        self._column_org = decode_bytes(self.read_length_encoded_string(), self._encoding)
+        self._db = utils.decode_bytes(self.read_length_encoded_string(), self._encoding)
+        self._table = utils.decode_bytes(self.read_length_encoded_string(), self._encoding)
+        self._table_org = utils.decode_bytes(self.read_length_encoded_string(), self._encoding)
+        self._column = utils.decode_bytes(self.read_length_encoded_string(), self._encoding)
+        self._column_org = utils.decode_bytes(self.read_length_encoded_string(), self._encoding)
         # fmt: on
         self._pos += 1  # skip 1 (non-null)
         self._charsetnr = self._read_uint16()

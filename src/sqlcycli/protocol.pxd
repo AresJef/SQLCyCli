@@ -1,13 +1,5 @@
 # cython: language_level=3
 
-# Constants
-cdef:
-    unsigned char NULL_COLUMN
-    unsigned char UNSIGNED_CHAR_COLUMN
-    unsigned char UNSIGNED_SHORT_COLUMN
-    unsigned char UNSIGNED_INT24_COLUMN
-    unsigned char UNSIGNED_INT64_COLUMN
-
 # MySQL Packet
 cdef class MysqlPacket:
     cdef:
@@ -33,10 +25,10 @@ cdef class MysqlPacket:
     cdef inline bytes read_remains(self)
     cdef inline unsigned long long read_length_encoded_integer(self)
     cdef inline bytes read_length_encoded_string(self)
-    cdef inline unsigned int _read_uint8(self)
-    cdef inline unsigned int _read_uint16(self)
+    cdef inline unsigned char _read_uint8(self)
+    cdef inline unsigned short _read_uint16(self)
     cdef inline unsigned int _read_uint24(self)
-    cdef inline unsigned long long _read_uint32(self)
+    cdef inline unsigned int _read_uint32(self)
     cdef inline unsigned long long _read_uint64(self)
     # Read Packet
     cdef inline bint is_ok_packet(self) except -1
