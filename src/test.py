@@ -407,19 +407,22 @@ class TestTranscode(TestCase):
         self.log_ended(test)
 
     def test_escape_dict(self) -> None:
+        from collections import OrderedDict
         from sqlcycli.transcode import escape
 
         test = "ESCAPE DICT"
         self.log_start(test)
 
         # . flat
-        v1 = {"key1": "val1", "key2": 1, "key3": 1.1}
-        v1c1 = "('val1',1,1.1)"  # literal
-        v1c2 = ("'val1'", "1", "1.1")  # itemize
-        v1c3 = ["'val1'", "1", "1.1"]  # many
-        self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
-        self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
-        self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+        data = {"key1": "val1", "key2": 1, "key3": 1.1}
+        for v1 in [data, data.items(), OrderedDict(data)]:
+            v1c1 = "('val1',1,1.1)"  # literal
+            v1c2 = ("'val1'", "1", "1.1")  # itemize
+            v1c3 = ["'val1'", "1", "1.1"]  # many
+            self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
+            self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
+            self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+
         # . nested
         v2 = {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}
         v2c1 = "('val1',1,1.1),('val2',2,2.2)"  # literal
@@ -428,6 +431,22 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c3)
+        # . nested items()
+        vi = v2.items()
+        self.assertEqual(escape(vi, b"utf8", False, False), v2c1)
+        self.assertEqual(escape(vi, b"utf8", True, False), v2c2)
+        self.assertEqual(escape(vi, b"utf8", True, True), v2c3)
+        # . nested OrderedDict
+        vo = OrderedDict(v2)
+        self.assertEqual(escape(vo, b"utf8", False, False), v2c1)
+        self.assertEqual(escape(vo, b"utf8", True, False), v2c2)
+        self.assertEqual(escape(vo, b"utf8", True, True), v2c3)
+
+        # . empty
+        v3 = {}
+        self.assertEqual(escape(v3, b"utf8", False, False), "()")
+        self.assertEqual(escape(v3, b"utf8", True, False), ())
+        self.assertEqual(escape(v3, b"utf8", True, True), [])
 
         self.log_ended(test)
 
@@ -459,6 +478,12 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(val, b"utf8", False, False), v2c1)
             self.assertEqual(escape(val, b"utf8", True, False), v2c2)
             self.assertEqual(escape(val, b"utf8", True, True), v2c3)
+        # . empty
+        for dtype in (list, tuple):
+            v3 = dtype([])
+            self.assertEqual(escape(v3, b"utf8", False, False), "()")
+            self.assertEqual(escape(v3, b"utf8", True, False), ())
+            self.assertEqual(escape(v3, b"utf8", True, True), [])
 
         # Set & Frozenset
         # . flat
@@ -481,6 +506,12 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(val, b"utf8", False, False), cmp1)
             self.assertEqual(escape(val, b"utf8", True, False), cmp2)
             self.assertEqual(escape(val, b"utf8", True, True), cmp3)
+        # . empty
+        for dtype in (set, frozenset):
+            v3 = dtype([])
+            self.assertEqual(escape(v3, b"utf8", False, False), "()")
+            self.assertEqual(escape(v3, b"utf8", True, False), ())
+            self.assertEqual(escape(v3, b"utf8", True, True), [])
 
         # Sequence (dict_values)
         # . flat
@@ -493,6 +524,11 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c3)
+        # . empty
+        v3 = {}.values()
+        self.assertEqual(escape(v3, b"utf8", False, False), "()")
+        self.assertEqual(escape(v3, b"utf8", True, False), ())
+        self.assertEqual(escape(v3, b"utf8", True, True), [])
 
         self.log_ended(test)
 
@@ -502,8 +538,8 @@ class TestTranscode(TestCase):
         test = "ESCAPE NDARRAY/SERIES"
         self.log_start(test)
 
-        # Object: 'O'
-        # . 1-dimension: np.ndarray
+        # Object: 'O' ---------------------------------------------------------------
+        # . 1-dimensional
         v1 = np.array([1, 1.23, "abc"], dtype="O")
         v1c1 = "(1,1.23,'abc')"
         v1c2 = ("1", "1.23", "'abc'")
@@ -511,20 +547,31 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        v1 = pd.Series(v1)  # pd.Series
+        # . pd.Series
+        v1 = pd.Series(v1)
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype="O"), pd.Series([], dtype="O")]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         v2 = np.array([[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O")
         v2c1 = "(1,1.23,'abc'),(2,4.56,'def')"
         v2c2 = [("1", "1.23", "'abc'"), ("2", "4.56", "'def'")]
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype="O")
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Float: 'f'
-        # . 1-dimension: np.ndarray
+        # Float: 'f' ----------------------------------------------------------------
+        # . 1-dimensional
         value = (-1.1, 0.0, 1.1)
         v1c1 = "(-1.1,0.0,1.1)"
         v1c2 = ("-1.1", "0.0", "1.1")
@@ -534,10 +581,12 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-            v1 = pd.Series(v1)  # pd.Series
+            # . pd.Series
+            v1 = pd.Series(v1)
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+        # . catch inf error
         value = (-1.1, 0.0, np.inf)  # raise error for inf
         for dtype in (float, np.float32, np.float64):
             v1 = np.array(value, dtype=dtype)
@@ -554,7 +603,12 @@ class TestTranscode(TestCase):
                 escape(v1, b"utf8", True, False)
             with self.assertRaises(errors.EscapeError):
                 escape(v1, b"utf8", True, True)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype=np.float64), pd.Series([], dtype=np.float64)]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         value = [(-1.1, 0.0), (1.1, 2.2)]
         v2c1 = "(-1.1,0.0),(1.1,2.2)"
         v2c2 = [("-1.1", "0.0"), ("1.1", "2.2")]
@@ -563,6 +617,7 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
             self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
             self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . catch inf error
         value = [(-1.1, 0.0), (1.1, np.inf)]  # raise error for inf
         for dtype in (float, np.float32, np.float64):
             v2 = np.array(value, dtype=dtype)
@@ -572,9 +627,14 @@ class TestTranscode(TestCase):
                 escape(v2, b"utf8", True, False)
             with self.assertRaises(errors.EscapeError):
                 escape(v2, b"utf8", True, True)
+        # . empty
+        value = np.array([[], []], dtype=np.float64)
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Signed integer: 'i'
-        # . 1-dimension: np.ndarray
+        # Signed integer: 'i' -------------------------------------------------------
+        # . 1-dimensional
         value = (-1, 0, 1)
         v1c1 = "(-1,0,1)"
         v1c2 = ("-1", "0", "1")
@@ -584,11 +644,17 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+            # . pd.Series
             v1 = pd.Series(v1)
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype=np.int64), pd.Series([], dtype=np.int64)]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         value = [(-1, 0), (1, 2)]
         v2c1 = "(-1,0),(1,2)"
         v2c2 = [("-1", "0"), ("1", "2")]
@@ -597,9 +663,14 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
             self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
             self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype=np.int64)
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Unsigned Integer: 'u'
-        # . 1-dimension: np.ndarray
+        # Unsigned Integer: 'u' -----------------------------------------------------
+        # . 1-dimensional
         value = (0, 5, 10)
         v1c1 = "(0,5,10)"
         v1c2 = ("0", "5", "10")
@@ -609,11 +680,17 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-            v1 = pd.Series(v1)  # pd.Series
+            # pd.Series
+            v1 = pd.Series(v1)
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype=np.uint64), pd.Series([], dtype=np.uint64)]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         value = [(0, 5), (10, 15)]
         v2c1 = "(0,5),(10,15)"
         v2c2 = [("0", "5"), ("10", "15")]
@@ -622,9 +699,14 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
             self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
             self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype=np.uint64)
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Bool: 'b'
-        # . 1-dimension: np.ndarray
+        # Bool: 'b' -----------------------------------------------------------------
+        # . 1-dimensional
         value = (True, False, True)
         v1c1 = "(1,0,1)"
         v1c2 = ("1", "0", "1")
@@ -634,11 +716,17 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-            v1 = pd.Series(v1)  # pd.Series
+            # pd.Series
+            v1 = pd.Series(v1)
             self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
             self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
             self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype=np.bool_), pd.Series([], dtype=np.bool_)]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         value = [(True, False), (False, True)]
         v2c1 = "(1,0),(0,1)"
         v2c2 = [("1", "0"), ("0", "1")]
@@ -647,9 +735,14 @@ class TestTranscode(TestCase):
             self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
             self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
             self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype=np.bool_)
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Datetime64: 'M'
-        # . 1-dimension: np.ndarray
+        # Datetime64: 'M' -----------------------------------------------------------
+        # . 1-dimensional
         # fmt: off
         v1 = np.array([1, 2, 3], dtype="datetime64[s]")
         v1c1 = "('1970-01-01 00:00:01','1970-01-01 00:00:02','1970-01-01 00:00:03')"
@@ -659,11 +752,20 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        v1 = pd.Series(v1)  # pd.Series
+        # pd.Series
+        v1 = pd.Series(v1)
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [
+            np.array([], dtype="datetime64[ns]"),
+            pd.Series([], dtype="datetime64[ns]"),
+        ]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         v2 = np.array([[1, 2], [3, 4]], dtype="datetime64[s]")
         v2c1 = "('1970-01-01 00:00:01','1970-01-01 00:00:02'),('1970-01-01 00:00:03','1970-01-01 00:00:04')"
         v2c2 = [
@@ -673,9 +775,27 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype="datetime64[ns]")
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Timedelta64: 'm'
-        # . 1-dimension: np.ndarray
+        # pd.DatetimeIndex: 'M' -----------------------------------------------------
+        v1 = pd.DatetimeIndex(
+            ["1970-01-01 00:00:01", "1970-01-01 00:00:02", "1970-01-01 00:00:03"]
+        )
+        self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
+        self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
+        self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+        # . empty
+        v1 = pd.DatetimeIndex([])
+        self.assertEqual(escape(v1, b"utf8", False, False), "()")
+        self.assertEqual(escape(v1, b"utf8", True, False), ())
+        self.assertEqual(escape(v1, b"utf8", True, True), [])
+
+        # Timedelta64: 'm' ----------------------------------------------------------
+        # . 1-dimensional
         v1 = np.array([-1, 0, 1], dtype="timedelta64[s]")
         v1c1 = "('-00:00:01','00:00:00','00:00:01')"
         v1c2 = ("'-00:00:01'", "'00:00:00'", "'00:00:01'")
@@ -683,20 +803,45 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        v1 = pd.Series(v1)  # pd.Series
+        # pd.Series
+        v1 = pd.Series(v1)
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [
+            np.array([], dtype="timedelta64[ns]"),
+            pd.Series([], dtype="timedelta64[ns]"),
+        ]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         v2 = np.array([[-1, 0], [1, 2]], dtype="timedelta64[s]")
         v2c1 = "('-00:00:01','00:00:00'),('00:00:01','00:00:02')"
         v2c2 = [("'-00:00:01'", "'00:00:00'"), ("'00:00:01'", "'00:00:02'")]
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype="timedelta64[ns]")
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Bytes string: 'S'
-        # . 1-dimension: np.ndarray
+        # pd.TimedeltaIndex: 'm' ----------------------------------------------------
+        v1 = pd.TimedeltaIndex(["-00:00:01", "00:00:00", "00:00:01"])
+        self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
+        self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
+        self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
+
+        v1 = pd.TimedeltaIndex([])
+        self.assertEqual(escape(v1, b"utf8", False, False), "()")
+        self.assertEqual(escape(v1, b"utf8", True, False), ())
+        self.assertEqual(escape(v1, b"utf8", True, True), [])
+
+        # Bytes string: 'S' ---------------------------------------------------------
+        # . 1-dimensional
         v1 = np.array([1, 2, 3], dtype="S")
         v1c1 = "(_binary'1',_binary'2',_binary'3')"
         v1c2 = ("_binary'1'", "_binary'2'", "_binary'3'")
@@ -704,20 +849,31 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        v1 = pd.Series(v1)  # pd.Series
+        # pd.Series
+        v1 = pd.Series(v1)
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype="S"), pd.Series([], dtype="S")]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         v2 = np.array([[1, 2], [3, 4]], dtype="S")
         v2c1 = "(_binary'1',_binary'2'),(_binary'3',_binary'4')"
         v2c2 = [("_binary'1'", "_binary'2'"), ("_binary'3'", "_binary'4'")]
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype="S")
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
-        # Unicode string: 'U'
-        # . 1-dimension: np.ndarray
+        # Unicode string: 'U' -------------------------------------------------------
+        # . 1-dimensional
         v1 = np.array([1, 2, 3], dtype="U")
         v1c1 = "('1','2','3')"
         v1c2 = ("'1'", "'2'", "'3'")
@@ -725,17 +881,28 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        v1 = pd.Series(v1)  # pd.Series
+        # pd.Series
+        v1 = pd.Series(v1)
         self.assertEqual(escape(v1, b"utf8", False, False), v1c1)
         self.assertEqual(escape(v1, b"utf8", True, False), v1c2)
         self.assertEqual(escape(v1, b"utf8", True, True), v1c3)
-        # . 2-dimension: np.ndarray
+        # . empty
+        for value in [np.array([], dtype="U"), pd.Series([], dtype="U")]:
+            self.assertEqual(escape(value, b"utf8", False, False), "()")
+            self.assertEqual(escape(value, b"utf8", True, False), ())
+            self.assertEqual(escape(value, b"utf8", True, True), [])
+        # . 2-dimensional
         v2 = np.array([["1", "2"], ["3", "4"]], dtype="U")
         v2c1 = "('1','2'),('3','4')"
         v2c2 = [("'1'", "'2'"), ("'3'", "'4'")]
         self.assertEqual(escape(v2, b"utf8", False, False), v2c1)
         self.assertEqual(escape(v2, b"utf8", True, False), v2c2)
         self.assertEqual(escape(v2, b"utf8", True, True), v2c2)
+        # . empty
+        value = np.array([[], []], dtype="U")
+        self.assertEqual(escape(value, b"utf8", False, False), "()")
+        self.assertEqual(escape(value, b"utf8", True, False), [])
+        self.assertEqual(escape(value, b"utf8", True, True), [])
 
         self.log_ended(test)
 
@@ -751,6 +918,11 @@ class TestTranscode(TestCase):
         self.assertEqual(escape(val, b"utf8", False, False), cmp1)
         self.assertEqual(escape(val, b"utf8", True, False), cmp2)
         self.assertEqual(escape(val, b"utf8", True, True), cmp2)
+        # . empty
+        val = pd.DataFrame()
+        self.assertEqual(escape(val, b"utf8", False, False), "()")
+        self.assertEqual(escape(val, b"utf8", True, True), [])
+        self.assertEqual(escape(val, b"utf8", True, True), [])
 
         self.log_ended(test)
 
@@ -3319,6 +3491,15 @@ class TestCursor(TestCase):
                 )
                 cur.execute(f"select i from {self.table}")
                 self.assertEqual(cur.fetchall(), tuple((i,) for i in range(10)))
+                self.delete(conn)
+
+                # . insert many [above MAX_STATEMENT_LENGTH]
+                size = 200_000
+                cur.executemany(
+                    f"insert into {self.table} (i) values (%s)", range(size)
+                )
+                cur.execute(f"select i from {self.table}")
+                self.assertEqual(cur.fetchall(), tuple((i,) for i in range(size)))
                 self.delete(conn)
 
                 # . insert many
