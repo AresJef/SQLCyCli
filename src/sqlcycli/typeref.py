@@ -39,8 +39,8 @@ RECORD: type[np.record] = np.record
 # . pandas types
 SERIES: type[Series] = Series
 DATAFRAME: type[DataFrame] = DataFrame
-TIMESTAMP: type[Timestamp] = Timestamp
-TIMEDELTA: type[Timedelta] = Timedelta
+PD_TIMESTAMP: type[Timestamp] = Timestamp
+PD_TIMEDELTA: type[Timedelta] = Timedelta
 DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTAINDEX: type[TimedeltaIndex] = TimedeltaIndex
 # . cytimes types
@@ -54,4 +54,3 @@ except ImportError:
     CYTIMES_AVAILABLE: cython.bint = False
     PYDT: type[pydt] = None
     PDDT: type[pydt] = None
-

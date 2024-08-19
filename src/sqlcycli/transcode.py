@@ -1369,10 +1369,10 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
 
     # Date&Time Types
     # . <'pandas.Timestamp'>
-    if dtype is typeref.TIMESTAMP:
+    if dtype is typeref.PD_TIMESTAMP:
         return _escape_datetime(data)
     # . <'pandas.Timedelta'>`
-    if dtype is typeref.TIMEDELTA:
+    if dtype is typeref.PD_TIMEDELTA:
         return _escape_timedelta(data)
     # . <'numpy.datetime64'>
     if dtype is typeref.DATETIME64:
@@ -2442,10 +2442,10 @@ def _escape_item_uncommon(
 
     # Date&Time Types
     # . <'pandas.Timestamp'>
-    if dtype is typeref.TIMESTAMP:
+    if dtype is typeref.PD_TIMESTAMP:
         return _escape_datetime(data)
     # . <'pandas.Timedelta'>`
-    if dtype is typeref.TIMEDELTA:
+    if dtype is typeref.PD_TIMEDELTA:
         return _escape_timedelta(data)
     # . <'numpy.datetime64'>
     if dtype is typeref.DATETIME64:
@@ -2979,7 +2979,7 @@ def decode(
     :param use_decimal `<'bool'>`: Whether to use <'Decimal'> to represent DECIMAL column, `False` use <'float'>.
     :param decode_bit `<'bool'>`: Whether to decode BIT column to integer, `False` keep as original <'bytes'>.
     :param decode_json `<'bool'>`: Whether to deserialize JSON column, `False` keep as original JSON <'str'>.
-    :raise `<'DecodeError'>`: When encountering unknown 'field_type'.    
+    :raise `<'DecodeError'>`: When encountering unknown 'field_type'.
     """
     # Char / Binary
     if field_type in (

@@ -29,8 +29,8 @@ cdef:
     # . pandas types
     object SERIES
     object DATAFRAME
-    object TIMESTAMP
-    object TIMEDELTA
+    object PD_TIMESTAMP
+    object PD_TIMEDELTA
     object DATETIMEINDEX
     object TIMEDELTAINDEX
     # . cytimes types
