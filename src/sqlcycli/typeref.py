@@ -16,6 +16,7 @@ from pandas import Timedelta, TimedeltaIndex
 NONE: type = type(None)
 DICT_KEYS: type = type(dict().keys())
 DICT_VALUES: type = type(dict().values())
+DICT_ITEMS: type = type(dict().items())
 DECIMAL: type[Decimal] = Decimal
 STRUCT_TIME: type[struct_time] = struct_time
 # . numpy types

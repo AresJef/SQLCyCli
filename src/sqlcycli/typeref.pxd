@@ -6,6 +6,7 @@ cdef:
     object NONE
     object DICT_KEYS
     object DICT_VALUES
+    object DICT_ITEMS
     object DECIMAL
     object STRUCT_TIME
     # . numpy types
