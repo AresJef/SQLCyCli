@@ -7,6 +7,7 @@ from __future__ import annotations
 import cython
 from cython.cimports.cpython.time import time as unix_time  # type: ignore
 from cython.cimports.libc.limits import UINT_MAX, ULLONG_MAX  # type: ignore
+from cython.cimports.cpython.list import PyList_GET_SIZE as list_len  # type: ignore
 from cython.cimports.cpython.list import PyList_AsTuple as list_to_tuple  # type: ignore
 from cython.cimports.cpython.tuple import PyTuple_GET_SIZE as tuple_len  # type: ignore
 from cython.cimports.cpython.tuple import PyTuple_GetSlice as tuple_slice  # type: ignore
@@ -686,54 +687,58 @@ class Cursor:
             return self._query_str(self._format(sql, args))
 
         # Multi-rows query
-        # The escaped 'args' now on can only be a <'list[str/tuple]'>.
+        # The escaped 'args' now on can only be a <'list'>.
+        # If the list is empty, execute the query directly.
+        if list_len(args) == 0:
+            return self._query_str(self._format(sql, ()))
+
+        # Bulk INSERT/REPLACE `NOT` matched
         rows: cython.ulonglong = 0
         m = INSERT_VALUES_RE.match(sql)
-        # . bulk INSERT/REPLACE not matched: execute row by row
         if m is None:
+            # . execute row by row
             for arg in args:
                 rows += self._query_str(self._format(sql, arg))
             self._affected_rows = rows
             return rows
-        # . bulk INSERT/REPLACE: execute rows under max length
+
+        # Bulk INSERT/REPLACE match
         self._verify_connected()
         conn: BaseConnection = self._conn
         # . split query
-        cmp: tuple = m.groups()
-        pfix: str
+        gps: tuple = m.groups()
         values: str
-        sfix: str
-        pfix, values, sfix = cmp
-        # . query prefix
-        pfix = self._format(pfix, ())
-        prefix: bytes = conn.encode_sql(pfix)  # INSERT INTO ... VALUES
-        # . query values
-        values = values.rstrip()  # (%s, %s, ...)
-        # . query suffix
-        if sfix is not None:
-            suffix: bytes = conn.encode_sql(sfix)  # AS ... ON DUPLICATE ...
-        else:
-            suffix: bytes = b""
-        # . execute query
+        pfix, values, sfix = gps
+        # . query prefix INSERT INTO ... VALUES
+        prefix: bytes = conn.encode_sql(self._format(pfix, ()))
+        # . query values: (%s, %s, ...)
+        values = values.rstrip()
+        # . query suffix: AS ... ON DUPLICATE ...
+        suffix: bytes = b"" if sfix is None else conn.encode_sql(sfix)
+        # . prepare statement
         args_iter = iter(args)
-        val: bytes = conn.encode_sql(self._format(values, next(args_iter)))
-        val_len: cython.uint = bytes_len(val)
-        stmt: bytearray = bytearray(prefix)
-        stmt += val
+        vals: bytes = conn.encode_sql(self._format(values, next(args_iter)))
+        stmt: list[bytes] = [prefix, vals]
         fix_len: cython.uint = bytes_len(prefix) + bytes_len(suffix)
+        val_len: cython.uint = bytes_len(vals)
         sql_len: cython.uint = fix_len + val_len
         for arg in args_iter:
-            val = conn.encode_sql(self._format(values, arg))
-            val_len = bytes_len(val)
-            sql_len += val_len + 1
+            vals = conn.encode_sql(self._format(values, arg))
+            val_len = bytes_len(vals)
+            sql_len += 1 + val_len
             if sql_len <= MAX_STATEMENT_LENGTH:
-                stmt += b","
+                stmt.append(b",")
+                stmt.append(vals)
             else:
-                rows += self._query_bytes(bytes(stmt + suffix))
-                stmt = bytearray(prefix)
+                # - execute within limit
+                stmt.append(suffix)
+                rows += self._query_bytes(b"".join(stmt))  
+                # - reset stmt & sql_len
+                stmt = [prefix, vals]
                 sql_len = fix_len + val_len
-            stmt += val
-        rows += self._query_bytes(bytes(stmt + suffix))
+        # . execute
+        stmt.append(suffix)
+        rows += self._query_bytes(b"".join(stmt)) 
         self._affected_rows = rows
         return rows
 
@@ -3515,7 +3520,7 @@ class BaseConnection:
         :raise `<'InternalError'>`: If the packet sequence number is wrong.
         """
         # Read buffer data
-        buffer: bytearray = bytearray()
+        buffer: list[bytes] = []
         while True:
             data: bytes = self._read_bytes(4)
             packet_header: cython.pchar = bytes_to_chars(data)
@@ -3538,13 +3543,13 @@ class BaseConnection:
                     raise errors.InternalError(0, msg)
             self._next_seq_id = (self._next_seq_id + 1) % 256
             recv_data: bytes = self._read_bytes(bytes_to_read)
-            buffer += recv_data
+            buffer.append(recv_data)
             # https://dev.mysql.com/doc/internals/en/sending-more-than-16mbyte.html
             if bytes_to_read < MAX_PACKET_LENGTH:
                 break
 
         # Return buffer
-        return bytes(buffer)
+        return b"".join(buffer)
 
     @cython.cfunc
     @cython.inline(True)
