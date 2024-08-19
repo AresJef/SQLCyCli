@@ -229,10 +229,6 @@ def _escape_bool(data: object) -> str:
 def _escape_int(data: object) -> str:
     """(cfunc) Escape integer 'data' to literal `<'str'>.
 
-    Since this function simply calls Python built-in `str()`,
-    all actual integer escapes are written as 'str(data)' inline
-    (with '# _escape_int' comment) for optimal performance.
-
     ### Example:
     >>> _escape_int(123)
     >>> "123"  # str
@@ -275,11 +271,6 @@ def _escape_str(data: object, encoding: cython.pchar) -> str:
 @cython.inline(True)
 def _escape_none(_) -> str:
     """(cfunc) Escape None 'data' to literal `<'str'>`.
-
-    Since this function simply returns 'NULL', all
-    actual None escapes return 'NULL' directly inline
-    (with '# _escape_none' comment) for optimal
-    performance.
 
     ### Example:
     >>> _escape_none(None)
@@ -494,10 +485,6 @@ def _escape_memoryview(data: memoryview) -> str:
 def _escape_decimal(data: object) -> str:
     """(cfunc) Escape decimal 'data' to literal `<'str'>`.
 
-    Since this function simply calls Python built-in `str()`,
-    all actual decimal escapes are written as 'str(data)' inline
-    (with '# _escape_decimal' comment) for optimal performance.
-
     ### Example:
     >>> _escape_decimal(decimal.Decimal("123.456"))
     >>> "123.456"  # str
@@ -532,12 +519,12 @@ def _escape_bit(data: BIT) -> str:
         # . validate int & escape
         try:
             i_val: cython.ulonglong = int(value)
-            return str(i_val)  # _escape_int
+            return _escape_int(i_val)
         except Exception as err:
             raise ValueError("Invalid BIT value %r %s." % (value, type(value))) from err
 
     # . decode to int & esacpe (raw bytes)
-    return str(_decode_bit(b_val, True))  # _escape_int
+    return _escape_int(_decode_bit(b_val, True))
 
 
 @cython.cfunc
@@ -662,7 +649,7 @@ def _escape_range(data: object) -> str:
     >>> _escape_range(range(1, 4))
     >>> "(1,2,3)"  # str
     """
-    return "(" + ",".join([str(i) for i in data]) + ")"  # _escape_int
+    return "(" + ",".join([_escape_int(i) for i in data]) + ")"
 
 
 # . Mapping types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1248,10 +1235,10 @@ def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
     """
     # Validate shape
     shape: tuple = data.shape
-    width: cython.Py_ssize_t = shape[1]
+    width: cython.Py_ssize_t = cython.cast(object, tuple_getitem(shape, 1))
     if width == 0:
         return "()"  # exit
-    size: cython.Py_ssize_t = shape[0]
+    size: cython.Py_ssize_t = cython.cast(object, tuple_getitem(shape, 0))
     if size == 0:
         return "()"  # exit
     # Escape DataFrame
@@ -1283,7 +1270,7 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
         return _escape_str(data, encoding)
     # . <'int'>
     if dtype is int:
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'float'>
     if dtype is float:
         return _escape_float(data)
@@ -1292,7 +1279,7 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
         return _escape_bool(data)
     # . <None>
     if dtype is typeref.NONE:
-        return "NULL"  # _escape_none
+        return _escape_none(data)
 
     # Date&Time Types
     # . <'datetime.datetime'>
@@ -1311,7 +1298,7 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
     # Numeric Types
     # . <'decimal.Decimal'>
     if dtype is typeref.DECIMAL:
-        return str(data)  # _escape_decimal
+        return _escape_decimal(data)
 
     # Bytes Types
     # . <'bytes'>
@@ -1354,7 +1341,7 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
         or dtype is typeref.INT16
         or dtype is typeref.INT8
     ):
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'numpy.uint'>
     if (
         dtype is typeref.UINT64
@@ -1362,7 +1349,7 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
         or dtype is typeref.UINT16
         or dtype is typeref.UINT8
     ):
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'numpy.bool_'>
     if dtype is typeref.BOOL_:
         return _escape_bool(data)
@@ -1411,6 +1398,11 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
         return _escape_sequence(data, encoding)
 
+    # Mapping Types
+    # . <'dict_items'>
+    if dtype is typeref.DICT_ITEMS:
+        return _escape_dict(dict(data), encoding)
+
     # NumPy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
@@ -1458,16 +1450,16 @@ def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
     # Basic Types
     # . subclass of <'str'>
     if isinstance(data, str):
-        return _escape_str(data, encoding)
+        return _escape_str(str(data), encoding)
     # . subclass of <'int'>
     if isinstance(data, int):
-        return str(data)  # _escape_int
+        return _escape_int(int(data))
     # . subclass of <'float'>
     if isinstance(data, float):
-        return _escape_float(data)
+        return _escape_float(float(data))
     # . subclass of <'bool'>
     if isinstance(data, bool):
-        return _escape_bool(data)
+        return _escape_bool(bool(data))
 
     # Date&Time Types
     # . subclass of <'datetime.datetime'>
@@ -1483,37 +1475,24 @@ def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
     if isinstance(data, datetime.timedelta):
         return _escape_timedelta(data)
 
-    # Numeric Types
-    # . subclass of <'decimal.Decimal'>
-    if isinstance(data, typeref.DECIMAL):
-        return str(data)  # _escape_decimal
-
-    # Bytes Types
-    # . subclass of <'bytes'>
-    if isinstance(data, bytes):
-        return _escape_bytes(data)
-    # . subclass of <'bytearray'>
-    if isinstance(data, bytearray):
-        return _escape_bytearray(data)
-
     # Sequence Types
     # . subclass of <'tuple'>
     if isinstance(data, tuple):
-        return _escape_tuple(data, encoding)
+        return _escape_tuple(tuple(data), encoding)
     # . subclass of <'list'>
     if isinstance(data, list):
-        return _escape_list(data, encoding)
+        return _escape_list(list(data), encoding)
     # . subclass of <'set'>
     if isinstance(data, set):
-        return _escape_set(data, encoding)
+        return _escape_set(set(data), encoding)
     # . subclass of <'frozenset'>
     if isinstance(data, frozenset):
-        return _escape_frozenset(data, encoding)
+        return _escape_frozenset(frozenset(data), encoding)
 
     # Mapping Types
     # . subclass of <'dict'>
     if isinstance(data, dict):
-        return _escape_dict(data, encoding)
+        return _escape_dict(dict(data), encoding)
 
     # Invalid Data Type
     raise TypeError("Unsupported 'data' type %s." % dtype)
@@ -1715,7 +1694,7 @@ def _escape_item_range(data: object, many: cython.bint) -> object:
     >>> _escape_item_range(range(1, 4), True)
     >>> ["1", "2", "3"]  # list[str]
     """
-    l = [str(i) for i in data]  # _escape_int
+    l = [_escape_int(i) for i in data]
     return list_to_tuple(l) if not many else l
 
 
@@ -1846,7 +1825,7 @@ def _escape_item_ndarray_object(
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         if not many:
             # fmt: off
@@ -1908,7 +1887,7 @@ def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
@@ -1958,7 +1937,7 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . check if value is finite
         if not is_arr_float_finite_1d(arr, s_i):  # type: ignore
             raise ValueError("Float value 'nan' & 'inf' is not supported.")
@@ -2012,7 +1991,7 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         if not many:
             return list_to_tuple(["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(s_i)])  # type: ignore
@@ -2068,7 +2047,7 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         res = translate_str(res, DT64_JSON_TABLE)  # type: ignore
@@ -2118,7 +2097,7 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
         arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
@@ -2179,7 +2158,7 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         if not many:
             return list_to_tuple([_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)])  # type: ignore
@@ -2233,7 +2212,7 @@ def _escape_item_ndarray_unicode(
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return ()  # exit
+            return () if not many else []  # exit
         # . escape items to literals
         # fmt: off
         if not many:
@@ -2309,12 +2288,12 @@ def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
     """
     # Validate shape
     shape: tuple = data.shape
-    width: cython.Py_ssize_t = shape[1]
+    width: cython.Py_ssize_t = cython.cast(object, tuple_getitem(shape, 1))
     if width == 0:
-        return ()  # exit
-    size: cython.Py_ssize_t = shape[0]
+        return []  # exit
+    size: cython.Py_ssize_t = cython.cast(object, tuple_getitem(shape, 0))
     if size == 0:
-        return ()  # exit
+        return []  # exit
     # Escape DataFrame
     # fmt: off
     cols = [
@@ -2350,7 +2329,7 @@ def _escape_item_common(
         return _escape_str(data, encoding)
     # . <'int'>
     if dtype is int:
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'float'>
     if dtype is float:
         return _escape_float(data)
@@ -2359,7 +2338,7 @@ def _escape_item_common(
         return _escape_bool(data)
     # . <None>
     if dtype is typeref.NONE:
-        return "NULL"  # _escape_none
+        return _escape_none(data)
 
     # Date&Time Types
     # . <'datetime.datetime'>
@@ -2378,7 +2357,7 @@ def _escape_item_common(
     # Numeric Types
     # . <'decimal.Decimal'>
     if dtype is typeref.DECIMAL:
-        return str(data)  # _escape_decimal
+        return _escape_decimal(data)
 
     # Bytes Types
     # . <'bytes'>
@@ -2427,7 +2406,7 @@ def _escape_item_uncommon(
         or dtype is typeref.INT16
         or dtype is typeref.INT8
     ):
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'numpy.uint'>
     if (
         dtype is typeref.UINT64
@@ -2435,7 +2414,7 @@ def _escape_item_uncommon(
         or dtype is typeref.UINT16
         or dtype is typeref.UINT8
     ):
-        return str(data)  # _escape_int
+        return _escape_int(data)
     # . <'numpy.bool_'>
     if dtype is typeref.BOOL_:
         return _escape_bool(data)
@@ -2483,6 +2462,11 @@ def _escape_item_uncommon(
     # . <'dict_keys'> & <'dict_values'>
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
         return _escape_item_sequence(data, encoding, many)
+
+    # Mapping Types
+    # . <'dict_items'>
+    if dtype is typeref.DICT_ITEMS:
+        return _escape_item_dict(dict(data), encoding, many)
 
     # NumPy Types
     # . <'numpy.ndarray'>
@@ -2537,16 +2521,16 @@ def _escape_item_subclass(
     # Basic Types
     # . subclass of <'str'>
     if isinstance(data, str):
-        return _escape_str(data, encoding)
+        return _escape_str(str(data), encoding)
     # . subclass of <'int'>
     if isinstance(data, int):
-        return str(data)  # _escape_int
+        return _escape_int(int(data))
     # . subclass of <'float'>
     if isinstance(data, float):
-        return _escape_float(data)
+        return _escape_float(float(data))
     # . subclass of <'bool'>
     if isinstance(data, bool):
-        return _escape_bool(data)
+        return _escape_bool(bool(data))
 
     # Date&Time Types
     # . subclass of <'datetime.datetime'>
@@ -2562,37 +2546,24 @@ def _escape_item_subclass(
     if isinstance(data, datetime.timedelta):
         return _escape_timedelta(data)
 
-    # Numeric Types
-    # . subclass of <'decimal.Decimal'>
-    if isinstance(data, typeref.DECIMAL):
-        return str(data)  # _escape_decimal
-
-    # Bytes Types
-    # . subclass of <'bytes'>
-    if isinstance(data, bytes):
-        return _escape_bytes(data)
-    # . subclass of <'bytearray'>
-    if isinstance(data, bytearray):
-        return _escape_bytearray(data)
-
     # Sequence Types
     # . subclass of <'list'>
     if isinstance(data, list):
-        return _escape_item_list(data, encoding, many)
+        return _escape_item_list(list(data), encoding, many)
     # . subclass of <'tuple'>
     if isinstance(data, tuple):
-        return _escape_item_tuple(data, encoding, many)
+        return _escape_item_tuple(tuple(data), encoding, many)
     # . subclass of <'set'>
     if isinstance(data, set):
-        return _escape_item_set(data, encoding, many)
+        return _escape_item_set(set(data), encoding, many)
     # . subclass of <'frozenset'>
     if isinstance(data, frozenset):
-        return _escape_item_frozenset(data, encoding, many)
+        return _escape_item_frozenset(frozenset(data), encoding, many)
 
     # Mapping Types
     # . subclass of <'dict'>
     if isinstance(data, dict):
-        return _escape_item_dict(data, encoding, many)
+        return _escape_item_dict(dict(data), encoding, many)
 
     # Invalid Data Type
     raise TypeError("Unsupported 'data' type %s." % dtype)
