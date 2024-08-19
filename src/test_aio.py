@@ -2199,6 +2199,15 @@ class TestCursor(TestCase):
                 self.assertEqual(await cur.fetchall(), tuple((i,) for i in range(10)))
                 await self.delete(conn)
 
+                # . insert many [above MAX_STATEMENT_LENGTH]
+                size = 200_000
+                await cur.executemany(
+                    f"insert into {self.table} (i) values (%s)", range(size)
+                )
+                await cur.execute(f"select i from {self.table}")
+                self.assertEqual(await cur.fetchall(), tuple((i,) for i in range(size)))
+                await self.delete(conn)
+
                 # . insert many
                 # . many should automatically set itemize to True.
                 await cur.execute(
