@@ -54,21 +54,21 @@ ctypedef struct hms:
 cdef inline bytes encode_str(object obj, char* encoding):
     """Encode string to bytes using 'encoding' with
     'surrogateescape' error handling `<'bytes'>`."""
-    return PyUnicode_AsEncodedString(obj, encoding, "surrogateescape")
+    return PyUnicode_AsEncodedString(obj, encoding, b"surrogateescape")
 
 cdef inline str decode_bytes(object data, char* encoding):
     """Decode bytes to string using 'encoding' with "surrogateescape" error handling `<'str'>`."""
-    return PyUnicode_Decode(bytes_to_chars(data), bytes_len(data), encoding, "surrogateescape")
+    return PyUnicode_Decode(bytes_to_chars(data), bytes_len(data), encoding, b"surrogateescape")
 
 cdef inline str decode_bytes_utf8(object data):
     """Decode bytes to string using 'utf-8' encoding
     with 'surrogateescape' error handling `<'str'>`."""
-    return PyUnicode_DecodeUTF8(bytes_to_chars(data), bytes_len(data), "surrogateescape")
+    return PyUnicode_DecodeUTF8(bytes_to_chars(data), bytes_len(data), b"surrogateescape")
 
 cdef inline str decode_bytes_ascii(object data):
     """Decode bytes to string using 'ascii' encoding
     with 'surrogateescape' error handling `<'str'>`."""
-    return PyUnicode_DecodeASCII(bytes_to_chars(data), bytes_len(data), "surrogateescape")
+    return PyUnicode_DecodeASCII(bytes_to_chars(data), bytes_len(data), b"surrogateescape")
 
 cdef inline str translate_str(object value, list table):
     """Translate string with the given 'table' `<'str'>`."""
