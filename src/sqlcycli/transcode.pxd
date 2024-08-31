@@ -75,32 +75,31 @@ cdef inline str translate_str(object value, list table):
     return PyUnicode_Translate(value, table, NULL)
 
 cdef inline char* slice_to_chars(char* data, Py_ssize_t start, Py_ssize_t end):
-    """Slice data `<'char*'>` from 'start' to 'end' `<'char*'>`."""
+    """Slice 'data' from 'start' to 'end' `<'char*'>`."""
     if end - start < 1:
         raise ValueError("Invalid slice size: [start]%d -> [end]%d." % (start, end))
     return data[start:end]
 
 cdef inline long long slice_to_int(char* data, Py_ssize_t start, Py_ssize_t end):
-    """Slice data `<'char*'>` from 'start' to 'end', and convert to `<'long long'>`."""
+    """Slice 'data' from 'start' to 'end', and convert to `<'long long'>`."""
     return strtoll(slice_to_chars(data, start, end), NULL, 10)
 
 cdef inline long long chars_to_ll(char* data):
-    """Convert 'data' `<'char*'>` to `<'long long'>`."""
+    """Convert 'data' to `<'long long'>`."""
     return strtoll(data, NULL, 10)
 
 cdef inline unsigned long long chars_to_ull(char* data):
-    """Convert 'data' `<'char*'>` to `<'unsigned long long'>`."""
+    """Convert 'data' to `<'unsigned long long'>`."""
     return strtoull(data, NULL, 10)
 
 cdef inline long double chars_to_ld(char* data):
-    """Convert 'data' `<'char*'>` to `<'long double'>`."""
+    """Convert 'data' to `<'long double'>`."""
     return strtold(data, NULL)
 
 # Utils: Unpack unsigned integer
-cdef inline unsigned long long unpack_uint64_big_endian(char* data, unsigned long long pos):
-    """Read (unpack) unsigned 64-bit integer from 'data' at givent 'pos' `<'int'>`.
-    
-    Note: The data is assumed to be in big-endian format.
+cdef inline unsigned long long unpack_uint64_big_endian(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 64-bit integer from 'data'
+    at the given 'pos' in big-endian order `<'int'>`.
     """
     cdef:
         unsigned long long v0 = <unsigned char> data[pos + 7]
@@ -204,7 +203,7 @@ cdef inline hms microseconds_to_hms(unsigned long long us) except *:
     return hms(hour, minute, second, us)
 
 cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
-    """Parse microsecond fraction from 'data' `<'char*'>` from 'start' to 'end' `<'int'>`."""
+    """Parse microsecond fraction from 'start' to 'end' of the 'data' `<'int'>`."""
     # Validate fraction
     cdef Py_ssize_t size = end - start
     if size > 6:

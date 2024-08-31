@@ -245,13 +245,12 @@ def _escape_float(data: object) -> str:
     >>> _escape_float(123.456)
     >>> "123.456"  # str
     """
-    # For normal native Python float numbers, orjson
-    # performs faster than Python built-in `str()`
-    # function.
+    # For normal float numbers, orjson performs
+    # faster than Python built-in `str()` function.
     if isnormal(data):
         return _orjson_dumps(data)
-    # For other float values, we fallback to use
-    # Python built-in `str()` approach.
+    # For other float objects, fallback to Python
+    # built-in `str()` approach.
     return _escape_float64(data)
 
 
@@ -289,24 +288,24 @@ def _escape_datetime(data: object) -> str:
     >>> _escape_datetime(datetime.datetime(2021, 1, 1, 12, 0, 0, 100))
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
-    microsecond: cython.int = datetime.PyDateTime_DATE_GET_MICROSECOND(data)
+    microsecond: cython.int = datetime.datetime_microsecond(data)
     if microsecond == 0:
         return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
-            datetime.PyDateTime_GET_YEAR(data),
-            datetime.PyDateTime_GET_MONTH(data),
-            datetime.PyDateTime_GET_DAY(data),
-            datetime.PyDateTime_DATE_GET_HOUR(data),
-            datetime.PyDateTime_DATE_GET_MINUTE(data),
-            datetime.PyDateTime_DATE_GET_SECOND(data),
+            datetime.datetime_year(data),
+            datetime.datetime_month(data),
+            datetime.datetime_day(data),
+            datetime.datetime_hour(data),
+            datetime.datetime_minute(data),
+            datetime.datetime_second(data),
         )
     else:
         return "'%04d-%02d-%02d %02d:%02d:%02d.%06d'" % (
-            datetime.PyDateTime_GET_YEAR(data),
-            datetime.PyDateTime_GET_MONTH(data),
-            datetime.PyDateTime_GET_DAY(data),
-            datetime.PyDateTime_DATE_GET_HOUR(data),
-            datetime.PyDateTime_DATE_GET_MINUTE(data),
-            datetime.PyDateTime_DATE_GET_SECOND(data),
+            datetime.datetime_year(data),
+            datetime.datetime_month(data),
+            datetime.datetime_day(data),
+            datetime.datetime_hour(data),
+            datetime.datetime_minute(data),
+            datetime.datetime_second(data),
             microsecond,
         )
 
@@ -338,9 +337,9 @@ def _escape_date(data: object) -> str:
     >>> "'2021-01-01'"  # str
     """
     return "'%04d-%02d-%02d'" % (
-        datetime.PyDateTime_GET_YEAR(data),
-        datetime.PyDateTime_GET_MONTH(data),
-        datetime.PyDateTime_GET_DAY(data),
+        datetime.date_year(data),
+        datetime.date_month(data),
+        datetime.date_day(data),
     )
 
 
@@ -353,18 +352,18 @@ def _escape_time(data: object) -> str:
     >>> _escape_time(datetime.time(12, 0, 0, 100))
     >>> "'12:00:00.00100'"  # str
     """
-    microsecond: cython.int = datetime.PyDateTime_TIME_GET_MICROSECOND(data)
+    microsecond: cython.int = datetime.time_microsecond(data)
     if microsecond == 0:
         return "'%02d:%02d:%02d'" % (
-            datetime.PyDateTime_TIME_GET_HOUR(data),
-            datetime.PyDateTime_TIME_GET_MINUTE(data),
-            datetime.PyDateTime_TIME_GET_SECOND(data),
+            datetime.time_hour(data),
+            datetime.time_minute(data),
+            datetime.time_second(data),
         )
     else:
         return "'%02d:%02d:%02d.%06d'" % (
-            datetime.PyDateTime_TIME_GET_HOUR(data),
-            datetime.PyDateTime_TIME_GET_MINUTE(data),
-            datetime.PyDateTime_TIME_GET_SECOND(data),
+            datetime.time_hour(data),
+            datetime.time_minute(data),
+            datetime.time_second(data),
             microsecond,
         )
 
@@ -382,10 +381,9 @@ def _escape_timedelta(data: object) -> str:
     """
     # Get total seconds and microseconds
     seconds: cython.longlong = (
-        datetime.PyDateTime_DELTA_GET_SECONDS(data)
-        + datetime.PyDateTime_DELTA_GET_DAYS(data) * 86_400
+        datetime.timedelta_seconds(data) + datetime.timedelta_days(data) * 86_400
     )
-    microseconds: cython.int = datetime.PyDateTime_DELTA_GET_MICROSECONDS(data)
+    microseconds: cython.int = datetime.timedelta_microseconds(data)
 
     # Positive timedelta
     if seconds >= 0:
@@ -829,7 +827,7 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         [[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O"))
     >>> "(1,1.23,'abc'),(2,4.56,'def')"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -882,7 +880,7 @@ def _escape_ndarray_int(arr: np.ndarray) -> str:
         [[1, 2], [3, 4]], dtype=np.uint64))
     >>> "(1,2),(3,4)"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -927,7 +925,7 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
         [[-1.1, 0.0], [1.1, 2.2]], dtype=float))
     >>> "(-1.1,0.0),(1.1,2.2)"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -976,7 +974,7 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
         [[True, False], [False, True]], dtype=bool))
     >>> "(1,0),(0,1)"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1022,7 +1020,7 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
     # Notes: 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
     # so character ['"', "T", "[", "]"] should be replaced to comply with literal
     # datetime format.
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1066,7 +1064,7 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
         [[-1, 0], [1, 2]], dtype="timedelta64[s]"))
     >>> "('-00:00:01','00:00:00'),('00:00:01','00:00:02')"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1122,7 +1120,7 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
         [[1, 2], [3, 4]], dtype="S"))
     >>> "(_binary'1',_binary'2'),(_binary'3',_binary'4')"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1166,7 +1164,7 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
         [[1, 2], [3, 4]], dtype="U"))
     >>> "('1','2'),('3','4')"  # str
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1818,7 +1816,7 @@ def _escape_item_ndarray_object(
         [[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O"))
     >>> [("1", "1.23", "'abc'"), ("2", "4.56", "'def'")]  # list[tupe[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1880,7 +1878,7 @@ def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
         [[0, 1], [2, 3]], dtype=np.uint))
     >>> [("0", "1"), ("2", "3")]  # list[tupe[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1930,7 +1928,7 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
         [[-1.1, 0.0], [1.1, 2.2]], dtype=float))
     >>> [("-1.1", "0.0"), ("1.1", "2.2")]  # list[tupe[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -1984,7 +1982,7 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
         [[True, False], [False, True]], dtype=bool))
     >>> [("1", "0"), ("0", "1")]  # list[tupe[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -2040,7 +2038,7 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
     # Notes: 'orjson' returns '["1970-01-01T00:00:00",...,"2000-01-01T00:00:01"]',
     # so character ['"', "T", "[", "]"] should be replaced to comply with literal
     # datetime format.
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -2090,7 +2088,7 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
         [[-1, 0], [1, 2]], dtype="timedelta64[s]"))
     >>> [("'-00:00:01'", "'00:00:00'"), ("'00:00:01'", "'00:00:02'")]  # list[tuple[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -2151,7 +2149,7 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
         [[1, 2], [3, 4]], dtype="S"))
     >>> [("_binary'1'", "_binary'2'"), ("_binary'3'", "_binary'4'")]  # list[tuple[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -2205,7 +2203,7 @@ def _escape_item_ndarray_unicode(
         [[1, 2], [3, 4]], dtype="U"))
     >>> [("'1'", "'2'"), ("'3'", "'4'")]  # list[tuple[str]]
     """
-    ndim: cython.Py_ssize_t = arr.ndim
+    ndim: cython.int = arr.ndim
     shape = arr.shape
     # 1-dimensional
     if ndim == 1:
@@ -3072,14 +3070,14 @@ def _test_translate_str() -> None:
 
 
 def _test_slice_chars() -> None:
-    val: cython.pchar = b"hello1234"
+    chs: cython.pchar = b"hello1234"
     # slice to chars
-    n = val[0:5]
-    x: bytes = slice_to_chars(val, 0, 5)  # type: ignore
+    n = chs[0:5]
+    x: bytes = slice_to_chars(chs, 0, 5)  # type: ignore
     assert n == x, f"{n} | {x}"
     # slice to int
-    i = int(val[5:8])
-    j = slice_to_int(val, 5, 8)  # type: ignore
+    i = int(chs[5:8])
+    j = slice_to_int(chs, 5, 8)  # type: ignore
     assert i == j, f"{i} | {j}"
     print("Pass Slice Chars".ljust(80))
 
