@@ -168,10 +168,10 @@ class MysqlPacket:
         code: cython.uchar = self._read_uint8()
         if code < utils.UNSIGNED_CHAR_COLUMN:
             return code
-        if code == utils.UNSIGNED_SHORT_COLUMN:
-            return self._read_uint16()
         if code == utils.NULL_COLUMN:
             return 0
+        if code == utils.UNSIGNED_SHORT_COLUMN:
+            return self._read_uint16()
         if code == utils.UNSIGNED_INT24_COLUMN:
             return self._read_uint24()
         if code == utils.UNSIGNED_INT64_COLUMN:
@@ -192,10 +192,10 @@ class MysqlPacket:
         length: cython.uchar = self._read_uint8()
         if length < utils.UNSIGNED_CHAR_COLUMN:
             return self.read(length)
-        if length == utils.UNSIGNED_SHORT_COLUMN:
-            return self.read(self._read_uint16())
         if length == utils.NULL_COLUMN:
             return None
+        if length == utils.UNSIGNED_SHORT_COLUMN:
+            return self.read(self._read_uint16())
         if length == utils.UNSIGNED_INT24_COLUMN:
             return self.read(self._read_uint24())
         if length == utils.UNSIGNED_INT64_COLUMN:
