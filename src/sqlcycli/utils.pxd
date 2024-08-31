@@ -52,7 +52,7 @@ cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
 
 # Utils: Pack custom
 cdef inline bytes pack_I24B(unsigned int i, unsigned char j):
-    """Pack 'I[24bit]B' in little-endian order `<'bytes'>`.
+    """Pack 'I[24bit]B' in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<I", i)[:3] + struct.pack("<B", b)
@@ -65,7 +65,7 @@ cdef inline bytes pack_I24B(unsigned int i, unsigned char j):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_IB(unsigned int i, unsigned char j):
-    """Pack 'IB' in little-endian order `<'bytes'>`.
+    """Pack 'IB' in little-endian order to `<'bytes'>`.
 
     Equivalent to: 
     >>> struct.pack("<IB", i, j)
@@ -79,7 +79,7 @@ cdef inline bytes pack_IB(unsigned int i, unsigned char j):
     return PyBytes_FromStringAndSize(buffer, 5)
 
 cdef inline bytes pack_IIB23s(unsigned int i, unsigned int j, unsigned char k):
-    """Pack 'IIB23s' in little-endian order `<'bytes'>`.
+    """Pack 'IIB23s' in little-endian order to `<'bytes'>`.
 
     Equivalent to: 
     >>> struct.pack("<IIB23s", i, j, k, b"")
@@ -102,6 +102,8 @@ cdef inline bytes gen_length_encoded_integer(unsigned long long i):
     """Generate 'Length Coded Integer' for MySQL `<'bytes'>."""
     # https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
     cdef char buffer[9]
+    # value 251 is reserved for NULL, so only 0-250, 252-254
+    # are used as the first byte of a length-encoded integer.
     if i < UNSIGNED_CHAR_COLUMN:  # 251
         buffer[0] = i & 0xFF
         return PyBytes_FromStringAndSize(buffer, 1)
@@ -130,7 +132,7 @@ cdef inline bytes gen_length_encoded_integer(unsigned long long i):
 
 # Utils: Pack unsigned integers
 cdef inline bytes pack_uint8(unsigned int value):
-    """Pack unsigned 8-bit integer in little-endian order `<'bytes'>`.
+    """Pack unsigned 8-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<B", value)
@@ -140,7 +142,7 @@ cdef inline bytes pack_uint8(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_uint16(unsigned int value):
-    """Pack unsigned 16-bit integer in little-endian order `<'bytes'>`.
+    """Pack unsigned 16-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<H", value)
@@ -151,7 +153,7 @@ cdef inline bytes pack_uint16(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_uint24(unsigned int value):
-    """Pack unsigned 24-bit integer in little-endian order `<'bytes'>`.
+    """Pack unsigned 24-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<I", value)[:3]
@@ -163,7 +165,7 @@ cdef inline bytes pack_uint24(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_uint32(unsigned long long value):
-    """Pack unsigned 32-bit integer in little-endian order `<'bytes'>`.
+    """Pack unsigned 32-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<I", value)
@@ -176,7 +178,7 @@ cdef inline bytes pack_uint32(unsigned long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_uint64(unsigned long long value):
-    """Pack unsigned 64-bit integer in little-endian order `<'bytes'>`.
+    """Pack unsigned 64-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<Q", value)
@@ -193,14 +195,14 @@ cdef inline bytes pack_uint64(unsigned long long value):
     return PyBytes_FromStringAndSize(buffer, 8)
 
 # Utils: Unpack unsigned integer
-cdef inline unsigned char unpack_uint8(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 8-bit integer from 'data'
+cdef inline unsigned char unpack_uint8(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 8-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     return <unsigned char> data[pos]
 
-cdef inline unsigned short unpack_uint16(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 16-bit integer from 'data'
+cdef inline unsigned short unpack_uint16(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 16-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -209,8 +211,8 @@ cdef inline unsigned short unpack_uint16(char* data, unsigned long long pos):
         unsigned short res = p0 | (p1 << 8)
     return res
 
-cdef inline unsigned int unpack_uint24(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 24-bit integer from 'data'
+cdef inline unsigned int unpack_uint24(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 24-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -220,8 +222,8 @@ cdef inline unsigned int unpack_uint24(char* data, unsigned long long pos):
         unsigned int res = p0 | (p1 << 8) | (p2 << 16)
     return res
 
-cdef inline unsigned int unpack_uint32(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 32-bit integer from 'data'
+cdef inline unsigned int unpack_uint32(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 32-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -232,8 +234,8 @@ cdef inline unsigned int unpack_uint32(char* data, unsigned long long pos):
         unsigned int res = p0 | (p1 << 8) | (p2 << 16) | (p3 << 24)
     return res
 
-cdef inline unsigned long long unpack_uint64(char* data, unsigned long long pos):
-    """Unpack (read) unsigned 64-bit integer from 'data'
+cdef inline unsigned long long unpack_uint64(char* data, Py_ssize_t pos):
+    """Unpack (read) `UNSIGNED` 64-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
     cdef:
@@ -252,7 +254,7 @@ cdef inline unsigned long long unpack_uint64(char* data, unsigned long long pos)
 
 # Utils: Pack signed integer
 cdef inline bytes pack_int8(int value):
-    """Pack signed 8-bit integer in little-endian order `<'bytes'>`.
+    """Pack signed 8-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<b", value)
@@ -262,7 +264,7 @@ cdef inline bytes pack_int8(int value):
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_int16(int value):
-    """Pack signed 16-bit integer in little-endian order `<'bytes'>`.
+    """Pack signed 16-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<h", value)
@@ -273,7 +275,7 @@ cdef inline bytes pack_int16(int value):
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_int24(int value):
-    """Pack signed 24-bit integer in little-endian order `<'bytes'>`.
+    """Pack signed 24-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<i", value)[:3]
@@ -285,7 +287,7 @@ cdef inline bytes pack_int24(int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_int32(long long value):
-    """Pack signed 32-bit integer in little-endian order `<'bytes'>`.
+    """Pack signed 32-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<i", value)
@@ -298,7 +300,7 @@ cdef inline bytes pack_int32(long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_int64(long long value):
-    """Pack signed 64-bit integer in little-endian order `<'bytes'>`.
+    """Pack signed 64-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<q", value)
@@ -315,25 +317,35 @@ cdef inline bytes pack_int64(long long value):
     return PyBytes_FromStringAndSize(buffer, 8)
 
 # Utils: Unpack signed integer
-cdef inline signed char unpack_int8(char* data, unsigned long long pos):
-    """Read (unpack) signed 8-bit integer from 'data' at givent 'pos' `<'int'>`."""
+cdef inline signed char unpack_int8(char* data, Py_ssize_t pos):
+    """Unpack (read) `SIGNED` 8-bit integer from 'data'
+    at the given 'pos' in little-endian order `<'int'>`.
+    """
     return <signed char> data[pos]
 
-cdef inline short unpack_int16(char* data, unsigned long long pos):
-    """Read (unpack) signed 16-bit integer from 'data' at givent 'pos' `<'int'>`."""
+cdef inline short unpack_int16(char* data, Py_ssize_t pos):
+    """Unpack (read) `SIGNED` 16-bit integer from 'data'
+    at the given 'pos' in little-endian order `<'int'>`.
+    """
     return <short> unpack_uint16(data, pos)
 
-cdef inline int unpack_int24(char* data, unsigned long long pos):
-    """Read (unpack) signed 24-bit integer from 'data' at givent 'pos' `<'int'>`."""
+cdef inline int unpack_int24(char* data, Py_ssize_t pos):
+    """Unpack (read) `SIGNED` 24-bit integer from 'data'
+    at the given 'pos' in little-endian order `<'int'>`.
+    """
     cdef int res = <int> unpack_uint24(data, pos)
     return res if res < 0x800000 else res - 0x1000000
 
-cdef inline int unpack_int32(char* data, unsigned long long pos):
-    """Read (unpack) signed 32-bit integer from 'data' at givent 'pos' `<'int'>`."""
+cdef inline int unpack_int32(char* data, Py_ssize_t pos):
+    """Unpack (read) `SIGNED` 32-bit integer from 'data'
+    at the given 'pos' in little-endian order `<'int'>`.
+    """
     return <int> unpack_uint32(data, pos)
 
-cdef inline long long unpack_int64(char* data, unsigned long long pos):
-    """Read (unpack) signed 64-bit integer from 'data' at givent 'pos' `<'int'>`."""
+cdef inline long long unpack_int64(char* data, Py_ssize_t pos):
+    """Unpack (read) `SIGNED` 64-bit integer from 'data'
+    at the given 'pos' in little-endian order `<'int'>`.
+    """
     return <long long> unpack_uint64(data, pos)
 
 # Utils: Connection

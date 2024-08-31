@@ -360,24 +360,25 @@ def _test_custom_pack() -> None:
     print("Pass Pack IIB23s".ljust(80))
 
     # Test gen_length_encoded_integer
-    v = gen_length_encoded_integer(250)  # type: ignore
-    n = pack_uint8(250)  # type: ignore
-    assert v == n, f"{v} | {n}"
+    num = 250
+    v = gen_length_encoded_integer(num)  # type: ignore
+    n = pack_uint8(num)  # type: ignore
+    assert v == n, f"{v} | {n} - num: {num}"
 
     for num in (251, 65_535):
         v = gen_length_encoded_integer(num)  # type: ignore
         n = pack_uint8(UNSIGNED_SHORT_COLUMN) + pack_uint16(num)  # type: ignore
-        assert v == n, f"{v} | {n}"
+        assert v == n, f"{v} | {n} - num: {num}"
 
     for num in (65_536, 16_777_215):
         v = gen_length_encoded_integer(num)  # type: ignore
         n = pack_uint8(UNSIGNED_INT24_COLUMN) + pack_uint24(num)  # type: ignore
-        assert v == n, f"{v} | {n}"
+        assert v == n, f"{v} | {n} - num: {num}"
 
     for num in (16_777_216, 4_294_967_295):
         v = gen_length_encoded_integer(num)  # type: ignore
         n = pack_uint8(UNSIGNED_INT64_COLUMN) + pack_uint64(num)  # type: ignore
-        assert v == n, f"{v} | {n}"
+        assert v == n, f"{v} | {n} - num: {num}"
     print("Pass Gen Length Encoded Integer".ljust(80))
 
     del struct
