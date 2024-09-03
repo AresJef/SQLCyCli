@@ -2954,13 +2954,14 @@ class BaseConnection:
             )
 
         # . init data
-        data: bytes = utils.pack_IIB23s(
+        header: bytes = utils.pack_IIB23s(
             self._client_flag, sync_conn.MAX_PACKET_LENGTH, self._charset_id
         )
+        data: list[bytes] = [header]
 
         # . ssl connection
         if self._ssl_ctx is not None and self._server_capabilities & _CLIENT.SSL:
-            self._write_packet(data)
+            self._write_packet(header)
             # Stop sending events to data_received
             transport: Transport = self._writer.transport
             transport.pause_reading()
@@ -2979,7 +2980,8 @@ class BaseConnection:
             self._secure = True
 
         # . collect
-        data += self._user + b"\0"
+        data.append(self._user)
+        data.append(b"\0")
 
         # . auth
         plugin_name: bytes
@@ -3008,29 +3010,34 @@ class BaseConnection:
             plugin_name = None
             authres = b""
         if self._server_capabilities & _CLIENT.PLUGIN_AUTH_LENENC_CLIENT_DATA:
-            data += utils.gen_length_encoded_integer(bytes_len(authres)) + authres
+            data.append(utils.gen_length_encoded_integer(bytes_len(authres)))
+            data.append(authres)
         elif self._server_capabilities & _CLIENT.SECURE_CONNECTION:
-            data += utils.pack_uint8(bytes_len(authres)) + authres
+            data.append(utils.pack_uint8(bytes_len(authres)))
+            data.append(authres)
         else:
-            data += authres + b"\0"
+            data.append(authres)
+            data.append(b"\0")
 
         # . database
         if (
             self._database is not None
             and self._server_capabilities & _CLIENT.CONNECT_WITH_DB
         ):
-            data += self._database + b"\0"
+            data.append(self._database)
+            data.append(b"\0")
 
         # . auth plugin name
         if self._server_capabilities & _CLIENT.PLUGIN_AUTH:
-            data += (b"" if plugin_name is None else plugin_name) + b"\0"
+            data.append(b"" if plugin_name is None else plugin_name)
+            data.append(b"\0")
 
         # . connect attrs
         if self._server_capabilities & _CLIENT.CONNECT_ATTRS:
-            data += self._connect_attrs
+            data.append(self._connect_attrs)
 
         # . write packet
-        self._write_packet(data)
+        self._write_packet(b"".join(data))
         auth_pkt: MysqlPacket = await self._read_packet()
 
         # if authentication method isn't accepted the first byte
