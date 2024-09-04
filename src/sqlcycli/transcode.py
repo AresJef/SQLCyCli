@@ -13,7 +13,7 @@ from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ign
 from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Split as str_split  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # type: ignore
-from cython.cimports.cpython.unicode import PyUnicode_READ_CHAR as read_char  # type: ignore
+from cython.cimports.cpython.unicode import PyUnicode_READ_CHAR as str_read  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Substring as str_substr  # type: ignore
 from cython.cimports.sqlcycli.constants import _FIELD_TYPE  # type: ignore
 from cython.cimports.sqlcycli import typeref  # type: ignore
@@ -559,7 +559,7 @@ def _escape_list(data: list, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
@@ -578,7 +578,7 @@ def _escape_tuple(data: tuple, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
@@ -597,7 +597,7 @@ def _escape_set(data: set, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
@@ -616,7 +616,7 @@ def _escape_frozenset(data: frozenset, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
@@ -635,7 +635,7 @@ def _escape_sequence(data: Iterable, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
@@ -667,7 +667,7 @@ def _escape_dict(data: dict, encoding: cython.pchar) -> str:
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
     res = ",".join([_escape_common(i, encoding) for i in data.values()])
-    return res if read_char(res, 0) == "(" else "(" + res + ")"
+    return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 # . NumPy types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -900,7 +900,7 @@ def _escape_ndarray_int(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        if read_char(res, 1) == "[":
+        if str_read(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
@@ -951,7 +951,7 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
             raise ValueError("Float value 'nan' & 'inf' not supported.")
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        if read_char(res, 1) == "[":
+        if str_read(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
@@ -994,7 +994,7 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
-        if read_char(res, 1) == "[":
+        if str_read(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
@@ -1040,7 +1040,7 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
-        if read_char(res, 1) == "[":
+        if str_read(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, DT64_JSON_TABLE)  # type: ignore
     # invalid
