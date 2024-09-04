@@ -4,7 +4,7 @@
 import cython
 from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # type: ignore
-from cython.cimports.cpython.unicode import PyUnicode_ReadChar as read_char  # type: ignore
+from cython.cimports.cpython.unicode import PyUnicode_ReadChar as str_read  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Substring as str_substr  # type: ignore
 from cython.cimports.sqlcycli.transcode import escape  # type: ignore
 from cython.cimports.sqlcycli._ssl import is_ssl, is_ssl_ctx  # type: ignore
@@ -164,36 +164,40 @@ def validate_max_allowed_packet(
             ) from err
     # Arugment is string
     elif isinstance(max_allowed_packet, str):
-        length: cython.Py_ssize_t = str_len(max_allowed_packet)
-        ch: cython.Py_UCS4 = read_char(max_allowed_packet, length - 1)
-        # . skip M/K/G[B] suffix
-        if ch in ("B", "b"):
-            length -= 1
-            ch = read_char(max_allowed_packet, length - 1)
-        # . K/KiB suffix
-        if ch in ("K", "k"):
-            length -= 1
-            mult: cython.int = 1_024
-        # . M/MiB suffix
-        elif ch in ("M", "m"):
-            length -= 1
-            mult: cython.int = 1_048_576
-        # . G/GiB suffix
-        elif ch in ("G", "g"):
-            length -= 1
-            mult: cython.int = 1_073_741_824
-        # . no unit suffix
-        else:
-            mult: cython.int = 1
-        # . parse integer
+        size: cython.Py_ssize_t = str_len(max_allowed_packet)
         try:
-            if length < 1:
-                raise ValueError("Not enough charactors.")
-            value: cython.longlong = int(str_substr(max_allowed_packet, 0, length))
+            if size < 1:
+                raise ValueError("not enough charactors.")
+            ch: cython.Py_UCS4 = str_read(max_allowed_packet, size - 1)
+            # . skip M/K/G[B] suffix
+            if ch in ("B", "b"):
+                size -= 1
+                if size < 1:
+                    raise ValueError("not enough charactors.")
+                ch = str_read(max_allowed_packet, size - 1)
+            # . K/KiB suffix
+            if ch in ("K", "k"):
+                size -= 1
+                mult: cython.int = 1_024
+            # . M/MiB suffix
+            elif ch in ("M", "m"):
+                size -= 1
+                mult: cython.int = 1_048_576
+            # . G/GiB suffix
+            elif ch in ("G", "g"):
+                size -= 1
+                mult: cython.int = 1_073_741_824
+            # . no unit suffix
+            else:
+                mult: cython.int = 1
+            # . parse integer
+            if size < 1:
+                raise ValueError("not enough charactors.")
+            value: cython.longlong = int(str_substr(max_allowed_packet, 0, size))
         except Exception as err:
             raise errors.InvalidConnectionArgsError(
-                "Invalid 'max_allowed_packet' argument: %r %s."
-                % (max_allowed_packet, type(max_allowed_packet))
+                "Invalid 'max_allowed_packet' argument: %r %s.\nError: %s"
+                % (max_allowed_packet, type(max_allowed_packet), err)
             ) from err
         value *= mult
     # Invalid
@@ -597,4 +601,3 @@ def _test_validate_max_allowed_packet() -> None:
         else:
             raise AssertionError("Max allowed packet validation failed.")
     print("Pass Validate Max Allowed Packet".ljust(80))
-
