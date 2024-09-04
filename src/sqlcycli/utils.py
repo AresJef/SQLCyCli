@@ -61,7 +61,7 @@ def validate_arg_uint(
     min_val: cython.uint,
     max_val: cython.uint,
 ) -> object:
-    """(cfunc) Validate if an unsigned integer argument is valid `<'unsigned int'>`."""
+    """(cfunc) Validate if an unsigned integer argument is valid `<'int'>`."""
     if arg is None:
         return None
     try:
@@ -232,7 +232,7 @@ def validate_sql_mode(sql_mode: object, encoding: cython.pchar) -> str:
 @cython.cfunc
 @cython.inline(True)
 def validate_cursor(cursor: object, cursor_class: object) -> object:
-    """(cfunc) Validate if the 'cursor' argument is valid `<'object'>`."""
+    """(cfunc) Validate if the 'cursor' argument is valid `<'type'>`."""
     if cursor is None:
         return cursor_class
     try:
@@ -597,3 +597,4 @@ def _test_validate_max_allowed_packet() -> None:
         else:
             raise AssertionError("Max allowed packet validation failed.")
     print("Pass Validate Max Allowed Packet".ljust(80))
+

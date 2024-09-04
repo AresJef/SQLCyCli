@@ -43,7 +43,7 @@ cdef inline str decode_bytes_latin1(object data):
     return PyUnicode_DecodeLatin1(bytes_to_chars(data), bytes_len(data), b"surrogateescape")
 
 cdef inline Py_ssize_t find_null_term(char* data, Py_ssize_t pos) except -2:
-    """Find the next NULL-terminated string in the data `<'int'>`."""
+    """Find the next NULL-terminated starting from 'pos' in the data `<'int'>`."""
     cdef const char* ptr = data + pos
     loc = strchr(ptr, 0)
     if loc is NULL:
@@ -132,7 +132,7 @@ cdef inline bytes gen_length_encoded_integer(unsigned long long i):
 
 # Utils: Pack unsigned integers
 cdef inline bytes pack_uint8(unsigned int value):
-    """Pack unsigned 8-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `UNSIGNED` 8-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<B", value)
@@ -142,7 +142,7 @@ cdef inline bytes pack_uint8(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_uint16(unsigned int value):
-    """Pack unsigned 16-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `UNSIGNED` 16-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<H", value)
@@ -153,7 +153,7 @@ cdef inline bytes pack_uint16(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_uint24(unsigned int value):
-    """Pack unsigned 24-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `UNSIGNED` 24-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<I", value)[:3]
@@ -165,7 +165,7 @@ cdef inline bytes pack_uint24(unsigned int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_uint32(unsigned long long value):
-    """Pack unsigned 32-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `UNSIGNED` 32-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<I", value)
@@ -178,7 +178,7 @@ cdef inline bytes pack_uint32(unsigned long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_uint64(unsigned long long value):
-    """Pack unsigned 64-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `UNSIGNED` 64-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<Q", value)
@@ -254,7 +254,7 @@ cdef inline unsigned long long unpack_uint64(char* data, Py_ssize_t pos):
 
 # Utils: Pack signed integer
 cdef inline bytes pack_int8(int value):
-    """Pack signed 8-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `SIGNED` 8-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<b", value)
@@ -264,7 +264,7 @@ cdef inline bytes pack_int8(int value):
     return PyBytes_FromStringAndSize(buffer, 1)
 
 cdef inline bytes pack_int16(int value):
-    """Pack signed 16-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `SIGNED` 16-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<h", value)
@@ -275,7 +275,7 @@ cdef inline bytes pack_int16(int value):
     return PyBytes_FromStringAndSize(buffer, 2)
 
 cdef inline bytes pack_int24(int value):
-    """Pack signed 24-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `SIGNED` 24-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<i", value)[:3]
@@ -287,7 +287,7 @@ cdef inline bytes pack_int24(int value):
     return PyBytes_FromStringAndSize(buffer, 3)
 
 cdef inline bytes pack_int32(long long value):
-    """Pack signed 32-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `SIGNED` 32-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<i", value)
@@ -300,7 +300,7 @@ cdef inline bytes pack_int32(long long value):
     return PyBytes_FromStringAndSize(buffer, 4)
 
 cdef inline bytes pack_int64(long long value):
-    """Pack signed 64-bit integer in little-endian order to `<'bytes'>`.
+    """Pack `SIGNED` 64-bit integer in little-endian order to `<'bytes'>`.
     
     Equivalent to:
     >>> struct.pack("<q", value)
