@@ -17,7 +17,6 @@ from cython.cimports.cpython.bytes import PyBytes_Size as bytes_len  # type: ign
 from cython.cimports.cpython.bytes import PyBytes_AsString as bytes_to_chars  # type: ignore
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
-from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS  # type: ignore
 from cython.cimports.sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket  # type: ignore
@@ -33,14 +32,14 @@ from asyncio import AbstractEventLoop, Transport
 from asyncio import StreamReader, StreamReaderProtocol, StreamWriter
 from asyncio import get_event_loop as _get_event_loop, wait_for as _wait_for
 from pandas import DataFrame
+from sqlcycli import _auth
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
-from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
 from sqlcycli.transcode import escape, decode
 from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
 from sqlcycli.constants import _CLIENT, _COMMAND, _SERVER_STATUS, CR, ER
-from sqlcycli import connection as sync_conn, _auth, typeref, utils, errors
+from sqlcycli import connection as sync_conn, typeref, utils, errors
 
 __all__ = [
     "MysqlResult",
@@ -1797,7 +1796,7 @@ class BaseConnection:
     # SSL
     _ssl_ctx: object  # ssl.SSLContext
     # Auth
-    _auth_plugin: AuthPlugin
+    _auth_plugin: _auth.AuthPlugin
     _server_public_key: bytes
     # Decode
     _use_decimal: cython.bint
@@ -1851,7 +1850,7 @@ class BaseConnection:
         client_flag: int,
         program_name: str | None,
         ssl_ctx: object | None,
-        auth_plugin: AuthPlugin | None,
+        auth_plugin: _auth.AuthPlugin | None,
         server_public_key: bytes | None,
         use_decimal: bool,
         decode_bit: bool,
@@ -2115,7 +2114,7 @@ class BaseConnection:
         return self._ssl_ctx
 
     @property
-    def auth_plugin(self) -> AuthPlugin | None:
+    def auth_plugin(self) -> _auth.AuthPlugin | None:
         """The authentication plugins handlers `<'AuthPlugin/None'>`."""
         return self._auth_plugin
 
@@ -3534,7 +3533,7 @@ class Connection(BaseConnection):
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,
         ssl: SSL | object | None = None,
-        auth_plugin: dict[str | bytes, type] | AuthPlugin | None = None,
+        auth_plugin: dict[str | bytes, type] | _auth.AuthPlugin | None = None,
         server_public_key: bytes | None = None,
         use_decimal: bool = False,
         decode_bit: bool = False,
@@ -3651,10 +3650,10 @@ class Connection(BaseConnection):
         # fmt: on
         # . auth
         if auth_plugin is not None:
-            if isinstance(auth_plugin, AuthPlugin):
+            if isinstance(auth_plugin, _auth.AuthPlugin):
                 self._auth_plugin = auth_plugin
             elif isinstance(auth_plugin, dict):
-                self._auth_plugin = AuthPlugin(auth_plugin)
+                self._auth_plugin = _auth.AuthPlugin(auth_plugin)
             else:
                 raise errors.InvalidAuthPluginError(
                     "Invalid 'auth_plugin' argument: %r.\n"

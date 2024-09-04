@@ -1,8 +1,8 @@
 # cython: language_level=3
 
 # Utils
-cdef object validate_sync_cursor(object cursor)
-cdef object validate_async_cursor(object cursor)
+cdef object _validate_sync_cursor(object cursor)
+cdef object _validate_async_cursor(object cursor)
 
 # Connection
 cdef class ConnectionManager:

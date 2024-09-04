@@ -188,7 +188,7 @@ class AuthPlugin:
     # Methods ---------------------------------------------------------------------------------
     @cython.ccall
     def get(self, plugin_name: bytes) -> object:
-        """Get the handler for the plugin `<'type/None'>`."""
+        """Get the handler for the plugin by name `<'type/None'>`."""
         if plugin_name == b"mysql_native_password":
             return self._mysql_native_password
         if plugin_name == b"caching_sha2_password":
@@ -273,8 +273,8 @@ def sha2_rsa_encrypt(password: bytes, salt: bytes, public_key: bytes) -> bytes:
     """
     if not CRYPTOGRAPHY_AVAILABLE:
         raise RuntimeError(
-            "'cryptography' package is required for 'sha256_password' "
-            "or 'caching_sha2_password' auth methods."
+            "The 'cryptography' package is required for 'sha256_password' "
+            "or 'caching_sha2_password' authentication."
         )
 
     # xor_password
@@ -312,7 +312,8 @@ def ed25519_password(password: bytes, scramble: bytes) -> bytes:
     """
     if not NACL_AVAILABLE:
         raise RuntimeError(
-            "'nacl (pynacl)' package is required for 'client_ed25519' auth method."
+            "The 'nacl (pynacl)' package is required "
+            "for 'client_ed25519' authentication."
         )
     # h = SHA512(password)
     h: bytes = _hashlib_sha512(password).digest()

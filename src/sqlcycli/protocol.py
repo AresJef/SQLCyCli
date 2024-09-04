@@ -69,55 +69,73 @@ class MysqlPacket:
     @property
     def affected_rows(self) -> int:
         """The number of affected rows by the query `<'int'>`.
-        Only valid for OKPacket after 'read', else returns 0."""
+
+        Only valid for OKPacket after 'read_*()', else returns 0.
+        """
         return self._affected_rows
 
     @property
     def insert_id(self) -> int:
         """The last insert id of the query `<'int'>`.
-        Only valid for OKPacketafter 'read', else returns 0."""
+
+        Only valid for OKPacketafter 'read', else returns 0.
+        """
         return self._insert_id
 
     @property
     def server_status(self) -> int | None:
         """The server status of the query `<'int/None'>`.
-        Valid for OKPacket, EOFPacket after 'read', else returns None."""
+        
+        Valid for OKPacket, EOFPacket after 'read_*()', else returns None.
+        """
         return None if self._server_status == -1 else self._server_status
 
     @property
     def warning_count(self) -> int:
         """The number of warnings raised by the query `<'int'>`.
-        Only valid for OKPacket after 'read', else returns 0."""
+
+        Only valid for OKPacket after 'read_*()', else returns 0.
+        """
         return self._warning_count
 
     @property
     def has_next(self) -> bool:
         """The flag represents if there is more result exists `<'bool'>`.
-        Only valid for OKPacket, EOFPacket after 'read', else returns False."""
+        
+        Only valid for OKPacket, EOFPacket after 'read_*()', else returns False.
+        """
         return self._has_next
 
     @property
     def message(self) -> bytes | None:
         """The message of the query `<'bytes/None'>`.
-        Only valid for OKPacket after 'read', else returns None."""
+        
+        Only valid for OKPacket after 'read_*()', else returns None.
+        """
         return self._message
 
     @property
     def filename(self) -> bytes | None:
         """The filename of local file to be load `<'bytes/None'>`.
-        Only valid for LoadLocalPacket after 'read', else returns None."""
+        
+        Only valid for LoadLocalPacket after 'read_*()', else returns None.
+        """
         return self._filename
 
     @property
     def plugin_name(self) -> bytes | None:
         """The plugin name for authentication switch `<'bytes/None'>`.
-        Only valid for AuthSwitchRequest after 'read', else returns None."""
+        
+        Only valid for AuthSwitchRequest after 'read_*()', else returns None.
+        """
         return self._plugin_name
 
     @property
     def salt(self) -> bytes | None:
         """The salt for authentication switch `<'bytes/None'>`.
-        Only valid for AuthSwitchRequest after 'read', else returns None."""
+        
+        Only valid for AuthSwitchRequest after 'read_*()', else returns None.
+        """
         return self._salt
 
     # Read Data -------------------------------------------------------------------------------

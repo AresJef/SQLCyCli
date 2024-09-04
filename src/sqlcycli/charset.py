@@ -65,7 +65,7 @@ class Charset:
         self._encoding_c = self._encoding
         self._is_default = bool(is_default)
 
-    # Properties -------------------------------------------------------------------
+    # Property ---------------------------------------------------------------------
     @property
     def id(self) -> int:
         "The 'ID' of the charset `<'int'>`."
@@ -91,12 +91,12 @@ class Charset:
         "The 'encoding' of the charset `<'bytes'>`."
         return self._encoding
 
+    # Methods ----------------------------------------------------------------------
     @cython.ccall
     def is_binary(self) -> cython.bint:
         "Whether the charset is binary `<'bool'>`."
         return self._id == 63
 
-    # Special Methods --------------------------------------------------------------
     def __repr__(self) -> str:
         return "<Charset(id=%d, name='%s', collation='%s', encoding=%s)>" % (
             self._id,
@@ -307,10 +307,10 @@ class Charsets:
         )
 
 
-# Init ----------------------------------------------------------------------------------------
 _charsets: Charsets = Charsets()
 
 
+# Functions -----------------------------------------------------------------------------------
 @cython.ccall
 def all_charsets() -> Charsets:
     """Get the collection of all the MySQL charsets `<'Charsets'>`."""

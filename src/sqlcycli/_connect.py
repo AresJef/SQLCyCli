@@ -30,7 +30,7 @@ __all__ = ["connect", "ConnectionManager", "create_pool", "PoolManager"]
 # Utils ---------------------------------------------------------------------------------------
 @cython.cfunc
 @cython.inline(True)
-def validate_sync_cursor(cursor: Any) -> object:
+def _validate_sync_cursor(cursor: Any) -> object:
     """(cfunc) Validate and map the given 'cursor'
     argument to the correct sync `<'Cursor'>`."""
     if cursor is None:
@@ -58,7 +58,7 @@ def validate_sync_cursor(cursor: Any) -> object:
 
 @cython.cfunc
 @cython.inline(True)
-def validate_async_cursor(cursor: Any) -> object:
+def _validate_async_cursor(cursor: Any) -> object:
     """(cfunc) Validate and map the given 'cursor'
     argument to the correct async `<'aio.Cursor'>`."""
     if cursor is None:
@@ -119,7 +119,7 @@ class ConnectionManager:
     # Sync --------------------------------------------------------------------------------------
     def __enter__(self) -> BaseConnection:
         conn = Connection(
-            cursor=validate_sync_cursor(self._cursor),
+            cursor=_validate_sync_cursor(self._cursor),
             **self._kwargs,
         )
         conn.connect()
@@ -134,7 +134,7 @@ class ConnectionManager:
     async def _acquire_async_conn(self) -> aio.BaseConnection:
         """(internal) Acquire an `async` connection `<'BaseConnection'>`."""
         conn = aio.Connection(
-            cursor=validate_async_cursor(self._cursor),
+            cursor=_validate_async_cursor(self._cursor),
             loop=self._loop,
             **self._kwargs,
         )
@@ -308,7 +308,7 @@ class PoolManager:
 
     # Sync --------------------------------------------------------------------------------------
     def __enter__(self) -> aio.Pool:
-        pool = aio.Pool(cursor=validate_async_cursor(self._cursor), **self._kwargs)
+        pool = aio.Pool(cursor=_validate_async_cursor(self._cursor), **self._kwargs)
         self._pool = pool
         return self._pool
 
@@ -319,7 +319,7 @@ class PoolManager:
     # Async -------------------------------------------------------------------------------------
     async def _create_and_fill_pool(self) -> aio.Pool:
         """(internal) Create a pool and fill free connections `<'Pool'>`."""
-        pool = aio.Pool(cursor=validate_async_cursor(self._cursor), **self._kwargs)
+        pool = aio.Pool(cursor=_validate_async_cursor(self._cursor), **self._kwargs)
         await pool.fill(-1)
         return pool
 
