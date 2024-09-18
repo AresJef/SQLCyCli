@@ -18,14 +18,17 @@ cdef:
     list STR_ESCAPE_TABLE
     list DT64_JSON_TABLE
     list BRACKET_TABLE
-    # . time units
+    # . calendar
     unsigned int[13] DAYS_BR_MONTH
+    # . microseconds
     unsigned long long US_DAY
     unsigned long long US_HOUR
-    unsigned long long EPOCH_US
-    unsigned long long DT_MAX_US
-    unsigned long long DT_MIN_US
+    # . date
+    int ORDINAL_MAX
     # . datetime
+    unsigned long long EPOCH_US
+    unsigned long long DT_US_MAX
+    unsigned long long DT_US_MIN
     unsigned int[5] US_FRAC_CORRECTION
     # . ndarray dtype
     char NDARRAY_OBJECT
@@ -141,7 +144,7 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
     # from that boundary to n.  Life is much clearer if we subtract 1 from
     # n first -- then the values of n at 400-year boundaries are exactly
     # those divisible by _DI400Y:
-    cdef unsigned int n = min(max(ordinal, 1), 3_652_059) - 1
+    cdef unsigned int n = min(max(ordinal, 1), ORDINAL_MAX) - 1
     cdef unsigned int n400 = n // 146_097
     n %= 146_097
     cdef unsigned int year = n400 * 400 + 1
@@ -182,21 +185,20 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
         days_bf = days_bf_month(year, month)
     return ymd(year, month, n - days_bf + 1)  # type: ignore
 
-@cython.cdivision(True)
 cdef inline hms microseconds_to_hms(unsigned long long us) except *:
     """Convert microseconds to HMS `<'struct:hms'>`."""
     if us == 0:
         return hms(0, 0, 0, 0)  # exit
 
     cdef unsigned int hour, minute, second
-    us = us % US_DAY
-    hour = us // US_HOUR
-    us = us % US_HOUR
+    with cython.cdivision(True):
+        us = us % US_DAY
+        hour = us // US_HOUR
+        us = us % US_HOUR
     minute = us // 60_000_000
     us = us % 60_000_000
     second = us // 1_000_000
-    us %= 1_000_000
-    return hms(hour, minute, second, us)
+    return hms(hour, minute, second, us % 1_000_000)
 
 cdef inline int parse_us_fraction(char* data, Py_ssize_t start, Py_ssize_t end):
     """Parse microsecond fraction from 'start' to 'end' of the 'data' `<'int'>`."""

@@ -54,16 +54,19 @@ DT64_JSON_TABLE[ord("]")] = ")"
 BRACKET_TABLE: list = [chr(x) for x in range(128)]
 BRACKET_TABLE[ord("[")] = "("
 BRACKET_TABLE[ord("]")] = ")"
-# . time units
+# . calendar
 # fmt: off
 DAYS_BR_MONTH: cython.uint[13] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
+# . microseconds
 US_DAY: cython.ulonglong = 86_400_000_000
 US_HOUR: cython.ulonglong = 3_600_000_000
-EPOCH_US: cython.ulonglong = 62_135_683_200_000_000
-DT_MAX_US: cython.ulonglong = 315_537_983_999_999_999
-DT_MIN_US: cython.ulonglong = 86_400_000_000
 # fmt: on
+# . date
+ORDINAL_MAX: cython.int = 3_652_059
 # . datetime
+EPOCH_US: cython.ulonglong = 62_135_683_200_000_000
+DT_US_MAX: cython.ulonglong = 315_537_983_999_999_999
+DT_US_MIN: cython.ulonglong = 86_400_000_000
 US_FRAC_CORRECTION: cython.uint[5] = [100000, 10000, 1000, 100, 10]
 # . ndarray dtype
 NDARRAY_OBJECT: cython.char = ord(np.array(None, dtype="O").dtype.kind)  # "O"
@@ -708,7 +711,7 @@ def _escape_datetime64(data: object) -> str:
         )
         + EPOCH_US
     )
-    us = max(us, DT_MIN_US)
+    us = min(max(us, DT_US_MIN), DT_US_MAX)
     # Calculate ymd
     ymd = ordinal_to_ymd(us // US_DAY)  # type: ignore
     # Calculate hms
