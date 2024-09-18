@@ -1,6 +1,6 @@
 # cython: language_level=3
 cimport cython
-from libc.math cimport isfinite
+from libc cimport math
 from libc.stdlib cimport strtoll, strtoull, strtold
 from cpython.bytes cimport PyBytes_Size as bytes_len
 from cpython.bytes cimport PyBytes_AsString as bytes_to_chars
@@ -245,7 +245,7 @@ cdef inline bint is_arr_float_finite_1d(np.ndarray arr, np.npy_intp s_i) except 
     if npy_type == np.NPY_TYPES.NPY_FLOAT64:
         d_ptr = <double*> PyArray_DATA(arr)
         for i in range(s_i):
-            if not isfinite(d_ptr[i]):
+            if not math.isfinite(d_ptr[i]):
                 return False
         return True
     # Cast: float16 -> float32
@@ -256,7 +256,7 @@ cdef inline bint is_arr_float_finite_1d(np.ndarray arr, np.npy_intp s_i) except 
     if npy_type == np.NPY_TYPES.NPY_FLOAT32:
         f_ptr = <float*> PyArray_DATA(arr)
         for i in range(s_i):
-            if not isfinite(f_ptr[i]):
+            if not math.isfinite(f_ptr[i]):
                 return False
         return True
     # Invalid dtype
@@ -291,7 +291,7 @@ cdef inline bint is_arr_float_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_
         d_ptr = <double*> PyArray_DATA(arr)
         for i in range(s_i):
             for j in range(s_j):
-                if not isfinite(d_ptr[i * s_j + j]):
+                if not math.isfinite(d_ptr[i * s_j + j]):
                     return False
         return True
     # Cast: float16 -> float32
@@ -303,55 +303,85 @@ cdef inline bint is_arr_float_finite_2d(np.ndarray arr, np.npy_intp s_i, np.npy_
         f_ptr = <float*> PyArray_DATA(arr)
         for i in range(s_i):
             for j in range(s_j):
-                if not isfinite(f_ptr[i * s_j + j]):
+                if not math.isfinite(f_ptr[i * s_j + j]):
                     return False
         return True
     # Invalid dtype
     raise TypeError("Unsupported <'np.ndarray'> float dtype: %s." % arr.dtype)
 
 # Utils: ndarray nptime
-cdef inline long long nptime_to_microseconds(long long value, np.NPY_DATETIMEUNIT unit):
-    """Convert numpy.datetime64/timedelta64 value to total microseconds `<'long long'>`."""
-    # . common units
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ns:  # nanosecond
+cdef inline long long nptime_to_us_floor(long long value, np.NPY_DATETIMEUNIT unit):
+    """Convert numpy.datetime64/timedelta64 value to 
+    total microseconds (floor division) `<'long long'>`.
+    
+    If 'value' resolution is higher than 'us',
+    returns integer discards the resolution above microseconds.
+    """
+    # Conversion: common
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ns:
         return value // 1_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_us:  # microsecond
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_us:
         return value
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ms:  # millisecond
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ms:
         return value * 1_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_s:  # second
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_s:
         return value * 1_000_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_m:  # minute
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_m:
         return value * 60_000_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_h:  # hour
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_h:
         return value * US_HOUR
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_D:  # day
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_D:
         return value * US_DAY
-    # . uncommon units
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ps:  # picosecond
+
+    # Conversion: uncommon
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ps:
         return value // 1_000_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_fs:  # femtosecond
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_fs:
         return value // 1_000_000_000
-    if unit == np.NPY_DATETIMEUNIT.NPY_FR_as:  # attosecond
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_as:
         return value // 1_000_000_000 // 1_000
-    # . unsupported unit
+
+    # Unsupported unit
     raise ValueError(
         "Unsupported <'numpy.datetime64/timedelta64'> time unit "
         "to perform conversion: %d." % unit
     )
 
-cdef inline long long dt64_to_microseconds(object dt64):
-    """Convert numpy.datetime64 to total microseconds `<'long long'>`."""
-    return nptime_to_microseconds(
-        np.get_datetime64_value(dt64), 
-        np.get_datetime64_unit(dt64),
-    )
+cdef inline long long nptime_to_us_round(long long value, np.NPY_DATETIMEUNIT unit):
+    """Convert numpy.datetime64/timedelta64 value to 
+    total microseconds (round to nearest) `<'long long'>`.
+    
+    If 'value' resolution is higher than 'us',
+    returns integer rounds to the nearest microseconds.
+    """
+    # Conversion: common
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ns:
+        return math.llroundl(value / 1_000)
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_us:
+        return value
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ms:
+        return value * 1_000
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_s:
+        return value * 1_000_000
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_m:
+        return value * 60_000_000
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_h:
+        return value * US_HOUR
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_D:
+        return value * US_DAY
 
-cdef inline long long td64_to_microseconds(object td64):
-    """Convert numpy.timedelta64 to total microseconds `<'long long'>`."""
-    return nptime_to_microseconds(
-        np.get_timedelta64_value(td64), 
-        np.get_datetime64_unit(td64),
+    # Conversion: uncommon
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_ps:
+        return math.llroundl(value / 1_000_000)
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_fs:
+        return math.llroundl(value / 1_000_000_000)
+    if unit == np.NPY_DATETIMEUNIT.NPY_FR_as:
+        return math.llroundl(value / 1_000_000_000 / 1_000)
+
+    # Unsupported unit
+    raise ValueError(
+        "Unsupported <'numpy.datetime64/timedelta64'> time unit "
+        "to perform conversion: %d." % unit
     )
 
 # Custom types

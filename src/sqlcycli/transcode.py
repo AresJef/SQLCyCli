@@ -398,7 +398,7 @@ def _escape_timedelta(data: object) -> str:
 
     # Negative w/o microseconds
     elif microseconds == 0:
-        seconds = abs(seconds)
+        seconds = -seconds
         if seconds >= 3_600:
             hours = seconds // 3_600
             seconds %= 3_600
@@ -414,7 +414,7 @@ def _escape_timedelta(data: object) -> str:
 
     # Negative w/t microseconds
     else:
-        us: cython.ulonglong = abs(seconds * 1_000_000 + microseconds)
+        us: cython.ulonglong = -(seconds * 1_000_000 + microseconds)
         if us >= US_HOUR:
             hours = us // US_HOUR
             us %= US_HOUR
@@ -701,8 +701,14 @@ def _escape_datetime64(data: object) -> str:
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
     # Add back epoch seconds
-    us: cython.ulonglong = dt64_to_microseconds(data) + EPOCH_US  # type: ignore
-    us = min(max(us, DT_MIN_US), DT_MAX_US)
+    us: cython.ulonglong = (
+        nptime_to_us_floor(  # type: ignore
+            np.get_datetime64_value(data),
+            np.get_datetime64_unit(data),
+        )
+        + EPOCH_US
+    )
+    us = max(us, DT_MIN_US)
     # Calculate ymd
     ymd = ordinal_to_ymd(us // US_DAY)  # type: ignore
     # Calculate hms
@@ -733,7 +739,10 @@ def _escape_timedelta64(data: object) -> str:
     >>> _escape_timedelta64(np.timedelta64('12:00:00.000100'))
     >>> "'12:00:00.000100'"  # str
     """
-    us: cython.longlong = td64_to_microseconds(data)  # type: ignore
+    us: cython.longlong = nptime_to_us_round(  # type: ignore
+        np.get_timedelta64_value(data),
+        np.get_datetime64_unit(data),
+    )
     return _escape_timedelta64_fr_us(us)
 
 
@@ -742,8 +751,11 @@ def _escape_timedelta64(data: object) -> str:
 @cython.cdivision(True)
 def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
     """(cfunc) Escape numpy.timedelta64 microseconds to literal `<'str'>`."""
-    negate: cython.bint = us < 0
-    us = abs(us)
+    if us < 0:
+        negate: cython.bint = True
+        us = -us
+    else:
+        negate: cython.bint = False
     hours = us // US_HOUR
     us %= US_HOUR
     minutes = us // 60_000_000
@@ -1078,7 +1090,7 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
         l_i = []
         for i in range(s_i):
             us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
-            us = nptime_to_microseconds(us, unit)  # type: ignore
+            us = nptime_to_us_round(us, unit)  # type: ignore
             l_i.append(_escape_timedelta64_fr_us(us))
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
@@ -1096,7 +1108,7 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
             l_j = []
             for j in range(s_j):
                 us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
-                us = nptime_to_microseconds(us, unit)  # type: ignore
+                us = nptime_to_us_round(us, unit)  # type: ignore
                 l_j.append(_escape_timedelta64_fr_us(us))
             l_i.append("(" + ",".join(l_j) + ")")
         return ",".join(l_i)
@@ -2102,7 +2114,7 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
         l_i = []
         for i in range(s_i):
             us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
-            us = nptime_to_microseconds(us, unit)  # type: ignore
+            us = nptime_to_us_round(us, unit)  # type: ignore
             l_i.append(_escape_timedelta64_fr_us(us))
         return list_to_tuple(l_i) if not many else l_i
     # 2-dimensional
@@ -2120,7 +2132,7 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
             l_j = []
             for j in range(s_j):
                 us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
-                us = nptime_to_microseconds(us, unit)  # type: ignore
+                us = nptime_to_us_round(us, unit)  # type: ignore
                 l_j.append(_escape_timedelta64_fr_us(us))
             l_i.append(list_to_tuple(l_j))
         return l_i
