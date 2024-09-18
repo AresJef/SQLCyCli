@@ -141,30 +141,27 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
     # from that boundary to n.  Life is much clearer if we subtract 1 from
     # n first -- then the values of n at 400-year boundaries are exactly
     # those divisible by _DI400Y:
-    cdef:
-        unsigned int n = min(max(ordinal, 1), 3_652_059) - 1
-        unsigned int n400 = n // 146_097
-        unsigned int year, month, days_bf
-        unsigned int n100, n4, n1
-    n = n % 146_097
-    year = n400 * 400 + 1
+    cdef unsigned int n = min(max(ordinal, 1), 3_652_059) - 1
+    cdef unsigned int n400 = n // 146_097
+    n %= 146_097
+    cdef unsigned int year = n400 * 400 + 1
 
     # Now n is the (non-negative) offset, in days, from January 1 of year, to
     # the desired date.  Now compute how many 100-year cycles precede n.
     # Note that it's possible for n100 to equal 4!  In that case 4 full
     # 100-year cycles precede the desired day, which implies the desired
     # day is December 31 at the end of a 400-year cycle.
-    n100 = n // 36_524
-    n = n % 36_524
+    cdef unsigned int n100 = n // 36_524
+    n %= 36_524
 
     # Now compute how many 4-year cycles precede it.
-    n4 = n // 1_461
-    n = n % 1_461
+    cdef unsigned int n4 = n // 1_461
+    n %= 1_461
 
     # And now how many single years.  Again n1 can be 4, and again meaning
     # that the desired day is December 31 at the end of the 4-year cycle.
-    n1 = n // 365
-    n = n % 365
+    cdef unsigned int n1 = n // 365
+    n %= 365
 
     # We now know the year and the offset from January 1st.  Leap years are
     # tricky, because they can be century years.  The basic rule is that a
@@ -178,13 +175,12 @@ cdef inline ymd ordinal_to_ymd(int ordinal) except *:
 
     # Now the year is correct, and n is the offset from January 1.  We find
     # the month via an estimate that's either exact or one too large.
-    month = (n + 50) >> 5
-    days_bf = days_bf_month(year, month)
+    cdef unsigned int month = (n + 50) >> 5
+    cdef unsigned int days_bf = days_bf_month(year, month)
     if days_bf > n:
         month -= 1
         days_bf = days_bf_month(year, month)
-    n = n - days_bf + 1
-    return ymd(year, month, n)  # type: ignore
+    return ymd(year, month, n - days_bf + 1)  # type: ignore
 
 @cython.cdivision(True)
 cdef inline hms microseconds_to_hms(unsigned long long us) except *:
