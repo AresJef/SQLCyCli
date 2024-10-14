@@ -191,10 +191,9 @@ cdef inline hms microseconds_to_hms(unsigned long long us) except *:
         return hms(0, 0, 0, 0)  # exit
 
     cdef unsigned int hour, minute, second
-    with cython.cdivision(True):
-        us = us % US_DAY
-        hour = us // US_HOUR
-        us = us % US_HOUR
+    us = us % US_DAY
+    hour = us // US_HOUR
+    us = us % US_HOUR
     minute = us // 60_000_000
     us = us % 60_000_000
     second = us // 1_000_000

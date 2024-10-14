@@ -57,10 +57,10 @@ BRACKET_TABLE[ord("]")] = ")"
 # . calendar
 # fmt: off
 DAYS_BR_MONTH: cython.uint[13] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
+# fmt: on
 # . microseconds
 US_DAY: cython.ulonglong = 86_400_000_000
 US_HOUR: cython.ulonglong = 3_600_000_000
-# fmt: on
 # . date
 ORDINAL_MAX: cython.int = 3_652_059
 # . datetime
@@ -373,7 +373,6 @@ def _escape_time(data: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-@cython.cdivision(True)
 def _escape_timedelta(data: object) -> str:
     """(cfunc) Escape timedelta 'data' to literal `<'str'>`.
 
@@ -695,7 +694,6 @@ def _escape_float64(data: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-@cython.cdivision(True)
 def _escape_datetime64(data: object) -> str:
     """(cfunc) Escape numpy.datetime64 'data' to literal `<'str'>`.
 
@@ -734,7 +732,6 @@ def _escape_datetime64(data: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-@cython.cdivision(True)
 def _escape_timedelta64(data: object) -> str:
     """(cfunc) Escape numpy.timedelta64 'data' to literal `<'str'>`.
 
@@ -751,7 +748,6 @@ def _escape_timedelta64(data: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-@cython.cdivision(True)
 def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
     """(cfunc) Escape numpy.timedelta64 microseconds to literal `<'str'>`."""
     if us < 0:
@@ -1064,7 +1060,6 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-@cython.cdivision(True)
 def _escape_ndarray_td64(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
