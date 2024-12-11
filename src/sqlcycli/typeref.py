@@ -46,12 +46,12 @@ DATETIMEINDEX: type[DatetimeIndex] = DatetimeIndex
 TIMEDELTAINDEX: type[TimedeltaIndex] = TimedeltaIndex
 # . cytimes types
 try:
-    from cytimes import pydt, pddt
+    from cytimes import Pydt, Pddt
 
     CYTIMES_AVAILABLE: cython.bint = True
-    PYDT: type[pydt] = pydt
-    PDDT: type[pddt] = pddt
+    PYDT: type[Pydt] = Pydt
+    PDDT: type[Pddt] = Pddt
 except ImportError:
     CYTIMES_AVAILABLE: cython.bint = False
-    PYDT: type[pydt] = None
-    PDDT: type[pydt] = None
+    PYDT: type[Pydt] = None
+    PDDT: type[Pydt] = None

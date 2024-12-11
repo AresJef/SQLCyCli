@@ -996,18 +996,18 @@ class TestTranscode(TestCase):
         # pydt
         val = datetime.datetime(2021, 1, 1, 12, 0, 0)
         cmp = "'2021-01-01 12:00:00'"
-        self.assertEqual(escape(cytimes.pydt(val), b"utf8", False, False), cmp)
-        self.assertEqual(escape(cytimes.pydt(val), b"utf8", True, False), cmp)
-        self.assertEqual(escape(cytimes.pydt(val), b"utf8", True, True), cmp)
+        self.assertEqual(escape(cytimes.Pydt.parse(val), b"utf8", False, False), cmp)
+        self.assertEqual(escape(cytimes.Pydt.parse(val), b"utf8", True, False), cmp)
+        self.assertEqual(escape(cytimes.Pydt.parse(val), b"utf8", True, True), cmp)
 
         # pddt
         val = [datetime.datetime(2021, 1, 1, 12, 0, 0), "2021-01-01 12:00:01"]
         cmp1 = "('2021-01-01 12:00:00','2021-01-01 12:00:01')"
         cmp2 = ("'2021-01-01 12:00:00'", "'2021-01-01 12:00:01'")
         cmp3 = ["'2021-01-01 12:00:00'", "'2021-01-01 12:00:01'"]
-        self.assertEqual(escape(cytimes.pddt(val), b"utf8", False, False), cmp1)
-        self.assertEqual(escape(cytimes.pddt(val), b"utf8", True, False), cmp2)
-        self.assertEqual(escape(cytimes.pddt(val), b"utf8", True, True), cmp3)
+        self.assertEqual(escape(cytimes.Pddt(val), b"utf8", False, False), cmp1)
+        self.assertEqual(escape(cytimes.Pddt(val), b"utf8", True, False), cmp2)
+        self.assertEqual(escape(cytimes.Pddt(val), b"utf8", True, True), cmp3)
 
         self.log_ended(test)
 

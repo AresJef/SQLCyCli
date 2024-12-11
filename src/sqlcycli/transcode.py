@@ -1477,10 +1477,10 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
     if typeref.CYTIMES_AVAILABLE:
         # . <'cytimes.pydt'>
         if dtype is typeref.PYDT:
-            return _escape_datetime(data.dt)
+            return _escape_datetime(data)
         # . <'cytimes.pddt'>
         if dtype is typeref.PDDT:
-            return _escape_series(data.dt, encoding)
+            return _escape_series(data, encoding)
 
     ##### Subclass Types #####
     return _escape_subclass(data, encoding, dtype)
@@ -2524,10 +2524,10 @@ def _escape_item_uncommon(
     if typeref.CYTIMES_AVAILABLE:
         # . <'cytimes.pydt'>
         if dtype is typeref.PYDT:
-            return _escape_datetime(data.dt)
+            return _escape_datetime(data)
         # . <'cytimes.pddt'>
         if dtype is typeref.PDDT:
-            return _escape_item_series(data.dt, encoding, many)
+            return _escape_item_series(data, encoding, many)
 
     ##### Subclass Types #####
     return _escape_item_subclass(data, encoding, many, dtype)
