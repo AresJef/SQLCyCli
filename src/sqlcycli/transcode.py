@@ -54,20 +54,6 @@ DT64_JSON_TABLE[ord("]")] = ")"
 BRACKET_TABLE: list = [chr(x) for x in range(128)]
 BRACKET_TABLE[ord("[")] = "("
 BRACKET_TABLE[ord("]")] = ")"
-# . calendar
-# fmt: off
-DAYS_BR_MONTH: cython.uint[13] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
-# fmt: on
-# . microseconds
-US_DAY: cython.ulonglong = 86_400_000_000
-US_HOUR: cython.ulonglong = 3_600_000_000
-# . date
-ORDINAL_MAX: cython.int = 3_652_059
-# . datetime
-EPOCH_US: cython.ulonglong = 62_135_683_200_000_000
-DT_US_MAX: cython.ulonglong = 315_537_983_999_999_999
-DT_US_MIN: cython.ulonglong = 86_400_000_000
-US_FRAC_CORRECTION: cython.uint[5] = [100000, 10000, 1000, 100, 10]
 # . ndarray dtype
 NDARRAY_OBJECT: cython.char = ord(np.array(None, dtype="O").dtype.kind)  # "O"
 NDARRAY_INT: cython.char = ord(np.array(1, dtype=np.int64).dtype.kind)  # "i"
@@ -78,6 +64,57 @@ NDARRAY_DT64: cython.char = ord(np.array(1, dtype="datetime64[ns]").dtype.kind) 
 NDARRAY_TD64: cython.char = ord(np.array(1, dtype="timedelta64[ns]").dtype.kind)  # "m"
 NDARRAY_BYTES: cython.char = ord(np.array(b"1", dtype="S").dtype.kind)  # "S"
 NDARRAY_UNICODE: cython.char = ord(np.array("1", dtype="U").dtype.kind)  # "U"
+# . calendar
+# fmt: off
+DAYS_BR_MONTH: cython.int[13] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
+# fmt: on
+# . date
+ORDINAL_MAX: cython.int = 3_652_059
+# . datetime
+#: EPOCH (1970-01-01)
+EPOCH_YEAR: cython.longlong = 1970
+EPOCH_MONTH: cython.longlong = 23_628
+EPOCH_DAY: cython.longlong = 719_163
+EPOCH_HOUR: cython.longlong = EPOCH_DAY * 24
+EPOCH_MINUTE: cython.longlong = EPOCH_HOUR * 60
+EPOCH_SECOND: cython.longlong = EPOCH_MINUTE * 60
+EPOCH_MILLISECOND: cython.longlong = EPOCH_SECOND * 1_000
+EPOCH_MICROSECOND: cython.longlong = EPOCH_MILLISECOND * 1_000
+#: fraction correction
+US_FRAC_CORRECTION: cython.int[5] = [100000, 10000, 1000, 100, 10]
+# . conversion for seconds
+SS_MINUTE: cython.longlong = 60
+SS_HOUR: cython.longlong = SS_MINUTE * 60
+SS_DAY: cython.longlong = SS_HOUR * 24
+# . conversion for milliseconds
+MS_SECOND: cython.longlong = 1_000
+MS_MINUTE: cython.longlong = MS_SECOND * 60
+MS_HOUR: cython.longlong = MS_MINUTE * 60
+MS_DAY: cython.longlong = MS_HOUR * 24
+# . conversion for microseconds
+US_MILLISECOND: cython.longlong = 1_000
+US_SECOND: cython.longlong = US_MILLISECOND * 1_000
+US_MINUTE: cython.longlong = US_SECOND * 60
+US_HOUR: cython.longlong = US_MINUTE * 60
+US_DAY: cython.longlong = US_HOUR * 24
+# . conversion for nanoseconds
+NS_MICROSECOND: cython.longlong = 1_000
+NS_MILLISECOND: cython.longlong = NS_MICROSECOND * 1_000
+NS_SECOND: cython.longlong = NS_MILLISECOND * 1_000
+NS_MINUTE: cython.longlong = NS_SECOND * 60
+NS_HOUR: cython.longlong = NS_MINUTE * 60
+NS_DAY: cython.longlong = NS_HOUR * 24
+# . conversion for timedelta64
+TD64_YY_DAY: cython.double = 365.2425  # Exact days in a year for td64
+TD64_YY_SECOND: cython.longlong = int(TD64_YY_DAY * SS_DAY)
+TD64_YY_MILLISECOND: cython.longlong = TD64_YY_SECOND * 1_000
+TD64_YY_MICROSECOND: cython.longlong = TD64_YY_MILLISECOND * 1_000
+TD64_YY_NANOSECOND: cython.longlong = TD64_YY_MICROSECOND * 1_000
+TD64_MM_DAY: cython.double = 30.436875  # Exact days in a month for td64
+TD64_MM_SECOND: cython.longlong = int(TD64_MM_DAY * SS_DAY)
+TD64_MM_MILLISECOND: cython.longlong = TD64_MM_SECOND * 1_000
+TD64_MM_MICROSECOND: cython.longlong = TD64_MM_MILLISECOND * 1_000
+TD64_MM_NANOSECOND: cython.longlong = TD64_MM_MICROSECOND * 1_000
 
 
 # Utils ---------------------------------------------------------------------------------------
@@ -382,61 +419,59 @@ def _escape_timedelta(data: object) -> str:
     >>> "'12:00:00.000100'"  # str
     """
     # Get total seconds and microseconds
-    seconds: cython.longlong = (
-        datetime.timedelta_seconds(data) + datetime.timedelta_days(data) * 86_400
+    hh: cython.int
+    mi: cython.int
+    ss: cython.longlong = (
+        datetime.timedelta_seconds(data) + datetime.timedelta_days(data) * SS_DAY
     )
-    microseconds: cython.int = datetime.timedelta_microseconds(data)
+    us: cython.longlong = datetime.timedelta_microseconds(data)
 
     # Positive timedelta
-    if seconds >= 0:
-        hours = seconds // 3_600
-        seconds %= 3_600
-        minutes = seconds // 60
-        seconds %= 60
-        if microseconds == 0:
-            return "'%02d:%02d:%02d'" % (hours, minutes, seconds)
-        else:
-            return "'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, microseconds)
+    if ss >= 0:
+        hh = math_floor_div(ss, SS_HOUR)  # type: ignore
+        ss -= hh * SS_HOUR
+        mi = math_floor_div(ss, SS_MINUTE)  # type: ignore
+        ss -= mi * SS_MINUTE
+        if us == 0:
+            return "'%02d:%02d:%02d'" % (hh, mi, ss)
+        return "'%02d:%02d:%02d.%06d'" % (hh, mi, ss, us)
 
     # Negative w/o microseconds
-    elif microseconds == 0:
-        seconds = -seconds
-        if seconds >= 3_600:
-            hours = seconds // 3_600
-            seconds %= 3_600
-            minutes = seconds // 60
-            seconds %= 60
-            return "'-%02d:%02d:%02d'" % (hours, minutes, seconds)
-        elif seconds >= 60:
-            minutes = seconds // 60
-            seconds %= 60
-            return "'-00:%02d:%02d'" % (minutes, seconds)
-        else:
-            return "'-00:00:%02d'" % seconds
+    if us == 0:
+        ss = -ss
+        if ss >= 3_600:
+            hh = math_floor_div(ss, SS_HOUR)  # type: ignore
+            ss -= hh * SS_HOUR
+            mi = math_floor_div(ss, SS_MINUTE)  # type: ignore
+            ss -= mi * SS_MINUTE
+            return "'-%02d:%02d:%02d'" % (hh, mi, ss)
+        if ss >= 60:
+            mi = math_floor_div(ss, SS_MINUTE)  # type: ignore
+            ss -= mi * SS_MINUTE
+            return "'-00:%02d:%02d'" % (mi, ss)
+        return "'-00:00:%02d'" % ss
 
     # Negative w/t microseconds
-    else:
-        us: cython.ulonglong = -(seconds * 1_000_000 + microseconds)
-        if us >= US_HOUR:
-            hours = us // US_HOUR
-            us %= US_HOUR
-            minutes = us // 60_000_000
-            us %= 60_000_000
-            seconds = us // 1_000_000
-            us %= 1_000_000
-            return "'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
-        elif us >= 60_000_000:
-            minutes = us // 60_000_000
-            us %= 60_000_000
-            seconds = us // 1_000_000
-            us %= 1_000_000
-            return "'-00:%02d:%02d.%06d'" % (minutes, seconds, us)
-        elif us >= 1_000_000:
-            seconds = us // 1_000_000
-            us %= 1_000_000
-            return "'-00:00:%02d.%06d'" % (seconds, us)
-        else:
-            return "'-00:00:00.%06d'" % us
+    us = -(ss * 1_000_000 + us)
+    if us >= US_HOUR:
+        hh = math_floor_div(us, US_HOUR)  # type: ignore
+        us -= hh * US_HOUR
+        mi = math_floor_div(us, US_MINUTE)  # type: ignore
+        us -= mi * US_MINUTE
+        ss = math_floor_div(us, US_SECOND)  # type: ignore
+        us -= ss * US_SECOND
+        return "'-%02d:%02d:%02d.%06d'" % (hh, mi, ss, us)
+    if us >= 60_000_000:
+        mi = math_floor_div(us, US_MINUTE)  # type: ignore
+        us -= mi * US_MINUTE
+        ss = math_floor_div(us, US_SECOND)  # type: ignore
+        us -= ss * US_SECOND
+        return "'-00:%02d:%02d.%06d'" % (mi, ss, us)
+    if us >= 1_000_000:
+        ss = math_floor_div(us, US_SECOND)  # type: ignore
+        us -= ss * US_SECOND
+        return "'-00:00:%02d.%06d'" % (ss, us)
+    return "'-00:00:00.%06d'" % us
 
 
 # . Bytes types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -701,31 +736,30 @@ def _escape_datetime64(data: object) -> str:
     >>> _escape_datetime64(np.datetime64('2021-01-01T12:00:00.001'))
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
-    # Add back epoch seconds
-    us: cython.ulonglong = (
-        nptime_to_us_floor(  # type: ignore
-            np.get_datetime64_value(data),
-            np.get_datetime64_unit(data),
-        )
-        + EPOCH_US
-    )
-    us = min(max(us, DT_US_MIN), DT_US_MAX)
-    # Calculate ymd
-    ymd = ordinal_to_ymd(us // US_DAY)  # type: ignore
-    # Calculate hms
-    hms = microseconds_to_hms(us)  # type: ignore
-    # Escape
+    return _escape_datetime64_fr_us(dt64_as_int64_us(data))  # type: ignore
+
+
+@cython.cfunc
+@cython.inline(True)
+def _escape_datetime64_fr_us(us: cython.longlong) -> str:
+    """(cfunc) Escape numpy.datetime64 microseconds to literal `<'str'>."""
+    # Compute ymd & hmsf
+    us: cython.longlong = us + EPOCH_MICROSECOND  # type: ignore
+    _ymd = ymd_fr_ordinal(math_floor_div(us, US_DAY))  # type: ignore
+    _hmsf = hmsf_fr_us(us)  # type: ignore
+
+    # Escape datetime64
     # fmt: off
-    microsecond: cython.uint = hms.microsecond
+    microsecond: cython.uint = _hmsf.microsecond
     if microsecond == 0:
         return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
-            ymd.year, ymd.month, ymd.day, 
-            hms.hour, hms.minute, hms.second,
+            _ymd.year, _ymd.month, _ymd.day, 
+            _hmsf.hour, _hmsf.minute, _hmsf.second,
         )
     else:
         return "'%04d-%02d-%02d %02d:%02d:%02d.%06d'" % (
-            ymd.year, ymd.month, ymd.day, 
-            hms.hour, hms.minute, hms.second, microsecond,
+            _ymd.year, _ymd.month, _ymd.day, 
+            _hmsf.hour, _hmsf.minute, _hmsf.second, microsecond,
         )
     # fmt: on
 
@@ -739,11 +773,7 @@ def _escape_timedelta64(data: object) -> str:
     >>> _escape_timedelta64(np.timedelta64('12:00:00.000100'))
     >>> "'12:00:00.000100'"  # str
     """
-    us: cython.longlong = nptime_to_us_round(  # type: ignore
-        np.get_timedelta64_value(data),
-        np.get_datetime64_unit(data),
-    )
-    return _escape_timedelta64_fr_us(us)
+    return _escape_timedelta64_fr_us(td64_as_int64_us(data))  # type: ignore
 
 
 @cython.cfunc
@@ -755,22 +785,20 @@ def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
         us = -us
     else:
         negate: cython.bint = False
-    hours = us // US_HOUR
-    us %= US_HOUR
-    minutes = us // 60_000_000
-    us %= 60_000_000
-    seconds = us // 1_000_000
-    us %= 1_000_000
-    if us == 0:
-        if negate:
-            return "'-%02d:%02d:%02d'" % (hours, minutes, seconds)
-        else:
-            return "'%02d:%02d:%02d'" % (hours, minutes, seconds)
+    hh: cython.int = math_floor_div(us, US_HOUR)  # type: ignore
+    us -= hh * US_HOUR
+    mi: cython.int = math_floor_div(us, US_MINUTE)  # type: ignore
+    us -= mi * US_MINUTE
+    ss: cython.int = math_floor_div(us, US_SECOND)  # type: ignore
+    us -= ss * US_SECOND
+    if negate:
+        if us == 0:
+            return "'-%02d:%02d:%02d'" % (hh, mi, ss)
+        return "'-%02d:%02d:%02d.%06d'" % (hh, mi, ss, us)
     else:
-        if negate:
-            return "'-%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
-        else:
-            return "'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, us)
+        if us == 0:
+            return "'%02d:%02d:%02d'" % (hh, mi, ss)
+        return "'%02d:%02d:%02d.%06d'" % (hh, mi, ss, us)
 
 
 @cython.cfunc
@@ -862,17 +890,14 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         if s_j == 0:
             return "()"  # exit
         # . escape to literal
-        # fmt: off
-        l_i = [
-            "(" + ",".join([
-                _escape_common(arr_getitem_2d(arr, i, j), encoding)  # type: ignore
-                for j in range(s_j)]) + ")"
-            for i in range(s_i)
-        ]
-        # fmt: on
+        i: cython.Py_ssize_t
+        l_i = []
+        for i in range(s_i):
+            l_j = [_escape_common(arr_getitem_2d(arr, i, j), encoding) for j in range(s_j)]  # type: ignore
+            l_i.append("(" + ",".join(l_j) + ")")
         return ",".join(l_i)
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -915,7 +940,7 @@ def _escape_ndarray_int(arr: np.ndarray) -> str:
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -946,7 +971,7 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
             return "()"  # exit
         # . check if value is finite
         if not is_arr_float_finite_1d(arr, s_i):  # type: ignore
-            raise ValueError("Float value 'nan' & 'inf' not supported.")
+            raise ValueError("float value 'nan' & 'inf' are not supported.")
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
@@ -959,14 +984,14 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
             return "()"  # exit
         # . check if value is finite
         if not is_arr_float_finite_2d(arr, s_i, s_j):  # type: ignore
-            raise ValueError("Float value 'nan' & 'inf' not supported.")
+            raise ValueError("float value 'nan' & 'inf' are not supported.")
         # . escape to literal
         res = _orjson_dumps_numpy(arr)
         if str_read(res, 1) == "[":
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, BRACKET_TABLE)  # type: ignore
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -994,8 +1019,9 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
         if s_i == 0:
             return "()"  # exit
         # . escape to literal
-        res = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
-        return translate_str(res, BRACKET_TABLE)  # type: ignore
+        arr_ptr = cython.cast(cython.pointer(np.npy_bool), np.PyArray_DATA(arr))
+        l_i = ["1" if arr_ptr[i] else "0" for i in range(s_i)]
+        return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1004,12 +1030,15 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
         if s_j == 0:
             return "()"  # exit
         # . escape to literal
-        res = _orjson_dumps_numpy(np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64))
-        if str_read(res, 1) == "[":
-            res = str_substr(res, 1, str_len(res) - 1)
-        return translate_str(res, BRACKET_TABLE)  # type: ignore
+        arr_ptr = cython.cast(cython.pointer(np.npy_bool), np.PyArray_DATA(arr))
+        l_i = []
+        i: cython.Py_ssize_t
+        for i in range(s_i):
+            l_j = ["1" if arr_ptr[i * s_j + j] else "0" for j in range(s_j)]
+            l_i.append("(" + ",".join(l_j) + ")")
+        return ",".join(l_i)
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1055,7 +1084,7 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
             res = str_substr(res, 1, str_len(res) - 1)
         return translate_str(res, DT64_JSON_TABLE)  # type: ignore
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1084,12 +1113,11 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
-        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
-        l_i = []
-        for i in range(s_i):
-            us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
-            us = nptime_to_us_round(us, unit)  # type: ignore
-            l_i.append(_escape_timedelta64_fr_us(us))
+        arr_ptr = cython.cast(cython.pointer(np.npy_int64), np.PyArray_DATA(arr))
+        l_i = [
+            _escape_timedelta64_fr_us(td64_val_as_int64_us(arr_ptr[i], unit))  # type: ignore
+            for i in range(s_i)
+        ]
         return "(" + ",".join(l_i) + ")"
     # 2-dimensional
     if ndim == 2:
@@ -1100,18 +1128,18 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
             return "()"  # exit
         # . escape to literal
         unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0, 0])
-        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        arr_ptr = cython.cast(cython.pointer(np.npy_int64), np.PyArray_DATA(arr))
         l_i = []
+        i: cython.Py_ssize_t
         for i in range(s_i):
-            l_j = []
-            for j in range(s_j):
-                us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
-                us = nptime_to_us_round(us, unit)  # type: ignore
-                l_j.append(_escape_timedelta64_fr_us(us))
+            l_j = [
+                _escape_timedelta64_fr_us(td64_val_as_int64_us(arr_ptr[i * s_j + j], unit))  # type: ignore
+                for j in range(s_j)
+            ]
             l_i.append("(" + ",".join(l_j) + ")")
         return ",".join(l_i)
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1155,7 +1183,7 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
         ]
         return ",".join(l_i)
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1208,7 +1236,15 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
         # fmt: on
         return ",".join(l_i)
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
+
+
+@cython.cfunc
+@cython.inline(True)
+@cython.exceptval(-1, check=False)
+def _raise_unsupported_array_dim_error(ndim: cython.int) -> cython.bint:
+    """(internal) Raise unsupported ndarray dimension error"""
+    raise ValueError("unsupported <'numpy.ndarray'> dimension '%d'." % ndim)
 
 
 # . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1538,10 +1574,9 @@ def _escape_item_list(
         [["val1", 1, 1.1], ["val2", 2, 2.2]], False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data]
+    return list_to_tuple([_escape_common(i, encoding) for i in data])
 
 
 @cython.cfunc
@@ -1574,10 +1609,9 @@ def _escape_item_tuple(
         (("val1", 1, 1.1), ("val2", 2, 2.2)), False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data]
+    return list_to_tuple([_escape_common(i, encoding) for i in data])
 
 
 @cython.cfunc
@@ -1610,10 +1644,9 @@ def _escape_item_set(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}, False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data]
+    return list_to_tuple([_escape_common(i, encoding) for i in data])
 
 
 @cython.cfunc
@@ -1646,10 +1679,9 @@ def _escape_item_frozenset(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}), False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data]
+    return list_to_tuple([_escape_common(i, encoding) for i in data])
 
 
 @cython.cfunc
@@ -1682,10 +1714,9 @@ def _escape_item_sequence(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values(), True)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data]
+    return list_to_tuple([_escape_common(i, encoding) for i in data])
 
 
 @cython.cfunc
@@ -1703,7 +1734,7 @@ def _escape_item_range(data: object, many: cython.bint) -> object:
     >>> ["1", "2", "3"]  # list[str]
     """
     l = [_escape_int(i) for i in data]
-    return list_to_tuple(l) if not many else l
+    return l if many else list_to_tuple(l)
 
 
 # . Mapping types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1737,10 +1768,9 @@ def _escape_item_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}, True)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
-    if not many:
-        return list_to_tuple([_escape_common(i, encoding) for i in data.values()])
-    else:
+    if many:
         return [_escape_item_common(i, encoding, False) for i in data.values()]
+    return list_to_tuple([_escape_common(i, encoding) for i in data.values()])
 
 
 # . NumPy types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1833,20 +1863,19 @@ def _escape_item_ndarray_object(
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
-        if not many:
-            # fmt: off
-            return list_to_tuple([
-                _escape_common(arr_getitem_1d(arr, i), encoding)  # type: ignore
-                for i in range(s_i)
-            ])
-        else:
+        if many:
             return [
                 _escape_item_common(arr_getitem_1d(arr, i), encoding, False)  # type: ignore
                 for i in range(s_i)
             ]
-            # fmt: on
+        return list_to_tuple(
+            [
+                _escape_common(arr_getitem_1d(arr, i), encoding)  # type: ignore
+                for i in range(s_i)
+            ]
+        )
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1864,7 +1893,7 @@ def _escape_item_ndarray_object(
         ]
         # fmt: on
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1895,11 +1924,11 @@ def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
-        return list_to_tuple(l_i) if not many else l_i
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1912,7 +1941,7 @@ def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
         l_i = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
         return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1945,14 +1974,14 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . check if value is finite
         if not is_arr_float_finite_1d(arr, s_i):  # type: ignore
             raise ValueError("Float value 'nan' & 'inf' is not supported.")
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
-        return list_to_tuple(l_i) if not many else l_i
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -1968,7 +1997,7 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
         l_i = str_split(str_substr(res, 2, str_len(res) - 2), "],[", -1)
         return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -1999,12 +2028,11 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
-        if not many:
-            return list_to_tuple(["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(s_i)])  # type: ignore
-        else:
-            return ["1" if arr_getitem_1d_bint(arr, i) else "0" for i in range(s_i)]  # type: ignore
+        arr_ptr = cython.cast(cython.pointer(np.npy_bool), np.PyArray_DATA(arr))
+        l_i = ["1" if arr_ptr[i] else "0" for i in range(s_i)]
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -2013,12 +2041,15 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
         if s_j == 0:
             return []  # exit
         # . escape items to literals
-        return [
-            list_to_tuple(["1" if arr_getitem_2d_bint(arr, i, j) else "0" for j in range(s_j)])  # type: ignore
-            for i in range(s_i)
-        ]
+        arr_ptr = cython.cast(cython.pointer(np.npy_bool), np.PyArray_DATA(arr))
+        l_i = []
+        i: cython.Py_ssize_t
+        for i in range(s_i):
+            l_j = ["1" if arr_ptr[i * s_j + j] else "0" for j in range(s_j)]  # type: ignore
+            l_i.append(list_to_tuple(l_j))
+        return l_i
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -2055,12 +2086,12 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
         res = _orjson_dumps_numpy(arr)
         res = translate_str(res, DT64_JSON_TABLE)  # type: ignore
         l_i = str_split(str_substr(res, 1, str_len(res) - 1), ",", -1)
-        return list_to_tuple(l_i) if not many else l_i
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -2074,7 +2105,7 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
         l_i = str_split(str_substr(res, 2, str_len(res) - 2), "),(", -1)
         return [list_to_tuple(str_split(i, ",", -1)) for i in l_i]
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -2105,16 +2136,15 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
         unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0])
-        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
-        l_i = []
-        for i in range(s_i):
-            us: cython.longlong = arr_getitem_1d_ll(arr, i)  # type: ignore
-            us = nptime_to_us_round(us, unit)  # type: ignore
-            l_i.append(_escape_timedelta64_fr_us(us))
-        return list_to_tuple(l_i) if not many else l_i
+        arr_ptr = cython.cast(cython.pointer(np.npy_int64), np.PyArray_DATA(arr))
+        l_i = [
+            _escape_timedelta64_fr_us(td64_val_as_int64_us(arr_ptr[i], unit))  # type: ignore
+            for i in range(s_i)
+        ]
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -2124,18 +2154,18 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
             return []  # exit
         # . escape items to literals
         unit: np.NPY_DATETIMEUNIT = np.get_datetime64_unit(arr[0, 0])
-        arr = np.PyArray_Cast(arr, np.NPY_TYPES.NPY_INT64)
+        arr_ptr = cython.cast(cython.pointer(np.npy_int64), np.PyArray_DATA(arr))
         l_i = []
+        i: cython.Py_ssize_t
         for i in range(s_i):
-            l_j = []
-            for j in range(s_j):
-                us: cython.longlong = arr_getitem_2d_ll(arr, i, j)  # type: ignore
-                us = nptime_to_us_round(us, unit)  # type: ignore
-                l_j.append(_escape_timedelta64_fr_us(us))
+            l_j = [
+                _escape_timedelta64_fr_us(td64_val_as_int64_us(arr_ptr[i * s_j + j], unit))  # type: ignore
+                for j in range(s_j)
+            ]
             l_i.append(list_to_tuple(l_j))
         return l_i
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -2166,12 +2196,10 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
-        if not many:
-            return list_to_tuple([_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)])  # type: ignore
-        else:
-            return [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
+        l_i = [_escape_bytes(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -2180,12 +2208,14 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
         if s_j == 0:
             return []  # exit
         # . escape items to literals
-        return [
-            list_to_tuple([_escape_bytes(arr_getitem_2d(arr, i, j)) for j in range(s_j)])  # type: ignore
-            for i in range(s_i)
-        ]
+        l_i = []
+        i: cython.Py_ssize_t
+        for i in range(s_i):
+            l_j = [_escape_bytes(arr_getitem_2d(arr, i, j)) for j in range(s_j)]  # type: ignore
+            l_i.append(list_to_tuple(l_j))
+        return l_i
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 @cython.cfunc
@@ -2220,20 +2250,10 @@ def _escape_item_ndarray_unicode(
         s_i: cython.Py_ssize_t = shape[0]
         # . empty ndarray
         if s_i == 0:
-            return () if not many else []  # exit
+            return [] if many else ()  # exit
         # . escape items to literals
-        # fmt: off
-        if not many:
-            return list_to_tuple([
-                _escape_str(arr_getitem_1d(arr, i), encoding)  # type: ignore
-                for i in range(s_i)
-            ]) 
-        else:
-            return [
-                _escape_str(arr_getitem_1d(arr, i), encoding)  # type: ignore
-                for i in range(s_i)
-            ]
-        # fmt: on
+        l_i = [_escape_str(arr_getitem_1d(arr, i), encoding) for i in range(s_i)]  # type: ignore
+        return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
         s_i: cython.Py_ssize_t = shape[0]
@@ -2242,16 +2262,14 @@ def _escape_item_ndarray_unicode(
         if s_j == 0:
             return []  # exit
         # . escape items to literals
-        # fmt: off
-        return [
-            list_to_tuple([
-                _escape_str(arr_getitem_2d(arr, i, j), encoding)  # type: ignore
-                for j in range(s_j)])
-            for i in range(s_i)
-        ]
-        # fmt: on
+        l_i = []
+        i: cython.Py_ssize_t
+        for i in range(s_i):
+            l_j = [_escape_str(arr_getitem_2d(arr, i, j), encoding) for j in range(s_j)]  # type: ignore
+            l_i.append(list_to_tuple(l_j))
+        return l_i
     # invalid
-    raise ValueError("Unsupported <'numpy.ndarray'> dimension: %d." % ndim)
+    _raise_unsupported_array_dim_error(ndim)
 
 
 # . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -3130,7 +3148,7 @@ def _test_date_n_time() -> None:
 
     for year in range(1, 10_000):
         n = calendar.isleap(year)
-        x = is_leapyear(year)  # type: ignore
+        x = is_leap_year(year)  # type: ignore
         assert n == x, f"{n} | {x} - year: {year}"
 
     for year in (2023, 2024):
@@ -3143,7 +3161,7 @@ def _test_date_n_time() -> None:
 
     for ordinal in range(1, 3_652_059):
         ymd_n = _ord2ymd(ordinal)
-        ymd = ordinal_to_ymd(ordinal)  # type: ignore
+        ymd = ymd_fr_ordinal(ordinal)  # type: ignore
         ymd_x = (ymd.year, ymd.month, ymd.day)
         assert ymd_n == ymd_x, f"{ymd_n} | {ymd_x} - ordinal: {ordinal}"
 
@@ -3157,8 +3175,8 @@ def _test_date_n_time() -> None:
         (86_400_000_000, (0, 0, 0, 0)),
         (86_400_000_001, (0, 0, 0, 1)),
     ]:
-        hms = microseconds_to_hms(us)  # type: ignore
-        x = (hms.hour, hms.minute, hms.second, hms.microsecond)
+        _hmsf = hmsf_fr_us(us)  # type: ignore
+        x = (_hmsf.hour, _hmsf.minute, _hmsf.second, _hmsf.microsecond)
         assert hms_n == x, f"{hms_n} | {x} - microseconds: {us}"
 
     for idx, (frac, cmp) in enumerate(
