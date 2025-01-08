@@ -3,7 +3,7 @@
 # cython: boundscheck=False
 
 """
-This module provides a collection of classes to represents the MySQL functions.
+This module provides a collection of classes to represent the MySQL functions.
 Each class corresponds to a distinct MySQL function (e.g., TO_DAYS, MD5, etc.),
 and all of them derive from a common base class `<'SQLFunction'>`.
 
