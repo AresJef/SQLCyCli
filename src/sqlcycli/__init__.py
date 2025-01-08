@@ -1,4 +1,4 @@
-from sqlcycli import constants, errors
+from sqlcycli import constants, errors, sqlfunc, sqlintvl
 from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
@@ -24,6 +24,8 @@ __all__ = [
     # Module
     "constants",
     "errors",
+    "sqlfunc",
+    "sqlintvl",
     # Class
     "AuthPlugin",
     "OptionFile",
