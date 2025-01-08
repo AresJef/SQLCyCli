@@ -238,6 +238,10 @@ class DecodeError(TranscodeError, NotSupportedError):
     """Raised when a decode type is not supported."""
 
 
+class SQLFunctionError(TranscodeError, ProgrammingError):
+    """Raised when a SQL function is not supported."""
+
+
 # Protocol Exceptions ----------------------------------------------------------------------------
 class ProtocolError(MySQLError):
     """Base class for all exceptions raised by Protocol."""
