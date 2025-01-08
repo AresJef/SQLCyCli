@@ -1,8 +1,8 @@
-## Fast MySQL driver build in Cython (Sync and Async).
+# Fast MySQL driver build in Cython (Sync and Async).
 
 Created to be used in a project, this package is published to github for ease of management and installation across different modules.
 
-### Installation
+## Installation
 
 Install from `PyPi`
 
@@ -29,12 +29,12 @@ Try the following to fix dependency issue (source: [Stack Overflow](https://stac
 sudo apt-get install pkg-config python3-dev default-libmysqlclient-dev build-essential
 ```
 
-### Requirements
+## Requirements
 
 - Python 3.10 or higher.
 - MySQL 5.5 or higher.
 
-### Features
+## Features
 
 - Written in [Cython](https://cython.org/) for optimal performance (especially for SELECT/INSERT query).
 - All classes and methods are well documented and type annotated.
@@ -42,7 +42,7 @@ sudo apt-get install pkg-config python3-dev default-libmysqlclient-dev build-ess
 - API Compatiable with [PyMySQL](https://github.com/PyMySQL/PyMySQL) and [aiomysql](https://github.com/aio-libs/aiomysql).
 - Support conversion (escape) for most of the native python types, and objects from libaray [numpy](https://github.com/numpy/numpy) and [pandas](https://github.com/pandas-dev/pandas). Does `NOT` support custom conversion (escape).
 
-### Benchmark
+## Benchmark
 
 The following result comes from [benchmark](./src/benchmark.py):
 
@@ -76,9 +76,9 @@ aiomysql    async   50000   3.534125        0.344573    3.345815        0.104281
 asyncmy     async   50000   3.695764        0.352104    3.460674        0.104523
 ```
 
-### Usage
+## Usage
 
-#### Use `connect()` to create one connection (`Sync` or `Async`) to the server.
+### Use `connect()` to create one connection (`Sync` or `Async`) to the server.
 
 ```python
 import asyncio
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     asyncio.run(test_async_connection())
 ```
 
-#### Use `create_pool()` to create a Pool for managing and maintaining `Async` connections to the server.
+### Use `create_pool()` to create a Pool for managing and maintaining `Async` connections to the server.
 
 ```python
 import asyncio
@@ -172,6 +172,28 @@ if __name__ == "__main__":
     asyncio.run(test_pool_context_connected())
     asyncio.run(test_pool_context_disconnected())
     asyncio.run(test_pool_direct_connected())
+```
+
+### Use `sqlfunc` module to escape MySQL function values
+
+```python
+import datetime
+from sqlcycli import Connection, sqlfunc
+
+HOST = "localhost"
+PORT = 3306
+USER = "root"
+PSWD = "Password_123456"
+
+conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
+conn.connect()
+with conn.cursor() as cur:
+    cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
+    res = cur.fetchone()
+    print(cur.executed_sql)
+    # SELECT TO_DAYS('2007-10-07')
+    print(res)
+    # 733321
 ```
 
 ### Acknowledgements
