@@ -1,5 +1,5 @@
-import unittest, time, datetime, decimal
-from sqlcycli import escape, sqlfunc, sqlintvl, errors
+import unittest, time, datetime
+from sqlcycli import escape, sqlfunc, sqlintvl
 
 
 class TestCase(unittest.TestCase):
@@ -1198,3 +1198,19 @@ class TestSQLFunction(TestCase):
 if __name__ == "__main__":
     TestSQLInterval().test_all()
     TestSQLFunction().test_all()
+
+    import datetime
+    from sqlcycli import Connection, sqlfunc
+
+    HOST = "localhost"
+    PORT = 3306
+    USER = "root"
+    PSWD = "Password_123456"
+
+    conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
+    conn.connect()
+    with conn.cursor() as cur:
+        cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
+        res = cur.fetchone()
+        print(cur.executed_sql)
+        print(res)
