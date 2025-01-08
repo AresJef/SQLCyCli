@@ -82,6 +82,8 @@ else:
         extension("connection.py", True, "-Wno-unreachable-code"),
         extension("errors.py", True, "-Wno-unreachable-code"),
         extension("protocol.py", True, "-Wno-unreachable-code"),
+        extension("sqlfunc.py", True, "-Wno-unreachable-code"),
+        extension("sqlintvl.py", True, "-Wno-unreachable-code"),
         extension("transcode.py", True, "-Wno-unreachable-code"),
         extension("typeref.py", False),
         extension("utils.py", True, "-Wno-unreachable-code"),
