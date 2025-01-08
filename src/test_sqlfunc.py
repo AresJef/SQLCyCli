@@ -1214,3 +1214,4 @@ if __name__ == "__main__":
         res = cur.fetchone()
         print(cur.executed_sql)
         print(res)
+    conn.close()
