@@ -174,7 +174,7 @@ if __name__ == "__main__":
     asyncio.run(test_pool_direct_connected())
 ```
 
-### Use `sqlfunc` module to escape MySQL function values
+### Use `sqlfunc` module to escape MySQL function values.
 
 ```python
 import datetime
@@ -191,12 +191,13 @@ with conn.cursor() as cur:
     cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
     res = cur.fetchone()
     print(cur.executed_sql)
-    # SELECT TO_DAYS('2007-10-07')
+    # "SELECT TO_DAYS('2007-10-07')"
     print(res)
-    # 733321
+    # (733321,)
+conn.close()
 ```
 
-### Acknowledgements
+## Acknowledgements
 
 SQLCyCli is build on top of the following open-source repositories:
 
