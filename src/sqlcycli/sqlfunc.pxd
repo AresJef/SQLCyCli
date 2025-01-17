@@ -13,6 +13,7 @@ cdef class SQLFunction:
         tuple _args
         str _kwargs
         str _sep
+        Py_ssize_t _hashcode
     cdef inline str _validate_kwargs(self, dict kwargs)
     cpdef str generate(self)
 
@@ -24,4 +25,5 @@ cdef Sentinel IGNORED
 cdef class RawText:
     cdef:
         str _value
+        Py_ssize_t _hashcode
     cpdef str generate(self)

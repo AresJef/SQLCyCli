@@ -72,6 +72,7 @@ class SQLInterval:
 
     _name: str
     _expr: object
+    _hashcode: cython.Py_ssize_t
 
     def __init__(self, interval_name: str, expr: object):
         """The base class for MySQL temporal interval.
@@ -81,6 +82,7 @@ class SQLInterval:
         """
         self._name = interval_name
         self._expr = expr
+        self._hashcode = -1
 
     @property
     def name(self) -> str:
@@ -101,6 +103,14 @@ class SQLInterval:
 
     def __repr__(self) -> str:
         return "<SQLInterval: INTERVAL %s %s>" % (str(self._expr), self._name)
+
+    def __str__(self) -> str:
+        return "INTERVAL %s %s" % (str(self._expr), self._name)
+
+    def __hash__(self) -> int:
+        if self._hashcode == -1:
+            self._hashcode = hash((self.__class__.__name__, self._name, self._expr))
+        return self._hashcode
 
 
 # Intervals ----------------------------------------------------------------------------------------------------------

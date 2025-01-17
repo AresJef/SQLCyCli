@@ -64,6 +64,7 @@ class SQLFunction:
     _args: tuple
     _kwargs: str
     _sep: str
+    _hashcode: cython.Py_ssize_t
 
     def __init__(
         self,
@@ -89,6 +90,7 @@ class SQLFunction:
         self._args = args
         self._kwargs = self._validate_kwargs(kwargs)
         self._sep = sep
+        self._hashcode = -1
 
     @property
     def name(self) -> str:
@@ -151,12 +153,28 @@ class SQLFunction:
                 self._kwargs,
             )
 
+    def __str__(self) -> str:
+        return self.generate() % tuple([str(i) for i in self._args])
+
+    def __hash__(self) -> int:
+        if self._hashcode == -1:
+            self._hashcode = hash(
+                (
+                    self.__class__.__name__,
+                    self._name,
+                    self._args,
+                    self._kwargs,
+                    self._sep,
+                )
+            )
+        return self._hashcode
+
 
 @cython.cclass
 class Sentinel:
     """Represents a sentinel value for SQL functions."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Sentinel>"
 
 
@@ -228,6 +246,7 @@ class RawText:
     """
 
     _value: str
+    _hashcode: cython.Py_ssize_t
 
     def __init__(self, value: str):
         """The RawText in a SQL statement.
@@ -258,6 +277,7 @@ class RawText:
         ```
         """
         self._value = value
+        self._hashcode = -1
 
     @property
     def value(self) -> str:
@@ -269,8 +289,16 @@ class RawText:
         """Return the RawText value directly `<'str'>`."""
         return self._value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<RawText: %s>" % self._value
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __hash__(self) -> int:
+        if self._hashcode == -1:
+            self._hashcode = hash((self.__class__.__name__, self._value))
+        return self._hashcode
 
 
 @cython.cclass
