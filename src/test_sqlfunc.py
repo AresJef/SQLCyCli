@@ -9,6 +9,7 @@ class TestCase(unittest.TestCase):
         super().__init__(methodName)
         self._start_time = None
         self._ended_time = None
+        self._hashs = set()
 
     def test_all(self) -> None:
         pass
@@ -26,11 +27,24 @@ class TestCase(unittest.TestCase):
             msg += " (%.6fs)" % (self._ended_time - self._start_time)
         print(msg.ljust(60))
 
+    def reset_hashs(self) -> None:
+        self._hashs.clear()
+
+    def validate_hash(self, obj: object) -> None:
+        h = hash(obj)
+        self.assertTrue(h not in self._hashs)
+        self._hashs.add(h)
+
+    def compare(self, obj: object, expected: str) -> None:
+        self.validate_hash(obj)
+        self.assertEqual(escape(obj, b"utf8"), expected)
+
 
 class TestSQLInterval(TestCase):
     name: str = "SQLInterval"
 
     def test_all(self) -> None:
+        self.reset_hashs()
         self.log_start("escape")
         # fmt: off
 
@@ -58,15 +72,12 @@ class TestSQLInterval(TestCase):
         # fmt: on
         self.log_ended("escape")
 
-    # utils
-    def compare(self, intvl: sqlintvl.SQLInterval, expected: str) -> None:
-        self.assertEqual(escape(intvl, b"utf8"), expected)
-
 
 class TestSQLFunction(TestCase):
     name: str = "SQLFunction"
 
     def test_all(self) -> None:
+        self.reset_hashs()
         self.log_start("escape")
         # fmt: off
 
@@ -226,7 +237,7 @@ class TestSQLFunction(TestCase):
         self.compare(sqlfunc.FIELD("Gg", "Aa", "Bb", "Cc", "Dd", "Ff"), "FIELD('Gg','Aa','Bb','Cc','Dd','Ff')")
         # FIND_IN_SET
         self.compare(sqlfunc.FIND_IN_SET("b", "a,b,c,d"), "FIND_IN_SET('b','a,b,c,d')")
-        self.compare(sqlfunc.FIND_IN_SET("b", ("a", "b", "c", "d")), "FIND_IN_SET('b','a,b,c,d')")
+        self.compare(sqlfunc.FIND_IN_SET("b", ("a", "b", "c", "d", "e")), "FIND_IN_SET('b','a,b,c,d,e')")
         # FLOOR
         self.compare(sqlfunc.FLOOR(1.23), "FLOOR(1.23)")
         self.compare(sqlfunc.FLOOR("-1.23"), "FLOOR('-1.23')")
@@ -1190,28 +1201,24 @@ class TestSQLFunction(TestCase):
         # fmt: on
         self.log_ended("escape")
 
-    # utils
-    def compare(self, intvl: sqlfunc.SQLFunction, expected: str) -> None:
-        self.assertEqual(escape(intvl, b"utf8"), expected)
-
 
 if __name__ == "__main__":
     TestSQLInterval().test_all()
     TestSQLFunction().test_all()
 
-    import datetime
-    from sqlcycli import Connection, sqlfunc
+    # import datetime
+    # from sqlcycli import Connection, sqlfunc
 
-    HOST = "localhost"
-    PORT = 3306
-    USER = "root"
-    PSWD = "Password_123456"
+    # HOST = "localhost"
+    # PORT = 3306
+    # USER = "root"
+    # PSWD = "Password_123456"
 
-    conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
-    conn.connect()
-    with conn.cursor() as cur:
-        cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
-        res = cur.fetchone()
-        print(cur.executed_sql)
-        print(res)
-    conn.close()
+    # conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
+    # conn.connect()
+    # with conn.cursor() as cur:
+    #     cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
+    #     res = cur.fetchone()
+    #     print(cur.executed_sql)
+    #     print(res)
+    # conn.close()
