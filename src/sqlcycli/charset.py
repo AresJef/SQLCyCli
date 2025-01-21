@@ -105,14 +105,6 @@ class Charset:
             self._encoding,
         )
 
-    def __str__(self) -> str:
-        return "(id=%d, name='%s', collation='%s', encoding=%s)" % (
-            self._id,
-            self._name,
-            self._collation,
-            self._encoding,
-        )
-
     def __getitem__(self, index: cython.int) -> int | str | bytes:
         if index == 0:
             return self._id
@@ -249,23 +241,23 @@ class Charsets:
         return cython.cast(Charset, val)
 
     @cython.ccall
-    def by_name(self, name: str) -> Charset:
+    def by_name(self, name: str | Any) -> Charset:
         """Get MySQL charset by name `<'Charset'>`.
 
         :param name: `<'str'>` The name of the charset.
         """
-        if name == "utf8":
-            name = "utf8mb4"
+        if name == "utf8" or name == "utf-8":
+            return _utf8mb4_default
         val = dict_getitem(self._by_name, name)
         if val == cython.NULL:
             raise errors.CharsetNotFoundError(
-                "<'%s'>\nMySQL charset name '%s' does not exist."
+                "<'%s'>\nMySQL charactor set '%s' does not exist."
                 % (self.__class__.__name__, name)
             )
         return cython.cast(Charset, val)
 
     @cython.ccall
-    def by_collation(self, collation: str) -> Charset:
+    def by_collation(self, collation: str | Any) -> Charset:
         """Get MySQL charset by collation `<'Charset'>`.
 
         :param collation: `<'str'>` The collation of the charset.
@@ -273,26 +265,42 @@ class Charsets:
         val = dict_getitem(self._by_collation, collation)
         if val == cython.NULL:
             raise errors.CharsetNotFoundError(
-                "<'%s'>\nMySQL charset collation '%s' does not exist."
+                "<'%s'>\nMySQL charactor collation '%s' does not exist."
                 % (self.__class__.__name__, collation)
             )
         return cython.cast(Charset, val)
 
     @cython.ccall
-    def by_name_n_collation(self, name: str, collation: str) -> Charset:
+    def by_name_n_collation(self, name: str | Any, collation: str | Any) -> Charset:
         """Get MySQL charset by name and collation `<'Charset'>`.
 
         :param name: `<'str'>` The name of the charset.
         :param collation: `<'str'>` The collation of the charset.
         """
-        if name == "utf8":
-            name = "utf8mb4"
-        val = dict_getitem(
-            self._by_name_n_collation, self._gen_namecoll_key(name, collation)
-        )
+        if not isinstance(collation, str):
+            raise errors.CharsetValueError(
+                "<'%s'>\nInvalid charactor collation '%s', must be <'str'> type."
+                % (self.__class__.__name__, collation)
+            )
+        _collation: str = collation
+
+        if name == "utf8" or name == "utf-8":
+            if _collation == "utf8mb4_general_ci":
+                return _utf8mb4_default
+            _key: str = self._gen_namecoll_key("utf8mb4", _collation)
+        else:
+            if not isinstance(name, str):
+                raise errors.CharsetValueError(
+                    "<'%s'>\nInvalid charset name '%s', must be <'str'> type."
+                    % (self.__class__.__name__, name)
+                )
+            _name: str = name
+            _key: str = self._gen_namecoll_key(_name, _collation)
+
+        val = dict_getitem(self._by_name_n_collation, _key)
         if val == cython.NULL:
             raise errors.CharsetNotFoundError(
-                "<'%s'>\nMySQL charset name & collation '%s & %s' does not exist."
+                "<'%s'>\nMySQL charactor set & collation '%s & %s' does not exist."
                 % (self.__class__.__name__, name, collation)
             )
         return cython.cast(Charset, val)
@@ -327,7 +335,7 @@ def by_id(id: int | Any) -> Charset:
 
 
 @cython.ccall
-def by_name(name: str) -> Charset:
+def by_name(name: str | Any) -> Charset:
     """Get MySQL charset by name `<'Charset'>`.
 
     :param name: `<'str'>` The name of the charset.
@@ -336,7 +344,7 @@ def by_name(name: str) -> Charset:
 
 
 @cython.ccall
-def by_collation(collation: str) -> Charset:
+def by_collation(collation: str | Any) -> Charset:
     """Get MySQL charset by collation `<'Charset'>`.
 
     :param collation: `<'str'>` The collation of the charset.
@@ -345,7 +353,7 @@ def by_collation(collation: str) -> Charset:
 
 
 @cython.ccall
-def by_name_n_collation(name: str, collation: str) -> Charset:
+def by_name_n_collation(name: str | Any, collation: str | Any) -> Charset:
     """Get MySQL charset by name and collation `<'Charset'>`.
 
     :param name: `<'str'>` The name of the charset.
@@ -497,3 +505,5 @@ _charsets.add(Charset(248, "gb18030", "gb18030_chinese_ci", True))
 _charsets.add(Charset(249, "gb18030", "gb18030_bin"))
 _charsets.add(Charset(250, "gb18030", "gb18030_unicode_520_ci"))
 _charsets.add(Charset(255, "utf8mb4", "utf8mb4_0900_ai_ci"))
+
+_utf8mb4_default: Charset = _charsets.by_name("utf8mb4")

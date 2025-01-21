@@ -27,14 +27,15 @@ cdef class Charsets:
     cdef inline str _gen_namecoll_key(self, str name, str collation)
     # Access Charset
     cpdef Charset by_id(self, object id)
-    cpdef Charset by_name(self, str name)
-    cpdef Charset by_collation(self, str collation)
-    cpdef Charset by_name_n_collation(self, str name, str collation)
+    cpdef Charset by_name(self, object name)
+    cpdef Charset by_collation(self, object collation)
+    cpdef Charset by_name_n_collation(self, object name, object collation)
 
 # Init
 cdef Charsets _charsets
 cpdef Charsets all_charsets()
 cpdef Charset by_id(object id)
-cpdef Charset by_name(str name)
-cpdef Charset by_collation(str collation)
-cpdef Charset by_name_n_collation(str name, str collation)
+cpdef Charset by_name(object name)
+cpdef Charset by_collation(object collation)
+cpdef Charset by_name_n_collation(object name, object collation)
+cdef Charset _utf8mb4_default
