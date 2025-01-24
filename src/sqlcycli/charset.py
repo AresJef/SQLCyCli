@@ -246,7 +246,7 @@ class Charsets:
 
         :param name: `<'str'>` The name of the charset.
         """
-        if name == "utf8" or name == "utf-8":
+        if name == "utf8mb4" or name == "utf8" or name == "utf-8":
             return _utf8mb4_default
         val = dict_getitem(self._by_name, name)
         if val == cython.NULL:
@@ -284,7 +284,7 @@ class Charsets:
             )
         _collation: str = collation
 
-        if name == "utf8" or name == "utf-8":
+        if name == "utf8mb4" or name == "utf8" or name == "utf-8":
             if _collation == "utf8mb4_general_ci":
                 return _utf8mb4_default
             _key: str = self._gen_namecoll_key("utf8mb4", _collation)
