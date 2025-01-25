@@ -341,7 +341,6 @@ class Pool:
         use_decimal: bool = False,
         decode_bit: bool = False,
         decode_json: bool = False,
-        loop: AbstractEventLoop | None = None,
     ):
         """The pool that manages and maintains connections to
         the server. Increases reusability of established
@@ -354,7 +353,6 @@ class Pool:
             - If set to positive integer, the pool will automatically close
               and remove any connections idling more than the 'recycle' time.
             - If 'recycle=None' (Default), recycling is disabled.
-        :param loop: `<'AbstractEventLoop/None'>` The event loop for the pool connections. Defaults to `None`.
 
         #### Connection args:
         :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
@@ -396,7 +394,7 @@ class Pool:
         :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
         """
         # Pool Args
-        self._setup(min_size, max_size, recycle, loop)
+        self._setup(min_size, max_size, recycle)
 
         # Connection Args
         # . option file
@@ -494,14 +492,12 @@ class Pool:
         min_size: object,
         max_size: object,
         recycle: object,
-        loop: object,
     ) -> cython.bint:
         """(cfunc) Setup the pool.
 
         :param min_size: `<'int'>` The minimum number of active connections to maintain.
         :param max_size: `<'int'>` The maximum number of active connections to maintain.
         :param recycle: `<'int/None'>` The recycle time in seconds.
-        :param loop: `<'AbstractEventLoop/None'>` The event loop for the pool connections.
         """
         # . counting
         self._acqr = 0
@@ -539,10 +535,7 @@ class Pool:
         self._id = id(self)
         self._free_conns = deque(maxlen=self._max_size)
         self._used_conns = set()
-        if loop is None or not isinstance(loop, AbstractEventLoop):
-            self._loop = _get_event_loop()
-        else:
-            self._loop = loop
+        self._loop = None
         self._condition = Condition()
         self._closing = False
         self._closed = True
@@ -833,8 +826,7 @@ class Pool:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_free_conn(self, conn: object) -> cython.bint:
-        """(cfunc) Add a free connection to 'free_conns',
-        and update counting."""
+        """(cfunc) Add a free connection to 'free_conns', and update counting."""
         self._free_conns.append(conn)
         self._free += 1
         return True
@@ -853,6 +845,14 @@ class Pool:
             # Counting error: should not happen
             self._free = 0
             return None
+
+    @cython.cfunc
+    @cython.inline(True)
+    def _get_loop(self) -> object:
+        """(internal) Get async event loop `<'AbstractEventLoop'>`'"""
+        if self._loop is None:
+            self._loop = _get_event_loop()
+        return self._loop
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -1066,7 +1066,7 @@ class Pool:
                 self._charset,
                 self._connect_timeout,
                 self._read_timeout,
-                self._wait_timeout,
+                self._write_timeout,
                 self._wait_timeout,
                 self._bind_address,
                 self._unix_socket,
@@ -1084,7 +1084,7 @@ class Pool:
                 self._use_decimal,
                 self._decode_bit,
                 self._decode_json,
-                self._loop,
+                self._get_loop(),
             )
             await conn.connect()
             # . initial setup
@@ -1248,15 +1248,17 @@ class Pool:
             ...
             await pool.wait_for_closed()  # manual closure
         """
+        loop: AbstractEventLoop = self._get_loop()
+        
         # Pool already closed
         if self._closed:
-            fut = self._loop.create_future()
+            fut = loop.create_future()
             fut.set_result(None)
             return fut
 
         # Set closing flag
         self._closing = True
-        return self._loop.create_task(self.wait_for_closed())
+        return loop.create_task(self.wait_for_closed())
 
     async def wait_for_closed(self) -> None:
         """Wait for the pool to be closed.

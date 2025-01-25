@@ -79,7 +79,7 @@ cdef class Pool:
         bint _decode_json
         
     # Setup
-    cdef inline bint _setup(self, object min_size, object max_size, object recycle, object loop) except -1
+    cdef inline bint _setup(self, object min_size, object max_size, object recycle) except -1
     # Pool
     cpdef unsigned int get_free(self)
     cpdef unsigned int get_used(self)
@@ -87,6 +87,7 @@ cdef class Pool:
     cpdef bint set_min_size(self, unsigned int size) except -1
     cpdef bint set_recycle(self, object size) except -1
     cdef inline PoolConnection _get_free_conn(self)
+    cdef inline object _get_loop(self)
     cdef inline bint _add_free_conn(self, object conn) except -1
     cpdef bint set_autocommit(self, bint value) except -1
     cpdef bint set_use_decimal(self, bint value) except -1
