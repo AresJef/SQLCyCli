@@ -506,4 +506,4 @@ _charsets.add(Charset(249, "gb18030", "gb18030_bin"))
 _charsets.add(Charset(250, "gb18030", "gb18030_unicode_520_ci"))
 _charsets.add(Charset(255, "utf8mb4", "utf8mb4_0900_ai_ci"))
 
-_utf8mb4_default: Charset = _charsets.by_name("utf8mb4")
+_utf8mb4_default: Charset = _charsets.by_id(45)
