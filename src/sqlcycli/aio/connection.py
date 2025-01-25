@@ -184,7 +184,7 @@ class MysqlResult:
             )
         try:
             self._conn._verify_connected()
-            loop = self._conn._loop
+            loop: AbstractEventLoop = self._conn._get_loop()
             try:
                 await loop.run_in_executor(None, opener)
                 with self._local_file:
@@ -2773,7 +2773,7 @@ class BaseConnection:
 
     async def _open_tcp(self, host: str = None, port: int = None, **kwargs) -> None:
         """(internal) Open the socket connection through TCP/IP."""
-        loop = self._loop
+        loop: AbstractEventLoop = self._get_loop()
         reader = StreamReader(loop=loop)
         protocol = StreamReaderProtocol(reader, loop=loop)
         transport, _ = await loop.create_connection(
@@ -2786,7 +2786,7 @@ class BaseConnection:
 
     async def _open_unix(self, unix_socket: str = None, **kwargs) -> None:
         """(internal) Open the socket connection through UNIX socket."""
-        loop = self._loop
+        loop: AbstractEventLoop = self._get_loop()
         reader = StreamReader(loop=loop)
         protocol = StreamReaderProtocol(reader, loop=loop)
         transport, _ = await loop.create_unix_connection(
@@ -3257,6 +3257,14 @@ class BaseConnection:
                 raise errors.ConnectionClosedError(0, self._close_reason)
         return True
 
+    @cython.cfunc
+    @cython.inline(True)
+    def _get_loop(self) -> object:
+        """(cfunc) Get async event loop `<'AbstractEventLoop'>`'"""
+        if self._loop is None:
+            self._loop = _get_event_loop()
+        return self._loop
+
     # Write -----------------------------------------------------------------------------------
     async def _execute_command(self, command: cython.uint, sql: bytes) -> None:
         """(internal) Execute SQL command.
@@ -3670,7 +3678,9 @@ class Connection(BaseConnection):
         self._decode_bit = bool(decode_bit)
         self._decode_json = bool(decode_json)
         # . loop
-        if loop is None or not isinstance(loop, AbstractEventLoop):
-            self._loop = _get_event_loop()
-        else:
-            self._loop = loop
+        if loop is not None and not isinstance(loop, AbstractEventLoop):
+            raise errors.InvalidConnectionArgsError(
+                "argument 'loop' must be `None` or <'AbstractEventLoop'>, "
+                "instead got %s." % type(loop)
+            )
+        self._loop = loop

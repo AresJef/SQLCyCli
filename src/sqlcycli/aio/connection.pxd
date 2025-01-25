@@ -166,6 +166,7 @@ cdef class BaseConnection:
     cdef inline bint _close_with_reason(self, str reason) except -1
     cpdef bint closed(self) except -1
     cdef inline bint _verify_connected(self) except -1
+    cdef inline object _get_loop(self)
     # Write
     cdef inline bint _write_packet(self, bytes payload) except -1
     cdef inline bint _write_bytes(self, bytes data) except -1
