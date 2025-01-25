@@ -189,9 +189,9 @@ conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
 conn.connect()
 with conn.cursor() as cur:
     cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
-    res = cur.fetchone()
     print(cur.executed_sql)
     # "SELECT TO_DAYS('2007-10-07')"
+    res = cur.fetchone()
     print(res)
     # (733321,)
 conn.close()
