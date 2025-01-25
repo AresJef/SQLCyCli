@@ -11,11 +11,11 @@ from cython.cimports.cpython.set import PySet_Add as set_add  # type: ignore
 from cython.cimports.cpython.set import PySet_Clear as set_clear  # type: ignore
 from cython.cimports.cpython.set import PySet_GET_SIZE as set_len  # type: ignore
 from cython.cimports.cpython.set import PySet_Discard as set_discard  # type: ignore
-from cython.cimports.sqlcycli.aio.connection import BaseConnection, Cursor  # type: ignore
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
+from cython.cimports.sqlcycli.aio import connection as async_conn  # type: ignore
 from cython.cimports.sqlcycli import connection as sync_conn, utils  # type: ignore
 
 # Python imports
@@ -24,19 +24,72 @@ from collections import deque
 from typing import Literal, Generator, Any
 from asyncio import AbstractEventLoop, Condition, Future
 from asyncio import gather as _gather, get_event_loop as _get_event_loop
-from sqlcycli.aio.connection import BaseConnection, Cursor
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
+from sqlcycli.aio import connection as async_conn
 from sqlcycli import connection as sync_conn, utils, errors
 
 __all__ = ["PoolConnection", "PoolConnectionManager", "Pool"]
 
 
+# Utils ---------------------------------------------------------------------------------------
+@cython.ccall
+def validate_sync_cursor(cursor: object) -> object:
+    """(cfunc) Validate and map the given 'cursor' to the corresponding sync `<'type[Cursor]/None'>`."""
+    if cursor is None:
+        return None
+    if type(cursor) is type:
+        if issubclass(cursor, sync_conn.Cursor):
+            return cursor
+        if cursor is async_conn.Cursor:
+            return sync_conn.Cursor
+        if cursor is async_conn.DictCursor:
+            return sync_conn.DictCursor
+        if cursor is async_conn.DfCursor:
+            return sync_conn.DfCursor
+        if cursor is async_conn.SSCursor:
+            return sync_conn.SSCursor
+        if cursor is async_conn.SSDictCursor:
+            return sync_conn.SSDictCursor
+        if cursor is async_conn.SSDfCursor:
+            return sync_conn.SSDfCursor
+    raise errors.InvalidConnectionArgsError(
+        "Invalid 'cursor' argument: %r. "
+        "Must be subclass of %r." % (cursor, sync_conn.Cursor)
+    )
+
+
+@cython.ccall
+def validate_async_cursor(cursor: object) -> object:
+    """(cfunc) Validate and map the given 'cursor' to the corresponding async `<'type[Cursor]/None'>`."""
+    if cursor is None:
+        return None
+    if type(cursor) is type:
+        if issubclass(cursor, async_conn.Cursor):
+            return cursor
+        if cursor is sync_conn.Cursor:
+            return async_conn.Cursor
+        if cursor is sync_conn.DictCursor:
+            return async_conn.DictCursor
+        if cursor is sync_conn.DfCursor:
+            return async_conn.DfCursor
+        if cursor is sync_conn.SSCursor:
+            return async_conn.SSCursor
+        if cursor is sync_conn.SSDictCursor:
+            return async_conn.SSDictCursor
+        if cursor is sync_conn.SSDfCursor:
+            return async_conn.SSDfCursor
+    raise errors.InvalidConnectionArgsError(
+        "Invalid 'cursor' argument: %r. "
+        "Must be subclass of %r." % (cursor, async_conn.Cursor)
+    )
+
+
 # Connection ----------------------------------------------------------------------------------
 @cython.cclass
-class PoolConnection(BaseConnection):
+class PoolConnection(async_conn.BaseConnection):
     """Represents the `async` connection to the server managed by a `Pool`.
 
     This class serves as the connection object managed by a pool only.
@@ -70,7 +123,7 @@ class PoolConnection(BaseConnection):
         max_allowed_packet: int,
         sql_mode: str | None,
         init_command: str | None,
-        cursor: type[Cursor],
+        cursor: type[async_conn.Cursor],
         client_flag: int,
         program_name: str | None,
         ssl_ctx: object | None,
@@ -294,7 +347,7 @@ class Pool:
     _max_allowed_packet: object  # uint
     _sql_mode: str
     _init_command: str
-    _cursor: type[Cursor]
+    _cursor: type[async_conn.Cursor]
     _client_flag: object  # uint
     _program_name: str
     # . ssl
@@ -331,7 +384,7 @@ class Pool:
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[Cursor] | None = Cursor,
+        cursor: type[async_conn.Cursor] | None = async_conn.Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -455,7 +508,7 @@ class Pool:
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
         self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
-        self._cursor = utils.validate_cursor(cursor, Cursor)
+        self._cursor = utils.validate_cursor(cursor, async_conn.Cursor)
         self._client_flag = utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX)
         self._program_name = utils.validate_arg_str(program_name, "program_name", None)
         # . ssl
@@ -1249,7 +1302,7 @@ class Pool:
             await pool.wait_for_closed()  # manual closure
         """
         loop: AbstractEventLoop = self._get_loop()
-        
+
         # Pool already closed
         if self._closed:
             fut = loop.create_future()

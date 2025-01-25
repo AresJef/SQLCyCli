@@ -1,10 +1,14 @@
 # cython: language_level=3
 from sqlcycli.charset cimport Charset
 from sqlcycli._auth cimport AuthPlugin
-from sqlcycli.aio.connection cimport BaseConnection
+from sqlcycli.aio cimport connection as async_conn
+
+# Utils
+cpdef object validate_sync_cursor(object cursor)
+cpdef object validate_async_cursor(object cursor)
 
 # Connection
-cdef class PoolConnection(BaseConnection):
+cdef class PoolConnection(async_conn.BaseConnection):
     cdef:
         Py_ssize_t _pool_id
         bint _close_scheduled
