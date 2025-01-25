@@ -1,15 +1,13 @@
 # cython: language_level=3
-
-# Utils
-cdef object _validate_sync_cursor(object cursor)
-cdef object _validate_async_cursor(object cursor)
+from sqlcycli cimport connection as sync_conn
+from sqlcycli.aio cimport connection as async_conn, pool as aio_pool
 
 # Connection
 cdef class ConnectionManager:
     cdef:
         # . connection
-        object _conn_sync
-        object _conn_async
+        sync_conn.BaseConnection _conn_sync
+        async_conn.BaseConnection _conn_async
         # . arguments
         dict _kwargs
         object _cursor
@@ -50,7 +48,7 @@ cpdef ConnectionManager connect(
 cdef class PoolManager:
     cdef:
         # . pool
-        object _pool
+        aio_pool.Pool _pool
         # . arguments
         dict _kwargs
         object _cursor

@@ -4,6 +4,8 @@
 
 # Cython imports
 import cython
+from cython.cimports.sqlcycli import connection as sync_conn  # type: ignore
+from cython.cimports.sqlcycli.aio import connection as async_conn, pool as aio_pool  # type: ignore
 
 # Python imports
 from os import PathLike
@@ -12,76 +14,10 @@ from asyncio import AbstractEventLoop
 from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
-from sqlcycli.connection import (
-    Cursor,
-    DictCursor,
-    DfCursor,
-    SSCursor,
-    SSDictCursor,
-    SSDfCursor,
-    BaseConnection,
-    Connection,
-)
-from sqlcycli import aio, errors
+from sqlcycli import connection as sync_conn
+from sqlcycli.aio import connection as async_conn, pool as aio_pool
 
 __all__ = ["connect", "ConnectionManager", "create_pool", "PoolManager"]
-
-
-# Utils ---------------------------------------------------------------------------------------
-@cython.cfunc
-@cython.inline(True)
-def _validate_sync_cursor(cursor: Any) -> object:
-    """(cfunc) Validate and map the given 'cursor'
-    argument to the correct sync `<'Cursor'>`."""
-    if cursor is None:
-        return None
-    if type(cursor) is type:
-        if issubclass(cursor, Cursor):
-            return cursor
-        if cursor is aio.Cursor:
-            return Cursor
-        if cursor is aio.DictCursor:
-            return DictCursor
-        if cursor is aio.DfCursor:
-            return DfCursor
-        if cursor is aio.SSCursor:
-            return SSCursor
-        if cursor is aio.SSDictCursor:
-            return SSDictCursor
-        if cursor is aio.SSDfCursor:
-            return SSDfCursor
-    raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' argument: %r. "
-        "Must be type [class] of %r." % (cursor, Cursor)
-    )
-
-
-@cython.cfunc
-@cython.inline(True)
-def _validate_async_cursor(cursor: Any) -> object:
-    """(cfunc) Validate and map the given 'cursor'
-    argument to the correct async `<'aio.Cursor'>`."""
-    if cursor is None:
-        return None
-    if type(cursor) is type:
-        if issubclass(cursor, aio.Cursor):
-            return cursor
-        if cursor is Cursor:
-            return aio.Cursor
-        if cursor is DictCursor:
-            return aio.DictCursor
-        if cursor is DfCursor:
-            return aio.DfCursor
-        if cursor is SSCursor:
-            return aio.SSCursor
-        if cursor is SSDictCursor:
-            return aio.SSDictCursor
-        if cursor is SSDfCursor:
-            return aio.SSDfCursor
-    raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' argument: %r. "
-        "Must be type [class] of %r." % (cursor, aio.Cursor)
-    )
 
 
 # Connection ----------------------------------------------------------------------------------
@@ -90,17 +26,17 @@ class ConnectionManager:
     """The Context Manager for both `sync` and `async` Connection."""
 
     # . connection
-    _conn_sync: BaseConnection
-    _conn_async: aio.BaseConnection
+    _conn_sync: sync_conn.BaseConnection
+    _conn_async: async_conn.BaseConnection
     # . arguments
     _kwargs: dict[str, Any]
-    _cursor: type[Cursor | aio.Cursor]
+    _cursor: type[sync_conn.Cursor | async_conn.Cursor]
     _loop: AbstractEventLoop
 
     def __init__(
         self,
         kwargs: dict[str, Any],
-        cursor: type[Cursor | aio.Cursor] | None,
+        cursor: type[sync_conn.Cursor | async_conn.Cursor] | None,
         loop: AbstractEventLoop | None,
     ) -> None:
         """The Context Manager for both `sync` and `async` Connection.
@@ -117,9 +53,9 @@ class ConnectionManager:
         self._loop = loop
 
     # Sync --------------------------------------------------------------------------------------
-    def __enter__(self) -> BaseConnection:
-        conn = Connection(
-            cursor=_validate_sync_cursor(self._cursor),
+    def __enter__(self) -> sync_conn.BaseConnection:
+        conn: sync_conn.BaseConnection = sync_conn.Connection(
+            cursor=aio_pool.validate_sync_cursor(self._cursor),
             **self._kwargs,
         )
         conn.connect()
@@ -131,20 +67,20 @@ class ConnectionManager:
         self._conn_sync = None
 
     # Async -------------------------------------------------------------------------------------
-    async def _acquire_async_conn(self) -> aio.BaseConnection:
+    async def _acquire_async_conn(self) -> async_conn.BaseConnection:
         """(internal) Acquire an `async` connection `<'BaseConnection'>`."""
-        conn = aio.Connection(
-            cursor=_validate_async_cursor(self._cursor),
+        conn: async_conn.BaseConnection = async_conn.Connection(
+            cursor=aio_pool.validate_async_cursor(self._cursor),
             loop=self._loop,
             **self._kwargs,
         )
         await conn.connect()
         return conn
 
-    def __await__(self) -> Generator[Any, Any, aio.BaseConnection]:
+    def __await__(self) -> Generator[Any, Any, async_conn.BaseConnection]:
         return self._acquire_async_conn().__await__()
 
-    async def __aenter__(self) -> aio.BaseConnection:
+    async def __aenter__(self) -> async_conn.BaseConnection:
         self._conn_async = await self._acquire_async_conn()
         return self._conn_async
 
@@ -182,7 +118,7 @@ def connect(
     max_allowed_packet: int | str | None = None,
     sql_mode: str | None = None,
     init_command: str | None = None,
-    cursor: type[Cursor] | None = Cursor,
+    cursor: type[sync_conn.Cursor | async_conn.Cursor] | None = sync_conn.Cursor,
     client_flag: int | Any = 0,
     program_name: str | None = None,
     option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -285,15 +221,15 @@ class PoolManager:
     """The Context Manager for Pool."""
 
     # . pool
-    _pool: aio.Pool
+    _pool: aio_pool.Pool
     # . arguments
     _kwargs: dict[str, Any]
-    _cursor: type[Cursor | aio.Cursor]
+    _cursor: type[sync_conn.Cursor | async_conn.Cursor]
 
     def __init__(
         self,
         kwargs: dict[str, Any],
-        cursor: type[Cursor | aio.Cursor] | None,
+        cursor: type[sync_conn.Cursor | async_conn.Cursor] | None,
     ) -> None:
         """The Context Manager for Pool.
 
@@ -307,8 +243,10 @@ class PoolManager:
         self._cursor = cursor
 
     # Sync --------------------------------------------------------------------------------------
-    def __enter__(self) -> aio.Pool:
-        pool = aio.Pool(cursor=_validate_async_cursor(self._cursor), **self._kwargs)
+    def __enter__(self) -> aio_pool.Pool:
+        pool: aio_pool.Pool = aio_pool.Pool(
+            cursor=aio_pool.validate_async_cursor(self._cursor), **self._kwargs
+        )
         self._pool = pool
         return self._pool
 
@@ -317,16 +255,18 @@ class PoolManager:
         self._pool = None
 
     # Async -------------------------------------------------------------------------------------
-    async def _create_and_fill_pool(self) -> aio.Pool:
+    async def _create_and_fill_pool(self) -> aio_pool.Pool:
         """(internal) Create a pool and fill free connections `<'Pool'>`."""
-        pool = aio.Pool(cursor=_validate_async_cursor(self._cursor), **self._kwargs)
+        pool: aio_pool.Pool = aio_pool.Pool(
+            cursor=aio_pool.validate_async_cursor(self._cursor), **self._kwargs
+        )
         await pool.fill(-1)
         return pool
 
-    def __await__(self) -> Generator[Any, Any, aio.Pool]:
+    def __await__(self) -> Generator[Any, Any, aio_pool.Pool]:
         return self._create_and_fill_pool().__await__()
 
-    async def __aenter__(self) -> aio.Pool:
+    async def __aenter__(self) -> aio_pool.Pool:
         self._pool = await self._create_and_fill_pool()
         return self._pool
 
@@ -364,7 +304,7 @@ def create_pool(
     max_allowed_packet: int | str | None = None,
     sql_mode: str | None = None,
     init_command: str | None = None,
-    cursor: type[Cursor] | None = Cursor,
+    cursor: type[sync_conn.Cursor | async_conn.Cursor] | None = sync_conn.Cursor,
     client_flag: int | Any = 0,
     program_name: str | None = None,
     option_file: str | bytes | PathLike | OptionFile | None = None,
