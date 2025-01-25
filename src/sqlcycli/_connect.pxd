@@ -86,5 +86,4 @@ cpdef PoolManager create_pool(
     object server_public_key=?,
     object use_decimal=?,
     object decode_json=?,
-    object loop=?,
 )

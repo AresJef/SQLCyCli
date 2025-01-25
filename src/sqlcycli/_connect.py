@@ -373,7 +373,6 @@ def create_pool(
     server_public_key: bytes | None = None,
     use_decimal: bool = False,
     decode_json: bool = False,
-    loop: AbstractEventLoop | None = None,
 ) -> PoolManager:
     """Create a connection pool to manage and maintain `async`
     connections through context manager `<'PoolManager'>`.
@@ -456,7 +455,6 @@ def create_pool(
             "server_public_key": server_public_key,
             "use_decimal": use_decimal,
             "decode_json": decode_json,
-            "loop": loop,
         },
         cursor,
     )
