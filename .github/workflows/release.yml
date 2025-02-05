@@ -42,7 +42,7 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 arm64 universal2
           CIBW_ARCHS_LINUX: ${{matrix.arch}}
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: wheelhouse/*.whl
           retention-days: 1
@@ -68,7 +68,7 @@ jobs:
         run: |
           python -m build --sdist --outdir dist
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: dist/*.tar.gz
           retention-days: 1
