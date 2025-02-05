@@ -8,7 +8,12 @@ from sqlcycli.aio.connection import (
     BaseConnection,
     Connection,
 )
-from sqlcycli.aio.pool import PoolConnection, Pool
+from sqlcycli.aio.pool import (
+    PoolConnection,
+    PoolSyncConnection,
+    PoolConnectionManager,
+    Pool,
+)
 
 __all__ = [
     "Cursor",
@@ -20,5 +25,7 @@ __all__ = [
     "BaseConnection",
     "Connection",
     "PoolConnection",
+    "PoolSyncConnection",
+    "PoolConnectionManager",
     "Pool",
 ]
