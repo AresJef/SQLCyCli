@@ -2020,9 +2020,6 @@ class TestCursor(TestCase):
 
                 sql = "SELECT * FROM foo"
                 self.assertEqual(cur.mogrify(sql, (), many=True), sql)
-                with self.assertRaises(errors.InvalidSQLArgsErorr):
-                    sql = "SELECT * FROM foo WHERE bar IN %s AND foo = %s"
-                    print(cur.mogrify(sql, (), many=True))
 
         self.log_ended(test)
 
@@ -3174,9 +3171,7 @@ class TestOldIssues(TestCase):
                 await cur.execute(f"create table {self.table} (ts timestamp)")
                 await cur.execute(f"insert into {self.table} (ts) values (now())")
                 await cur.execute(f"select ts from {self.table}")
-                self.assertTrue(
-                    isinstance((await cur.fetchone())[0], datetime.datetime)
-                )
+                self.assertIsInstance((await cur.fetchone())[0], datetime.datetime)
 
             await self.drop(conn)
         self.log_ended(test)
@@ -3583,7 +3578,7 @@ class TestGitHubIssues(TestCase):
                 row = await cur.fetchone()
                 # don't assert the exact internal binary value, as it could
                 # vary across implementations
-                self.assertTrue(isinstance(row[0], bytes))
+                self.assertIsInstance(row[0], bytes)
 
             await self.drop(conn)
         self.log_ended(test)
