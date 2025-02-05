@@ -78,7 +78,7 @@ asyncmy     async   50000   3.695764        0.352104    3.460674        0.104523
 
 ## Usage
 
-### Use `connect()` to create one connection (`Sync` or `Async`) to the server.
+### Use `connect()` to create a connection (`Sync` or `Async`) with the server.
 
 ```python
 import asyncio
@@ -89,32 +89,31 @@ PORT = 3306
 USER = "root"
 PSWD = "password"
 
-# Synchronous Connection
-def test_sync_connection() -> None:
+# Connection (Sync & Async)
+async def test_connection() -> None:
+    # Sync Connection - - - - - - - - - - - - - - - - - -
     with sqlcycli.connect(HOST, PORT, USER, PSWD) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
-            res = cur.fetchone()
-            assert res == (1,)
+            assert cur.fetchone() == (1,)
+
     # Connection closed
     assert conn.closed()
 
-# Asynchronous Connection
-async def test_async_connection() -> None:
+    # Async Connection - - - - - - - - - - - - - - - - -
     async with sqlcycli.connect(HOST, PORT, USER, PSWD) as conn:
         async with conn.cursor() as cur:
             await cur.execute("SELECT 1")
-            res = await cur.fetchone()
-            assert res == (1,)
+            assert await cur.fetchone() == (1,)
+
     # Connection closed
     assert conn.closed()
 
 if __name__ == "__main__":
-    test_sync_connection()
-    asyncio.run(test_async_connection())
+    asyncio.run(test_connection())
 ```
 
-### Use `create_pool()` to create a Pool for managing and maintaining `Async` connections to the server.
+### Use `create_pool()` to create a Pool for managing and maintaining connections (`Sync` or `Async`) with the server.
 
 ```python
 import asyncio
@@ -125,76 +124,145 @@ PORT = 3306
 USER = "root"
 PSWD = "password"
 
-# Pool (Context Manager: Connected)
+# Pool (Context: Connected)
 async def test_pool_context_connected() -> None:
     async with sqlcycli.create_pool(HOST, PORT, USER, PSWD, min_size=1) as pool:
         # Pool is connected: 1 free connection (min_size=1)
         assert not pool.closed() and pool.free == 1
+
+        # Sync Connection - - - - - - - - - - - - - - - - - -
+        with pool.acquire() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                assert cur.fetchone() == (1,)
+
+        # Async Connection - - - - - - - - - - - - - - - - -
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
-                res = await cur.fetchone()
-                assert res == (1,)
+                assert await cur.fetchone() == (1,)
+
     # Pool closed
     assert pool.closed() and pool.total == 0
 
-# Pool (Context Manager: Disconnected)
+# Pool (Context: Disconnected)
 async def test_pool_context_disconnected() -> None:
     with sqlcycli.create_pool(HOST, PORT, USER, PSWD, min_size=1) as pool:
         # Pool is not connected: 0 free connection (min_size=1)
         assert pool.closed() and pool.free == 0
-        # Connect automatically
+
+        # Sync Connection - - - - - - - - - - - - - - - - - -
+        with pool.acquire() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                assert cur.fetchone() == (1,)
+
+        # Async Connection - - - - - - - - - - - - - - - - -
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
-                res = await cur.fetchone()
-                assert res == (1,)
-        # 1 free connection
+                assert await cur.fetchone() == (1,)
+        # 1 free async connection
         assert pool.free == 1
-    # Pool closed
-    assert pool.closed() and pool.total == 0
 
-# Pool (Create Directly: Connected)
-async def test_pool_direct_connected() -> None:
-    pool = await sqlcycli.create_pool(HOST, PORT, USER, PSWD, min_size=1)
-    # Pool is connected: 1 free connection (min_size=1)
-    assert not pool.closed() and pool.free == 1
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT 1")
-            res = await cur.fetchone()
-            assert res == (1,)
-    # Close pool manually
-    await pool.close()
+    # Pool closed
     assert pool.closed() and pool.total == 0
 
 if __name__ == "__main__":
     asyncio.run(test_pool_context_connected())
     asyncio.run(test_pool_context_disconnected())
-    asyncio.run(test_pool_direct_connected())
 ```
 
-### Use `sqlfunc` module to escape MySQL function values.
+### Use the `Pool` class to create a Pool instance. `Must close manually`.
 
 ```python
+import asyncio
+import sqlcycli
+
+HOST = "localhost"
+PORT = 3306
+USER = "root"
+PSWD = "password"
+
+# Pool (Instance: Connected)
+async def test_pool_instance_connected() -> None:
+    pool = await sqlcycli.create_pool(HOST, PORT, USER, PSWD, min_size=1)
+    # Pool is connected: 1 free connection (min_size=1)
+    assert not pool.closed() and pool.free == 1
+
+    # Sync Connection - - - - - - - - - - - - - - - - - -
+    with pool.acquire() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            assert cur.fetchone() == (1,)
+
+    # Async Connection - - - - - - - - - - - - - - - - -
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
+            assert await cur.fetchone() == (1,)
+
+    # Close pool manually
+    await pool.close()
+    assert pool.closed() and pool.total == 0
+
+
+# Pool (Instance: Disconnected)
+async def test_pool_instance_disconnected() -> None:
+    pool = sqlcycli.Pool(HOST, PORT, USER, PSWD, min_size=1)
+    # Pool is not connected: 0 free connection (min_size=1)
+    assert pool.closed() and pool.free == 0
+
+    # Sync Connection - - - - - - - - - - - - - - - - - -
+    with pool.acquire() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            assert cur.fetchone() == (1,)
+
+    # Async Connection - - - - - - - - - - - - - - - - -
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
+            assert await cur.fetchone() == (1,)
+    # 1 free async connection
+    assert pool.free == 1
+
+    # Close pool manually
+    await pool.close()
+    assert pool.closed() and pool.total == 0
+
+if __name__ == "__main__":
+    asyncio.run(test_pool_instance_connected())
+    asyncio.run(test_pool_instance_disconnected())
+```
+
+### Use the `sqlfunc` module to escape values for MySQL functions.
+
+```python
+import asyncio
 import datetime
-from sqlcycli import Connection, sqlfunc
+import sqlcycli
+from sqlcycli import sqlfunc
 
 HOST = "localhost"
 PORT = 3306
 USER = "root"
 PSWD = "Password_123456"
 
-conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
-conn.connect()
-with conn.cursor() as cur:
-    cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
-    print(cur.executed_sql)
-    # "SELECT TO_DAYS('2007-10-07')"
-    res = cur.fetchone()
-    print(res)
-    # (733321,)
-conn.close()
+# SQLFunction
+def test_sqlfunction() -> None:
+    with sqlcycli.connect(HOST, PORT, USER, PSWD) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
+            # SQLFunction 'TO_DAYS()' escaped as: TO_DAYS('2007-10-07')
+            assert cur.executed_sql == "SELECT TO_DAYS('2007-10-07')"
+            assert cur.fetchone() == (733321,)
+
+    # Connection closed
+    assert conn.closed()
+
+if __name__ == "__main__":
+    test_sqlfunction()
 ```
 
 ## Acknowledgements
