@@ -3,7 +3,7 @@ from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
 from sqlcycli.transcode import escape, BIT, JSON
-from sqlcycli.charset import Charset, all_charsets
+from sqlcycli.charset import Charset, Charsets, all_charsets
 from sqlcycli.protocol import MysqlPacket, FieldDescriptorPacket
 from sqlcycli.connection import (
     Cursor,
@@ -31,6 +31,7 @@ __all__ = [
     "OptionFile",
     "SSL",
     "Charset",
+    "Charsets",
     "MysqlPacket",
     "FieldDescriptorPacket",
     "Cursor",
