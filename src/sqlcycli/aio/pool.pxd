@@ -1,6 +1,7 @@
 # cython: language_level=3
 from sqlcycli.charset cimport Charset
 from sqlcycli._auth cimport AuthPlugin
+from sqlcycli cimport connection as sync_conn
 from sqlcycli.aio cimport connection as async_conn
 
 # Utils
@@ -12,18 +13,28 @@ cdef class PoolConnection(async_conn.BaseConnection):
     cdef:
         Py_ssize_t _pool_id
         bint _close_scheduled
-    # Pool
+    cpdef bint schedule_close(self) except -1
+
+cdef class PoolSyncConnection(sync_conn.BaseConnection):
+    cdef:
+        Py_ssize_t _pool_id
+        bint _close_scheduled
     cpdef bint schedule_close(self) except -1
 
 # Pool
 cdef class PoolConnectionManager:
     cdef:
         Pool _pool
-        PoolConnection _conn
-        bint _closed
+        PoolSyncConnection _sync_conn
+        PoolConnection _async_conn
+    # Sync
+    cdef inline PoolSyncConnection _acquire_sync_conn(self)
+    cdef inline bint _release_sync_conn(self) except -1
 
 cdef class Pool:
     cdef:
+        # Sync connection
+        PoolSyncConnection _sync_conn
         # Pool
         # . counting
         unsigned int _acqr
@@ -70,6 +81,7 @@ cdef class Pool:
         str _sql_mode
         str _init_command
         object _cursor
+        object _sync_cursor
         object _client_flag
         str _program_name
         # . ssl
@@ -83,24 +95,29 @@ cdef class Pool:
         bint _decode_json
         
     # Setup
-    cdef inline bint _setup(self, object min_size, object max_size, object recycle) except -1
+    cdef inline bint _setup(self, int min_size, int max_size, object recycle) except -1
     # Pool
-    cpdef unsigned int get_free(self)
-    cpdef unsigned int get_used(self)
-    cpdef unsigned int get_total(self)
     cpdef bint set_min_size(self, unsigned int size) except -1
     cpdef bint set_recycle(self, object size) except -1
-    cdef inline PoolConnection _get_free_conn(self)
-    cdef inline object _get_loop(self)
-    cdef inline bint _add_free_conn(self, object conn) except -1
     cpdef bint set_autocommit(self, bint value) except -1
     cpdef bint set_use_decimal(self, bint value) except -1
     cpdef bint set_decode_bit(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1
+    cdef inline bint _add_free_conn(self, PoolConnection conn) except -1
+    cdef inline PoolConnection _get_free_conn(self)
+    cdef inline unsigned int _get_free(self) except -1
+    cdef inline unsigned int _get_used(self) except -1
+    cdef inline unsigned int _get_total(self) except -1
+    cdef inline object _get_loop(self)
     # Acquire / Fill / Release
     cpdef PoolConnectionManager acquire(self)
+    cpdef object release(self, object conn)
+    cdef inline PoolSyncConnection _acquire_sync_conn(self)
+    cdef inline bint _release_sync_conn(self, PoolSyncConnection conn) except -1
     # Close
+    cpdef object close(self)
     cpdef bint terminate(self) except -1
     cpdef bint closed(self) except -1
+    cdef inline bint _close_sync_conn(self) except -1
     cdef inline bint _verify_open(self) except -1
   
