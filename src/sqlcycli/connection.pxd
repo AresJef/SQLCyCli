@@ -22,18 +22,18 @@ cdef class MysqlResult:
         # Connection
         BaseConnection _conn
         # Packet data
-        unsigned long long affected_rows
-        unsigned long long insert_id
-        int server_status
-        unsigned int warning_count
-        bint has_next
-        bytes message
+        unsigned long long _affected_rows
+        unsigned long long _insert_id
+        int _server_status
+        unsigned int _warning_count
+        bint _has_next
+        bytes _message
         # Field data
-        unsigned long long field_count
-        tuple fields
-        tuple rows
+        unsigned long long _field_count
+        tuple _fields
+        tuple _rows
         # Unbuffered
-        bint unbuffered_active
+        bint _unbuffered_active
     # Methods
     cpdef bint read(self) except -1
     cpdef bint init_unbuffered_query(self) except -1
@@ -85,7 +85,7 @@ cdef class Cursor:
     cdef inline tuple _fetchall_dict(self)
     cdef inline object _fetchall_df(self)
     cdef inline dict _convert_row_to_dict(self, tuple row, tuple cols, unsigned long long field_count)
-    cpdef bint scroll(self, long long value, object mode=?) except -1
+    cpdef bint scroll(self, long long value, str mode=?) except -1
     cpdef bint nextset(self) except -1
     cdef inline tuple _next_row_unbuffered(self)
     cpdef tuple columns(self)
@@ -98,6 +98,21 @@ cdef class Cursor:
     # Close
     cpdef bint close(self) except -1
     cpdef bint closed(self) except -1
+
+cdef class DictCursor(Cursor):
+    pass
+
+cdef class DfCursor(Cursor):
+    pass
+
+cdef class SSCursor(Cursor):
+    pass
+
+cdef class SSDictCursor(DictCursor):
+    pass
+
+cdef class SSDfCursor(DfCursor):
+    pass
 
 # Connection
 cdef class CursorManager:

@@ -10,18 +10,18 @@ cdef class MysqlResult:
         BaseConnection _conn
         object _local_file
         # Packet data
-        unsigned long long affected_rows
-        unsigned long long insert_id
-        int server_status
-        unsigned int warning_count
-        bint has_next
-        bytes message
+        unsigned long long _affected_rows
+        unsigned long long _insert_id
+        int _server_status
+        unsigned int _warning_count
+        bint _has_next
+        bytes _message
         # Field data
-        unsigned long long field_count
-        tuple fields
-        tuple rows
+        unsigned long long _field_count
+        tuple _fields
+        tuple _rows
         # Unbuffered
-        bint unbuffered_active
+        bint _unbuffered_active
     # Methods
     cdef inline bint _read_ok_packet(self, MysqlPacket pkt) except -1
     cdef inline bint _read_eof_packet(self, MysqlPacket pkt) except -1
@@ -62,6 +62,21 @@ cdef class Cursor:
     # Close
     cpdef bint force_close(self) except -1
     cpdef bint closed(self) except -1
+
+cdef class DictCursor(Cursor):
+    pass
+
+cdef class DfCursor(Cursor):
+    pass
+
+cdef class SSCursor(Cursor):
+    pass
+
+cdef class SSDictCursor(DictCursor):
+    pass
+
+cdef class SSDfCursor(DfCursor):
+    pass
 
 # Connection
 cdef class CursorManager:

@@ -65,18 +65,18 @@ class MysqlResult:
     _conn: BaseConnection
     _local_file: BufferedReader
     # Packet data
-    affected_rows: cython.ulonglong  # Value of 18446744073709551615 means None
-    insert_id: cython.ulonglong  # Value of 18446744073709551615 means None
-    server_status: cython.int  # Value of -1 means None
-    warning_count: cython.uint
-    has_next: cython.bint
-    message: bytes
+    _affected_rows: cython.ulonglong  # Value of 18446744073709551615 means None
+    _insert_id: cython.ulonglong  # Value of 18446744073709551615 means None
+    _server_status: cython.int  # Value of -1 means None
+    _warning_count: cython.uint
+    _has_next: cython.bint
+    _message: bytes
     # Field data
-    field_count: cython.ulonglong
-    fields: tuple[FieldDescriptorPacket]
-    rows: tuple[tuple]
+    _field_count: cython.ulonglong
+    _fields: tuple[FieldDescriptorPacket]
+    _rows: tuple[tuple]
     # Unbuffered
-    unbuffered_active: cython.bint
+    _unbuffered_active: cython.bint
 
     def __init__(self, conn: BaseConnection) -> None:
         """The result of a query execution.
@@ -87,24 +87,66 @@ class MysqlResult:
         self._conn = conn
         self._local_file = None
         # Packet data
-        self.affected_rows = 0
-        self.insert_id = 0
-        self.server_status = -1
-        self.warning_count = 0
-        self.has_next = False
-        self.message = None
+        self._affected_rows = 0
+        self._insert_id = 0
+        self._server_status = -1
+        self._warning_count = 0
+        self._has_next = False
+        self._message = None
         # Field data
-        self.field_count = 0
-        self.fields = None
-        self.rows = None
-        self.unbuffered_active = False
+        self._field_count = 0
+        self._fields = None
+        self._rows = None
+        # Unbuffered
+        self._unbuffered_active = False
 
-    async def read(self) -> None:
-        """Read the packet data.
+    # Property --------------------------------------------------------------------------------
+    @property
+    def affected_rows(self) -> int:
+        """The affected rows of the query result `<'int'>`.
 
-        After read, packet data is accessable through class
-        c-attributes, such as: 'affected_rows', 'fields', etc.
+        For UNBUFFERED cursor, the value is either 0 or 18446744073709551615.
         """
+        return self._affected_rows
+
+    @property
+    def insert_id(self) -> int:
+        """The LAST INSERT ID of the query result `<'int'>`."""
+        return self._insert_id
+
+    @property
+    def server_status(self) -> int:
+        """The server status of the query result `<'int/None'>`."""
+        return self._server_status
+
+    @property
+    def warning_count(self) -> int:
+        """Total warning counts of the query result `<'int'>`."""
+        return self._warning_count
+
+    @property
+    def message(self) -> bytes | None:
+        """The message of the query result `<'str/None'>`."""
+        return self._message
+
+    @property
+    def field_count(self) -> int:
+        """Total number of fields (columns) of the query result `<'int'>`."""
+        return self._field_count
+
+    @property
+    def fields(self) -> tuple[FieldDescriptorPacket] | None:
+        """The field (column) descriptors of the query
+        result `<'tuple[FieldDescriptorPacket]/None'>`.
+
+        Each item in the tuple is a FieldDescriptorPacket object,
+        which contains column's metadata of the result.
+        """
+        return self._fields
+
+    # Read ------------------------------------------------------------------------------------
+    async def read(self) -> None:
+        """Read the packet data."""
         try:
             pkt: MysqlPacket = await self._conn._read_packet()
             if pkt.read_ok_packet():
@@ -120,23 +162,23 @@ class MysqlResult:
         """Initiate unbuffered query mode.
 
         #### Used in unbuffered mode."""
-        self.unbuffered_active = True
+        self._unbuffered_active = True
         try:
             pkt: MysqlPacket = await self._conn._read_packet()
             if pkt.read_ok_packet():
                 self._read_ok_packet(pkt)
-                self.unbuffered_active = False
+                self._unbuffered_active = False
                 self._conn = None
             elif pkt.read_load_local_packet():
                 await self._read_load_local_packet(pkt)
-                self.unbuffered_active = False
+                self._unbuffered_active = False
                 self._conn = None
             else:
                 await self._read_result_packet_fields(pkt)
                 # Apparently, MySQLdb picks this number because it's the maximum
                 # value of a 64bit unsigned integer. Since we're emulating MySQLdb,
                 # we set it to this instead of None, which would be preferred.
-                self.affected_rows = ULLONG_MAX  # 18446744073709551615
+                self._affected_rows = ULLONG_MAX  # 18446744073709551615
         except:  # noqa
             self._conn = None
             raise
@@ -147,12 +189,12 @@ class MysqlResult:
     def _read_ok_packet(self, pkt: MysqlPacket) -> cython.bint:
         """(cfunc) Read OKPacket data. Used when the packet
         is known to be OKPacket `<'bool'>`."""
-        self.affected_rows = pkt._affected_rows
-        self.insert_id = pkt._insert_id
-        self.server_status = pkt._server_status
-        self.warning_count = pkt._warning_count
-        self.has_next = pkt._has_next
-        self.message = pkt._message
+        self._affected_rows = pkt._affected_rows
+        self._insert_id = pkt._insert_id
+        self._server_status = pkt._server_status
+        self._warning_count = pkt._warning_count
+        self._has_next = pkt._has_next
+        self._message = pkt._message
         return True
 
     async def _read_load_local_packet(self, pkt: MysqlPacket) -> None:
@@ -188,7 +230,8 @@ class MysqlResult:
             try:
                 await loop.run_in_executor(None, opener)
                 with self._local_file:
-                    size = sync_conn.MAX_PACKET_LENGTH
+                    # 16KB is efficient enough
+                    size: int = min(self._conn._max_allowed_packet, 16 * 1024)
                     while True:
                         chunk: bytes = await loop.run_in_executor(None, reader, size)
                         if not chunk:
@@ -226,8 +269,8 @@ class MysqlResult:
         # 2) Mask CAPABILITIES with server_capabilities
         # 3) if server_capabilities & CLIENT.DEPRECATE_EOF:
         #    use OKPacketWrapper instead of EOFPacketWrapper
-        self.warning_count = pkt._warning_count
-        self.has_next = pkt._has_next
+        self._warning_count = pkt._warning_count
+        self._has_next = pkt._has_next
         return True
 
     async def _read_result_packet(self, pkt: MysqlPacket) -> None:
@@ -246,16 +289,16 @@ class MysqlResult:
                 break
             rows.append(self._read_result_packet_row(pkt))
             affected_rows += 1
-        self.affected_rows = affected_rows
-        self.rows = list_to_tuple(rows)
+        self._affected_rows = affected_rows
+        self._rows = list_to_tuple(rows)
 
     async def _read_result_packet_fields(self, pkt: MysqlPacket) -> None:
         """(internal) Read all the FieldDescriptor packets of the query."""
-        self.field_count = pkt.read_length_encoded_integer()
-        self.fields = list_to_tuple(
+        self._field_count = pkt.read_length_encoded_integer()
+        self._fields = list_to_tuple(
             [
                 await self._conn._read_field_descriptor_packet()
-                for _ in range(self.field_count)
+                for _ in range(self._field_count)
             ]
         )
         eof_packet: MysqlPacket = await self._conn._read_packet()
@@ -275,7 +318,7 @@ class MysqlResult:
         # Read data
         row: list = []
         field: FieldDescriptorPacket
-        for field in self.fields:
+        for field in self._fields:
             try:
                 value: bytes = pkt.read_length_encoded_string()
             except IndexError:  # MysqlPacketCursorError
@@ -303,20 +346,20 @@ class MysqlResult:
 
         #### Used in unbuffered mode."""
         # Check if in an active query
-        if not self.unbuffered_active:
+        if not self._unbuffered_active:
             return None
         # EOF
         pkt: MysqlPacket = await self._conn._read_packet()
         if pkt.read_eof_packet():
             self._read_eof_packet(pkt)
-            self.unbuffered_active = False
-            self.rows = None
+            self._unbuffered_active = False
+            self._rows = None
             self._conn = None
             return None
         # Read row
         row = self._read_result_packet_row(pkt)
-        self.affected_rows = 1
-        self.rows = (row,)  # rows should tuple of row for compatibility.
+        self._affected_rows = 1
+        self._rows = (row,)  # rows should tuple of row for compatibility.
         return row
 
     async def _drain_result_packet_unbuffered(self) -> None:
@@ -326,27 +369,27 @@ class MysqlResult:
         # After much reading on the protocol, it appears that there is,
         # in fact, no way to stop from sending all the data after
         # executing a query, so we just spin, and wait for an EOF packet.
-        while self.unbuffered_active:
+        while self._unbuffered_active:
             try:
                 pkt: MysqlPacket = await self._conn._read_packet()
             # If the query timed out we can simply ignore this error
             except errors.OperationalTimeoutError:
-                self.unbuffered_active = False
+                self._unbuffered_active = False
                 self._conn = None
                 return None
             # Release connection before raising the error
             except:  # noqa:
-                self.unbuffered_active = False
+                self._unbuffered_active = False
                 self._conn = None
                 raise
             # Exist when receieved EOFPacket
             if pkt.read_eof_packet():
                 self._read_eof_packet(pkt)
-                self.unbuffered_active = False
+                self._unbuffered_active = False
                 self._conn = None  # release reference to kill cyclic reference.
 
     def __del__(self) -> None:
-        if self.unbuffered_active:
+        if self._unbuffered_active:
             self._conn = None
 
 
@@ -425,7 +468,7 @@ class Cursor:
         return self._field_count
 
     @property
-    def fields(self) -> tuple[FieldDescriptorPacket]:
+    def fields(self) -> tuple[FieldDescriptorPacket] | None:
         """The field (column) descriptors of the query
         result `<'tuple[FieldDescriptorPacket]'>`.
 
@@ -477,7 +520,7 @@ class Cursor:
 
         #### Compliance with PEP-0249, alias for 'affected_rows'.
         """
-        return self.affected_rows
+        return self._affected_rows
 
     @property
     def rownumber(self) -> int:
@@ -508,7 +551,8 @@ class Cursor:
         """
         if self._fields is None:
             return None
-        return list_to_tuple([f.description() for f in self._fields])
+        field: FieldDescriptorPacket
+        return list_to_tuple([field.description() for field in self._fields])
 
     @property
     def arraysize(self) -> int:
@@ -520,16 +564,8 @@ class Cursor:
         return self._arraysize
 
     @arraysize.setter
-    def arraysize(self, value: int) -> None:
-        try:
-            self._arraysize = int(value)
-        except Exception as err:
-            raise errors.InvalidCursorArgsError(
-                "Invalid 'arraysize' value, expects positive "
-                "integer, instead of %r." % value
-            ) from err
-        if self._arraysize == 0:
-            self._arraysize = 1
+    def arraysize(self, value: cython.longlong) -> None:
+        self._arraysize = 1 if value < 1 else value
 
     # Write -----------------------------------------------------------------------------------
     async def execute(
@@ -649,7 +685,7 @@ class Cursor:
         # The escaped 'args' now on can only be a <'list'>.
         # If the list is empty, execute the query directly.
         if list_len(args) == 0:
-            return self._query_str(self._format(sql, ()))
+            return await self._query_str(sql)
 
         # Bulk INSERT/REPLACE `NOT` matched
         rows: cython.ulonglong = 0
@@ -897,10 +933,10 @@ class Cursor:
         # Multi-row query
         # The escaped 'args' now on can only be a <'list[str/tuple]'>.
         # Only the 'first' row [item] of the args will be bound to the sql.
-        if len(args) == 0:
-            return self._format(sql, ())
-        else:
-            return self._format(sql, args[0])
+        _args: list = args
+        if list_len(_args) == 0:
+            return sql
+        return self._format(sql, _args[0])
 
     async def _query_str(self, sql: str) -> int:
         """(internal) Execute a <'str'> query `<'int'>`."""
@@ -966,7 +1002,7 @@ class Cursor:
         else:
             row = await self._next_row_unbuffered()
             if row is None:
-                self._warning_count = self._result.warning_count
+                self._warning_count = self._result._warning_count
                 return None  # exit: no rows
             return row  # exit: one row
 
@@ -978,10 +1014,10 @@ class Cursor:
         #### Used by DictCursor & SSDictCursor.
         """
         # Fetch & validate
-        row = await self._fetchone_tuple()
+        row: tuple = await self._fetchone_tuple()
         if row is None:
             return None  # exit: no more rows
-        cols = self.columns()
+        cols: tuple = self.columns()
         if cols is None:
             return None  # eixt: no columns
         # Generate
@@ -1046,7 +1082,7 @@ class Cursor:
             for _ in range(size):
                 row = await self._next_row_unbuffered()
                 if row is None:
-                    self._warning_count = self._result.warning_count
+                    self._warning_count = self._result._warning_count
                     break
                 else:
                     rows.append(row)
@@ -1066,7 +1102,7 @@ class Cursor:
         rows: tuple = await self._fetchmany_tuple(size)
         if not rows:
             return ()  # exit: no more rows
-        cols = self.columns()
+        cols: tuple = self.columns()
         if cols is None:
             return ()  # eixt: no columns
         # Generate
@@ -1135,7 +1171,7 @@ class Cursor:
             while True:
                 row = await self._next_row_unbuffered()
                 if row is None:
-                    self._warning_count = self._result.warning_count
+                    self._warning_count = self._result._warning_count
                     break
                 else:
                     rows.append(row)
@@ -1152,7 +1188,7 @@ class Cursor:
         rows: tuple = await self._fetchall_tuple()
         if not rows:
             return ()  # exit: no more rows
-        cols = self.columns()
+        cols: tuple = self.columns()
         if cols is None:
             return ()  # eixt: no columns
         # Generate
@@ -1193,11 +1229,7 @@ class Cursor:
         return {cols[i]: row[i] for i in range(field_count)}
 
     # . rest
-    async def scroll(
-        self,
-        value: cython.longlong,
-        mode: Literal["relative", "absolute"] = "relative",
-    ) -> None:
+    async def scroll(self, value: cython.longlong, mode: str = "relative") -> None:
         """Scroll the cursor to a new position of the query result.
 
         :param value: `<'int'>` The value for the cursor position.
@@ -1216,16 +1248,13 @@ class Cursor:
             if row_size == 0:
                 self._row_idx = 0
                 return None
-            # Scroll cursor
+
             idx: cython.ulonglong
             if mode == "relative":
-                if value < 0:
-                    idx = -value
-                    if idx > row_size:
-                        raise errors.InvalidCursorIndexError(
-                            "Cursor index cannot be negative: %d."
-                            % (self._row_idx + value)
-                        )
+                if value < 0 and -value > self._row_idx:
+                    raise errors.InvalidCursorIndexError(
+                        "Cursor index cannot be negative: %d." % (self._row_idx + value)
+                    )
                 idx = self._row_idx + value
             elif mode == "absolute":
                 if value < 0:
@@ -1234,7 +1263,8 @@ class Cursor:
                     )
                 idx = value
             else:
-                raise errors.InvalidCursorArgsError("Inavlid scroll mode %r." % mode)
+                raise errors.InvalidCursorArgsError("Inavlid scroll mode '%s'." % mode)
+
             if idx >= row_size:
                 raise errors.InvalidCursorIndexError(
                     "Cursor index '%d' out of range: 0~%d." % (idx, row_size)
@@ -1243,23 +1273,23 @@ class Cursor:
             return None
 
         # Unbuffered
-        if value < 0:
-            raise errors.InvalidCursorIndexError(
-                "Backwards scrolling not supported by <'%s'>." % self.__class__.__name__
-            )
-        val: cython.ulonglong = value
         if mode == "relative":
-            val = value
-        elif mode == "absolute":
-            if val < self._row_idx:
+            if value < 0:
                 raise errors.InvalidCursorIndexError(
                     "Backwards scrolling not supported by <'%s'>."
                     % self.__class__.__name__
                 )
-            val -= self._row_idx
+        elif mode == "absolute":
+            if value < self._row_idx:
+                raise errors.InvalidCursorIndexError(
+                    "Backwards scrolling not supported by <'%s'>."
+                    % self.__class__.__name__
+                )
+            value -= self._row_idx
         else:
-            raise errors.InvalidCursorArgsError("Inavlid scroll mode %r." % mode)
-        for _ in range(val):
+            raise errors.InvalidCursorArgsError("Inavlid scroll mode '%s'." % mode)
+
+        for _ in range(value):
             if (await self._next_row_unbuffered()) is None:
                 break
 
@@ -1273,7 +1303,7 @@ class Cursor:
         if (
             curr_result is None
             or curr_result is not conn._result
-            or not curr_result.has_next
+            or not curr_result._has_next
         ):
             # . reset columns from previous result
             if self._columns is not None:
@@ -1322,12 +1352,12 @@ class Cursor:
         """(cfunc) Read query result."""
         result: MysqlResult = self._conn._result
         self._result = result
-        self._field_count = result.field_count
-        self._fields = result.fields
-        self._rows = result.rows
-        self._affected_rows = result.affected_rows
-        self._insert_id = result.insert_id
-        self._warning_count = result.warning_count
+        self._field_count = result._field_count
+        self._fields = result._fields
+        self._rows = result._rows
+        self._affected_rows = result._affected_rows
+        self._insert_id = result._insert_id
+        self._warning_count = result._warning_count
         return True
 
     @cython.cfunc
@@ -1680,6 +1710,7 @@ class CursorManager:
                 self._cur = None
             self._cur_type = None
             self._conn = None
+            self._closed = True
 
 
 @cython.cclass
@@ -1841,20 +1872,20 @@ class BaseConnection:
         wait_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
-        autocommit_mode: int,
-        local_infile: bool,
-        max_allowed_packet: int,
+        autocommit_mode: cython.int,
+        local_infile: cython.bint,
+        max_allowed_packet: cython.uint,
         sql_mode: str | None,
         init_command: str | None,
         cursor: type[Cursor],
-        client_flag: int,
+        client_flag: cython.uint,
         program_name: str | None,
         ssl_ctx: object | None,
         auth_plugin: _auth.AuthPlugin | None,
         server_public_key: bytes | None,
-        use_decimal: bool,
-        decode_bit: bool,
-        decode_json: bool,
+        use_decimal: cython.bint,
+        decode_bit: cython.bint,
+        decode_json: cython.bint,
         loop: AbstractEventLoop,
     ):
         """The `async` socket connection to the server.
@@ -1912,7 +1943,7 @@ class BaseConnection:
         self._bind_address = bind_address
         self._unix_socket = unix_socket
         self._autocommit_mode = autocommit_mode
-        self._local_infile = bool(local_infile)
+        self._local_infile = local_infile
         self._max_allowed_packet = max_allowed_packet
         self._sql_mode = sql_mode
         self._init_command = init_command
@@ -1925,9 +1956,9 @@ class BaseConnection:
         self._auth_plugin = auth_plugin
         self._server_public_key = server_public_key
         # . decode
-        self._use_decimal = bool(use_decimal)
-        self._decode_bit = bool(decode_bit)
-        self._decode_json = bool(decode_json)
+        self._use_decimal = use_decimal
+        self._decode_bit = decode_bit
+        self._decode_json = decode_json
         # . loop
         self._loop = loop
 
@@ -2288,7 +2319,8 @@ class BaseConnection:
 
     async def start(self) -> None:
         """START TRANSACTION, alias to 'Connection.begin()'."""
-        await self.begin()
+        await self._execute_command(_COMMAND.COM_QUERY, b"BEGIN")
+        await self._read_ok_packet()
 
     async def commit(self) -> None:
         """COMMIT any pending transaction to the database."""
@@ -2320,7 +2352,7 @@ class BaseConnection:
         """Execute 'SHOW WARNINGS' sql and returns
         the warnings `<'tuple[tuple]'>`."""
         await self.query("SHOW WARNINGS")
-        return self._result.rows
+        return self._result._rows
 
     async def select_database(self, db: str) -> None:
         """Select database for the connection (SESSION).
@@ -2514,7 +2546,13 @@ class BaseConnection:
         :param name: `<'str'>` The name of the timeout.
         :param value: `<'int'>` The timeout value in seconds.
         """
-        sql = "SET SESSION %s = %s" % (name, value)
+        try:
+            value = int(value)
+        except Exception as err:
+            raise errors.ConnectionValueError(
+                "Invalid '%s' value: %s." % (name, value)
+            ) from err
+        sql = "SET SESSION %s = %d" % (name, value)
         await self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
         await self._read_ok_packet()
 
@@ -2531,7 +2569,7 @@ class BaseConnection:
             sql = "SHOW GLOBAL VARIABLES LIKE '%s'" % name
         await self.query(sql, False)
         try:
-            return int(self._result.rows[0][1])
+            return int(self._result._rows[0][1])
         except Exception as err:
             raise errors.DatabaseError(
                 "Failed to get %s '%s' from server: %s"
@@ -2559,13 +2597,13 @@ class BaseConnection:
             - `True` to operate in autocommit (non-transactional) mode.
             - `False` to operate in manual commit (transactional) mode.
         """
-        if value != self.get_autocommit():
+        self._autocommit_mode = int(value)
+        if not self.closed() and value != self.get_autocommit():
             await self._execute_command(
                 _COMMAND.COM_QUERY,
                 b"SET AUTOCOMMIT = 1" if value else b"SET AUTOCOMMIT = 0",
             )
             await self._read_ok_packet()
-            self._autocommit_mode = value
 
     # . server
     @cython.ccall
@@ -2581,7 +2619,7 @@ class BaseConnection:
             m = sync_conn.SERVER_VERSION_RE.match(self._server_info)
             if m is None:
                 raise errors.DatabaseError(
-                    "Failed to parse server version from: %s." % self._server_info
+                    "Failed to parse server version from '%s'." % self._server_info
                 )
             cmp: tuple = m.group(1, 2, 3)
             self._server_version = list_to_tuple(
@@ -2607,12 +2645,12 @@ class BaseConnection:
     @cython.ccall
     def get_affected_rows(self) -> cython.ulonglong:
         """Get the number of affected rows by the last query `<'int'>`."""
-        return 0 if self._result is None else self._result.affected_rows
+        return 0 if self._result is None else self._result._affected_rows
 
     @cython.ccall
     def get_insert_id(self) -> cython.ulonglong:
         """Get the 'LAST_INSERT_ID' of the the last query `<'int'>`."""
-        return 0 if self._result is None else self._result.insert_id
+        return 0 if self._result is None else self._result._insert_id
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -2780,8 +2818,7 @@ class BaseConnection:
             lambda: protocol, host, port, **kwargs
         )
         writer = StreamWriter(transport, protocol, reader, loop)
-        self._reader = reader
-        self._writer = writer
+        self._writer, self._reader = writer, reader
         return True
 
     async def _open_unix(self, unix_socket: str = None, **kwargs) -> None:
@@ -2793,8 +2830,7 @@ class BaseConnection:
             lambda: protocol, unix_socket, **kwargs
         )
         writer = StreamWriter(transport, protocol, reader, loop)
-        self._reader = reader
-        self._writer = writer
+        self._writer, self._reader = writer, reader
         return True
 
     async def close(self) -> None:
@@ -2804,15 +2840,13 @@ class BaseConnection:
 
         #### This method does not raise any error.
         """
-        # Already closed
-        if self.closed():
-            return None
         # Close connection
-        try:
-            self._write_bytes(utils.pack_IB(1, _COMMAND.COM_QUIT))
-            await self._writer.drain()
-        finally:
-            self.force_close()
+        if not self.closed():
+            try:
+                self._write_bytes(utils.pack_IB(1, _COMMAND.COM_QUIT))
+                await self._writer.drain()
+            finally:
+                self.force_close()
 
     @cython.ccall
     @cython.exceptval(-1, check=False)
@@ -2828,8 +2862,7 @@ class BaseConnection:
                 self._writer.transport.close()
             except:  # noqa
                 pass
-        self._writer = None
-        self._reader = None
+            self._writer, self._reader = None, None
         return True
 
     @cython.cfunc
@@ -2850,9 +2883,9 @@ class BaseConnection:
     @cython.exceptval(-1, check=False)
     def closed(self) -> cython.bint:
         """Represents the connection state: whether is closed `<'bool'>`."""
-        return self._writer is None
+        return self._writer is None and self._reader is None
 
-    async def ping(self, reconnect: bool = True) -> None:
+    async def ping(self, reconnect: cython.bint = True) -> None:
         """Check if the connection is alive.
 
         :param reconnect: `<'bool'>` Whether to reconnect if disconnected. Defaults to `True`.
@@ -3277,10 +3310,10 @@ class BaseConnection:
         # If the last query was unbuffered, make sure it finishes
         # before sending new commands
         if self._result is not None:
-            if self._result.unbuffered_active:
+            if self._result._unbuffered_active:
                 warnings.warn("Previous unbuffered result was left incomplete.")
                 await self._result._drain_result_packet_unbuffered()
-            while self._result.has_next:
+            while self._result._has_next:
                 await self._read_query_result(False)  # next result
             self._result = None
 
@@ -3385,7 +3418,7 @@ class BaseConnection:
                 result = MysqlResult(self)
                 await result.init_unbuffered_query()
             except:  # noqa
-                result.unbuffered_active = False
+                result._unbuffered_active = False
                 result._conn = None
                 raise
         else:
@@ -3393,9 +3426,9 @@ class BaseConnection:
             await result.read()
         self._result = result
         # Update status
-        if result.server_status != -1:
-            self._server_status = result.server_status
-        return result.affected_rows
+        if result._server_status != -1:
+            self._server_status = result._server_status
+        return result._affected_rows
 
     async def _read_packet(self) -> MysqlPacket:
         """(internal) Read the next packet in its entirety
@@ -3407,8 +3440,8 @@ class BaseConnection:
         buffer: bytes = await self._read_packet_buffer()
         pkt = MysqlPacket(buffer, self._encoding)
         if pkt.is_error_packet():
-            if self._result is not None and self._result.unbuffered_active:
-                self._result.unbuffered_active = False
+            if self._result is not None and self._result._unbuffered_active:
+                self._result._unbuffered_active = False
             pkt.raise_error()
         return pkt
 
@@ -3421,8 +3454,8 @@ class BaseConnection:
         buffer: bytes = await self._read_packet_buffer()
         pkt = FieldDescriptorPacket(buffer, self._encoding)
         if pkt.is_error_packet():
-            if self._result is not None and self._result.unbuffered_active:
-                self._result.unbuffered_active = False
+            if self._result is not None and self._result._unbuffered_active:
+                self._result._unbuffered_active = False
             pkt.raise_error()
         return pkt
 
