@@ -24,7 +24,7 @@ cdef class Charsets:
     cdef inline bint _add_by_name(self, Charset charset) except -1
     cdef inline bint _add_by_collation(self, Charset charset) except -1
     cdef inline bint _add_by_name_n_collation(self, Charset charset) except -1
-    cdef inline str _gen_namecoll_key(self, str name, str collation)
+    cdef inline str _gen_charset_n_collate_key(self, object name, object collation)
     # Access Charset
     cpdef Charset by_id(self, object id)
     cpdef Charset by_name(self, object name)
@@ -38,4 +38,4 @@ cpdef Charset by_id(object id)
 cpdef Charset by_name(object name)
 cpdef Charset by_collation(object collation)
 cpdef Charset by_name_n_collation(object name, object collation)
-cdef Charset _utf8mb4_default
+cdef Charset _default_utf8mb4
