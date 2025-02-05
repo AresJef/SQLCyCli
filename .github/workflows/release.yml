@@ -44,6 +44,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{strategy.job-index}}
           path: wheelhouse/*.whl
           retention-days: 1
 
