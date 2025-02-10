@@ -1379,6 +1379,7 @@ class TestConnection(TestCase):
         self.test_close()
         self.test_connection_exception()
         self.test_transaction_exception()
+        self.test_savepoint()
         self.test_warnings()
         self.test_connect_function()
 
@@ -1645,6 +1646,23 @@ class TestConnection(TestCase):
                 pass
             self.assertTrue(cur.closed())
             self.assertTrue(conn.closed())
+        self.log_ended(test)
+
+    def test_savepoint(self):
+        test = "SAVEPOINT"
+        self.log_start(test)
+
+        with self.get_conn() as conn:
+            conn.begin()
+            conn.create_savepoint("sp")
+            with self.assertRaises(errors.OperationalError):
+                conn.rollback_savepoint("xx")
+            conn.rollback_savepoint("sp")
+            with self.assertRaises(errors.OperationalError):
+                conn.release_savepoint("xx")
+            conn.release_savepoint("sp")
+            conn.commit()
+
         self.log_ended(test)
 
     def test_warnings(self):

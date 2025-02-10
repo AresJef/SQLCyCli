@@ -1091,6 +1091,24 @@ class TestConnection(TestCase):
         self.assertTrue(pool.closed())
         self.log_ended(test)
 
+    async def test_savepoint(self):
+        test = "SAVEPOINT"
+        self.log_start(test)
+
+        async with await self.get_pool() as pool:
+            async with pool.acquire() as conn:
+                await conn.begin()
+                await conn.create_savepoint("sp")
+                with self.assertRaises(errors.OperationalError):
+                    await conn.rollback_savepoint("xx")
+                await conn.rollback_savepoint("sp")
+                with self.assertRaises(errors.OperationalError):
+                    await conn.release_savepoint("xx")
+                await conn.release_savepoint("sp")
+                await conn.commit()
+
+        self.log_ended(test)
+
     async def test_warnings(self):
         test = "WARNINGS"
         self.log_start(test)
@@ -4560,6 +4578,7 @@ class TestGitHubIssues(TestCase):
                     await cur.executemany(usql, args=(values, values, values))
 
                 await self.drop(conn)
+
         self.log_ended(test)
 
 
