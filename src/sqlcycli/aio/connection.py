@@ -2332,6 +2332,38 @@ class BaseConnection:
         await self._execute_command(_COMMAND.COM_QUERY, b"ROLLBACK")
         await self._read_ok_packet()
 
+    async def create_savepoint(self, identifier: str) -> None:
+        """Create a named transaction SAVEPOINT within the current transaction.
+        If the current transaction has a savepoint with the same name, the old
+        savepoint is deleted and a new one is set.
+
+        :param identifier `<'str'>`: The name of the savepoint.
+        """
+        await self.query("SAVEPOINT %s;" % identifier)
+
+    async def rollback_savepoint(self, identifier: str) -> None:
+        """ROLLBACK a transaction to the named SAVEPOINT without terminating the
+        transaction. Modifications that the current transaction made to rows after
+        the savepoint was set are undone in the rollback, but InnoDB does not release
+        the row locks that were stored in memory after the savepoint. (For a new
+        inserted row, the lock information is carried by the transaction ID stored
+        in the row; the lock is not separately stored in memory. In this case, the
+        row lock is released in the undo.) Savepoints that were set at a later time
+        than the named savepoint are deleted.
+
+        :param identifier `<'str'>`: The name of the savepoint.
+        """
+        await self.query("ROLLBACK TO SAVEPOINT %s;" % identifier)
+
+    async def release_savepoint(self, identifier: str) -> None:
+        """RELEASE the named SAVEPOINT from the set of savepoints of the
+        current transaction. No commit or rollback occurs. It raises an
+        error if the savepoint does not exist.
+
+        :param identifier `<'str'>`: The name of the savepoint.
+        """
+        await self.query("RELEASE SAVEPOINT %s;" % identifier)
+
     async def kill(self, thread_id: cython.int) -> None:
         """Execute KILL command.
 

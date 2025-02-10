@@ -206,6 +206,9 @@ cdef class BaseConnection:
     cpdef bint start(self) except -1
     cpdef bint commit(self) except -1
     cpdef bint rollback(self) except -1
+    cpdef bint create_savepoint(self, str identifier) except -1
+    cpdef bint rollback_savepoint(self, str identifier) except -1
+    cpdef bint release_savepoint(self, str identifier) except -1
     cpdef tuple show_warnings(self)
     cpdef bint select_database(self, str db) except -1
     cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
