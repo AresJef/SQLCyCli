@@ -1095,11 +1095,11 @@ class Pool:
         ### Notice for Pool Connection Consistency:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
-          when 'acquire()' from the pool.
+          when acquired.
         - If user changes 'charset', 'read_timeout', 'write_timeout' or
           'wait_timeout' through connection built-in methods, such as
           'set_charset()', 'set_read_timeout()', etc., these settings
-          will also be reset to pool defaults at 'release()'.
+          will also be reset to pool defaults at release.
         - Other changes made on the connection [SESSION] (especially
           through SQL queries), please manually call 'conn.schedule_close()'
           method before releasing back to the pool.
@@ -1148,11 +1148,11 @@ class Pool:
         ### Notice for Pool Connection Consistency:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
-          when 'acquire()' from the pool.
+          when acquired.
         - If user changes 'charset', 'read_timeout', 'write_timeout' or
           'wait_timeout' through connection built-in methods, such as
           'set_charset()', 'set_read_timeout()', etc., these settings
-          will also be reset to pool defaults at 'release()'.
+          will also be reset to pool defaults at release.
         - Other changes made on the connection [SESSION] (especially
           through SQL queries), please manually call 'conn.schedule_close()'
           method before releasing back to the pool.
