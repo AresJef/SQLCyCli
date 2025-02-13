@@ -1269,13 +1269,14 @@ class Pool:
         #### If the connection belongs to the pool, this method does not raise any error.
         """
         # Validate pool identity
-        if conn._pool_id != self._id or self._sync_conn is not conn:
+        if conn._pool_id != self._id:
             raise errors.PoolReleaseError(
                 "Cannot release connection that does not belong to the pool."
             )
 
         # Scheduled close / in transaction / closing
         if conn._close_scheduled or conn.get_transaction_status() or self._closing:
+            conn.close()
             return self._close_sync_conn()
 
         # Reset connection
@@ -1285,6 +1286,7 @@ class Pool:
                 conn.set_charset(self._charset._name, self._charset._collation)
                 conn._charset_changed = False
             except:  # noqa
+                conn.close()
                 return self._close_sync_conn()
         # . read timeout
         if conn._read_timeout_changed:
@@ -1292,6 +1294,7 @@ class Pool:
                 conn.set_read_timeout(self._read_timeout)
                 conn._read_timeout_changed = False
             except:  # noqa
+                conn.close()
                 return self._close_sync_conn()
         # . write timeout
         if conn._write_timeout_changed:
@@ -1299,6 +1302,7 @@ class Pool:
                 conn.set_write_timeout(self._write_timeout)
                 conn._write_timeout_changed = False
             except:  # noqa
+                conn.close()
                 return self._close_sync_conn()
         # . wait timeout
         if conn._wait_timeout_changed:
@@ -1306,7 +1310,12 @@ class Pool:
                 conn.set_wait_timeout(self._wait_timeout)
                 conn._wait_timeout_changed = False
             except:  # noqa
+                conn.close()
                 return self._close_sync_conn()
+
+        # Reclaim connection (normally should not happen)
+        if self._sync_conn is None:
+            self._sync_conn = conn
 
         return True
 
