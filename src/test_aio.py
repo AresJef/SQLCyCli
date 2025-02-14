@@ -180,6 +180,12 @@ class TestConnection(TestCase):
                 g_read = int((await cur.fetchone())[1])
                 await cur.execute("SHOW VARIABLES LIKE 'net_write_timeout'")
                 g_write = int((await cur.fetchone())[1])
+                await cur.execute("SHOW VARIABLES LIKE 'interactive_timeout'")
+                g_interactive = int((await cur.fetchone())[1])
+                await cur.execute("SHOW VARIABLES LIKE 'innodb_lock_wait_timeout'")
+                g_lock_wait = int((await cur.fetchone())[1])
+                await cur.execute("SHOW VARIABLES LIKE 'max_execution_time'")
+                g_execution = int((await cur.fetchone())[1])
 
             await conn.set_wait_timeout(180)
             self.assertEqual(await conn.get_wait_timeout(), 180)
@@ -196,10 +202,28 @@ class TestConnection(TestCase):
             await conn.set_write_timeout(None)
             self.assertEqual(await conn.get_write_timeout(), g_write)
 
+            await conn.set_interactive_timeout(180)
+            self.assertEqual(await conn.get_interactive_timeout(), 180)
+            await conn.set_interactive_timeout(None)
+            self.assertEqual(await conn.get_interactive_timeout(), g_interactive)
+
+            await conn.set_lock_wait_timeout(180)
+            self.assertEqual(await conn.get_lock_wait_timeout(), 180)
+            await conn.set_lock_wait_timeout(None)
+            self.assertEqual(await conn.get_lock_wait_timeout(), g_lock_wait)
+
+            await conn.set_execution_timeout(50_000)
+            self.assertEqual(await conn.get_execution_timeout(), 50_000)
+            await conn.set_execution_timeout(None)
+            self.assertEqual(await conn.get_execution_timeout(), g_execution)
+
         async with await self.get_conn(
             read_timeout=120,
             write_timeout=120,
             wait_timeout=120,
+            interactive_timeout=120,
+            lock_wait_timeout=120,
+            execution_timeout=120_000,
         ) as conn:
             self.assertEqual(await conn.get_wait_timeout(), 120)
             await conn.set_wait_timeout(g_wait)
@@ -218,6 +242,24 @@ class TestConnection(TestCase):
             self.assertEqual(await conn.get_write_timeout(), g_write)
             await conn.set_write_timeout(None)
             self.assertEqual(await conn.get_write_timeout(), 120)
+
+            self.assertEqual(await conn.get_interactive_timeout(), 120)
+            await conn.set_interactive_timeout(g_interactive)
+            self.assertEqual(await conn.get_interactive_timeout(), g_interactive)
+            await conn.set_interactive_timeout(None)
+            self.assertEqual(await conn.get_interactive_timeout(), 120)
+
+            self.assertEqual(await conn.get_lock_wait_timeout(), 120)
+            await conn.set_lock_wait_timeout(g_lock_wait)
+            self.assertEqual(await conn.get_lock_wait_timeout(), g_lock_wait)
+            await conn.set_lock_wait_timeout(None)
+            self.assertEqual(await conn.get_lock_wait_timeout(), 120)
+
+            self.assertEqual(await conn.get_execution_timeout(), 120_000)
+            await conn.set_execution_timeout(g_execution)
+            self.assertEqual(await conn.get_execution_timeout(), g_execution)
+            await conn.set_execution_timeout(None)
+            self.assertEqual(await conn.get_execution_timeout(), 120_000)
 
         self.log_ended(test)
 

@@ -1452,6 +1452,12 @@ class TestConnection(TestCase):
                 g_read = int(cur.fetchone()[1])
                 cur.execute("SHOW VARIABLES LIKE 'net_write_timeout'")
                 g_write = int(cur.fetchone()[1])
+                cur.execute("SHOW VARIABLES LIKE 'interactive_timeout'")
+                g_interactive = int(cur.fetchone()[1])
+                cur.execute("SHOW VARIABLES LIKE 'innodb_lock_wait_timeout'")
+                g_lock_wait = int(cur.fetchone()[1])
+                cur.execute("SHOW VARIABLES LIKE 'max_execution_time'")
+                g_execution = int(cur.fetchone()[1])
 
             conn.set_wait_timeout(180)
             self.assertEqual(conn.get_wait_timeout(), 180)
@@ -1468,10 +1474,28 @@ class TestConnection(TestCase):
             conn.set_write_timeout(None)
             self.assertEqual(conn.get_write_timeout(), g_write)
 
+            conn.set_interactive_timeout(180)
+            self.assertEqual(conn.get_interactive_timeout(), 180)
+            conn.set_interactive_timeout(None)
+            self.assertEqual(conn.get_interactive_timeout(), g_interactive)
+
+            conn.set_lock_wait_timeout(180)
+            self.assertEqual(conn.get_lock_wait_timeout(), 180)
+            conn.set_lock_wait_timeout(None)
+            self.assertEqual(conn.get_lock_wait_timeout(), g_lock_wait)
+
+            conn.set_execution_timeout(50_000)
+            self.assertEqual(conn.get_execution_timeout(), 50_000)
+            conn.set_execution_timeout(None)
+            self.assertEqual(conn.get_execution_timeout(), g_execution)
+
         with self.get_conn(
             read_timeout=120,
             write_timeout=120,
             wait_timeout=120,
+            interactive_timeout=120,
+            lock_wait_timeout=120,
+            execution_timeout=120_000,
         ) as conn:
             self.assertEqual(conn.get_wait_timeout(), 120)
             conn.set_wait_timeout(g_wait)
@@ -1490,6 +1514,24 @@ class TestConnection(TestCase):
             self.assertEqual(conn.get_write_timeout(), g_write)
             conn.set_write_timeout(None)
             self.assertEqual(conn.get_write_timeout(), 120)
+
+            self.assertEqual(conn.get_interactive_timeout(), 120)
+            conn.set_interactive_timeout(g_interactive)
+            self.assertEqual(conn.get_interactive_timeout(), g_interactive)
+            conn.set_interactive_timeout(None)
+            self.assertEqual(conn.get_interactive_timeout(), 120)
+
+            self.assertEqual(conn.get_lock_wait_timeout(), 120)
+            conn.set_lock_wait_timeout(g_lock_wait)
+            self.assertEqual(conn.get_lock_wait_timeout(), g_lock_wait)
+            conn.set_lock_wait_timeout(None)
+            self.assertEqual(conn.get_lock_wait_timeout(), 120)
+
+            self.assertEqual(conn.get_execution_timeout(), 120_000)
+            conn.set_execution_timeout(g_execution)
+            self.assertEqual(conn.get_execution_timeout(), g_execution)
+            conn.set_execution_timeout(None)
+            self.assertEqual(conn.get_execution_timeout(), 120_000)
 
         self.log_ended(test)
 
