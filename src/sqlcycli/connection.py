@@ -115,7 +115,7 @@ class MysqlResult:
     def __init__(self, conn: BaseConnection) -> None:
         """The result of a query execution.
 
-        :param conn: `<'BaseConnection'>` The connection that executed the query.
+        :param conn `<'BaseConnection'>`: The connection that executed the query.
         """
         # Connection
         self._conn = conn
@@ -457,7 +457,7 @@ class Cursor:
     def __init__(self, conn: BaseConnection) -> None:
         """The cursor (BUFFERED) to interact with the database.
 
-        :param conn: `<'BaseConnection'>` The connection of the cursor.
+        :param conn `<'BaseConnection'>`: The connection of the cursor.
         """
         self._setup(conn, False)
 
@@ -472,8 +472,8 @@ class Cursor:
     ) -> cython.bint:
         """(cfunc) Setup the cursor.
 
-        :param conn: `<'BaseConnection'>` The connection of the cursor.
-        :param unbuffered: `<'bool'>` Whether to setup as unbuffered cursor (SSCurosr).
+        :param conn `<'BaseConnection'>`: The connection of the cursor.
+        :param unbuffered `<'bool'>`: Whether to setup as unbuffered cursor (SSCurosr).
         """
         self._unbuffered = unbuffered  # Determines whether is SSCursor
         self._conn = conn
@@ -615,15 +615,15 @@ class Cursor:
     ) -> cython.ulonglong:
         """Prepare and execute a query, returns the affected/selected rows `<'int'>`.
 
-        :param sql: `<'str'>` The query SQL to execute.
-        :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`. Supports:
+        :param sql `<'str'>`: The query SQL to execute.
+        :param args `<'Any'>`: Arguments to bound to the SQL. Defaults to `None`. Supports:
             - Python native:
               int, float, bool, str, None, datetime, date, time,
               timedelta, struct_time, bytes, bytearray, memoryview,
               Decimal, dict, list, tuple, set, frozenset, range.
             - Library [numpy](https://github.com/numpy/numpy):
-              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
-              np.str_, np.datetime64, np.timedelta64, np.ndarray.
+              np.int, np.uint, np.float, np.bool, np.bytes,
+              np.str, np.datetime64, np.timedelta64, np.ndarray.
             - Library [pandas](https://github.com/pandas-dev/pandas):
               pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
               pd.TimedeltaIndex, pd.Series, pd.DataFrame.
@@ -631,8 +631,7 @@ class Cursor:
               pydt, pddt.
             * Note: For single 'NULL' value, use (None,) or [None].
 
-        ### Escape of 'args'
-        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
             - When 'itemize=True', the 'args' type determines how to escape.
                 * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
                   escapes to `<'tuple[str]'>`. The 'sql' should have '%s'
@@ -651,7 +650,7 @@ class Cursor:
               all escapes to one single literal string `<'str'>`. The 'sql' should
               have one '%s' placeholder.
 
-        :param many: `<'bool'>` Whether to execute multi-row 'args'. Defaults to `False`.
+        :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
             - When 'many=True', the argument 'itemize' is ignored. This function
               behaves the SAME as the 'executemany()' method. For more information
               and related examples, see 'cur.executemany()'.
@@ -780,15 +779,15 @@ class Cursor:
         """Prepare and execute multi-row 'args' against a query,
         returns the affected/selected rows `<'int'>`.
 
-        :param sql: `<'str'>` The query SQL to execute.
-        :param args: `<'Any'>` Sequences or mappings to bound to the SQL. Defaults to `None`. Supports:
+        :param sql `<'str'>`: The query SQL to execute.
+        :param args `<'Any'>`: Sequences or mappings to bound to the SQL. Defaults to `None`. Supports:
             - Python native:
               int, float, bool, str, None, datetime, date, time,
               timedelta, struct_time, bytes, bytearray, memoryview,
               Decimal, dict, list, tuple, set, frozenset, range.
             - Library [numpy](https://github.com/numpy/numpy):
-              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
-              np.str_, np.datetime64, np.timedelta64, np.ndarray.
+              np.int, np.uint, np.float, np.bool, np.bytes,
+              np.str, np.datetime64, np.timedelta64, np.ndarray.
             - Library [pandas](https://github.com/pandas-dev/pandas):
               pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
               pd.TimedeltaIndex, pd.Series, pd.DataFrame.
@@ -875,9 +874,9 @@ class Cursor:
         """Execute stored procedure 'procname' with 'args'
         and returns the original arguments.
 
-        :param procname: `<'str'>` Name of procedure to execute on server.
-        :param args: `<'list/tuple'>` Sequence of parameters to use with procedure.
-        :return: <'list/tuple'> The original arguments.
+        :param procname `<'str'>`: Name of procedure to execute on server.
+        :param args `<'list/tuple'>`: Sequence of parameters to use with procedure.
+        :returns `<'list/tuple'>`: The original arguments.
 
         Compatibility warning: PEP-249 specifies that any modified
         parameters must be returned. This is currently impossible
@@ -941,10 +940,10 @@ class Cursor:
         """Bound the 'args' to the 'sql' and returns the `exact*` string that
         will be sent to the database by calling the execute*() method `<'str'>`.
 
-        :param sql: `<'str'>` The query SQL to mogrify.
-        :param args: `<'Any'>` Arguments to bound to the SQL. Defaults to `None`.
-        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
-        :param many: `<'bool'>` Whether to execute multi-row 'args'. Defaults to `False`.
+        :param sql `<'str'>`: The query SQL to mogrify.
+        :param args `<'Any'>`: Arguments to bound to the SQL. Defaults to `None`.
+        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
+        :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
 
         ### Explanation
         - When 'many=False' & 'itemize=True' (default), this method behaves
@@ -1003,8 +1002,8 @@ class Cursor:
     def _format(self, sql: str, args: str | tuple) -> str:
         """(cfunc) Format the query with the arguments `<'str'>`.
 
-        :param sql: `<'str'>` The query to format.
-        :param args: `<'str/tuple'>` Arguments to bound to the SQL.
+        :param sql `<'str'>`: The query to format.
+        :param args `<'str/tuple'>`: Arguments to bound to the SQL.
         :raises `<'InvalidSQLArgsErorr'>`: If any error occurs.
         """
         try:
@@ -1021,7 +1020,7 @@ class Cursor:
     def fetchone(self) -> tuple | None:
         """Fetch the next row of the query result set `<'tuple/None'>`.
 
-        :return: a single `tuple`, or `None` when no more data is available.
+        :returns `<'tuple/None'>`: If no more rows, returns `None`.
         """
         return self._fetchone_tuple()
 
@@ -1030,7 +1029,7 @@ class Cursor:
     def _fetchone_tuple(self) -> tuple:
         """(cfunc) Fetch the next row of the query result set `<'tuple/None'>`.
 
-        :return: a single `tuple`, or `None` when no more data is available.
+        :returns `<'tuple/None'>`: If no more rows, returns `None`.
 
         #### Used by Cursor & SSCursor.
         """
@@ -1057,7 +1056,7 @@ class Cursor:
     def _fetchone_dict(self) -> dict:
         """(cfunc) Fetch the next row of the query result set `<'dict/None'>`.
 
-        :return: a `dict`, or `None` when no more data is available.
+        :returns `<'dict/None'>`: If no more rows, returns `None`.
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -1076,7 +1075,7 @@ class Cursor:
     def _fetchone_df(self) -> object:
         """(cfunc) Fetch the next row of the query result set `<'DataFrame/None'>`.
 
-        :return: a `DataFrame`, or `None` when no more data is available.
+        :returns `<'DataFrame/None'>`: If no more rows, returns `None`.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -1094,10 +1093,10 @@ class Cursor:
     def fetchmany(self, size: int = 1) -> tuple[tuple]:
         """Fetch the next set of rows of the query result `<'tuple[tuple]'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
         """
         return self._fetchmany_tuple(size)
 
@@ -1106,10 +1105,10 @@ class Cursor:
     def _fetchmany_tuple(self, size: cython.ulonglong) -> tuple[tuple]:
         """(cfunc) Fetch the next set of rows of the query result `<'tuple[tuple]'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
 
         #### Used by Cursor & SSCursor.
         """
@@ -1145,10 +1144,10 @@ class Cursor:
     def _fetchmany_dict(self, size: cython.ulonglong) -> tuple[dict]:
         """(cfunc) Fetch the next set of rows of the query result `<'tuple[dict]'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available. .
+        :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -1170,10 +1169,10 @@ class Cursor:
     def _fetchmany_df(self, size: cython.ulonglong) -> object:
         """(cfunc) Fetch the next set of rows of the query result `<'DataFrame'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
+        :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -1193,7 +1192,7 @@ class Cursor:
     def fetchall(self) -> tuple[tuple]:
         """Fetch all (remaining) rows of the query result `<'tuple[tuple]'>`.
 
-        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
         """
         return self._fetchall_tuple()
 
@@ -1202,7 +1201,7 @@ class Cursor:
     def _fetchall_tuple(self) -> tuple[tuple]:
         """(cfunc) Fetch all (remaining) rows of the query result `<'tuple[tuple]'>`.
 
-        :return: `tuple[tuple]`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
 
         #### Used by Cursor & SSCursor.
         """
@@ -1240,7 +1239,7 @@ class Cursor:
     def _fetchall_dict(self) -> tuple[dict]:
         """(cfunc) Fetch all (remaining) rows of the query result `<'tuple[dict]'>`.
 
-        :return: `tuple of dicts`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
 
         #### Used by DictCursor & SSDictCursor.
         """
@@ -1262,7 +1261,7 @@ class Cursor:
     def _fetchall_df(self) -> object:
         """(cfunc) Fetch all (remaining) rows of the query result `<'DataFrame'>`.
 
-        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
+        :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
 
         #### Used by DfCursor & SSDfCursor.
         """
@@ -1296,8 +1295,8 @@ class Cursor:
     def scroll(self, value: cython.longlong, mode: str = "relative") -> cython.bint:
         """Scroll the cursor to a new position of the query result.
 
-        :param value: `<'int'>` The value for the cursor position.
-        :param mode: `<'str'>` The mode of the cursor movement. Defaults to `'relative'`.
+        :param value `<'int'>`: The value for the cursor position.
+        :param mode `<'str'>`: The mode of the cursor movement. Defaults to `'relative'`.
             - 'relative': The 'value' is taken as an offset to the current position.
             - 'absolute': The 'value' is taken as the absolute target position.
 
@@ -1559,7 +1558,7 @@ class DictCursor(Cursor):
     def fetchone(self) -> dict | None:
         """Fetch the next row of the query result set `<'dict/None'>`.
 
-        :return: a `dict`, or `None` when no more data is available.
+        :returns `<'dict/None'>`: If no more rows, returns `None`.
         """
         return self._fetchone_dict()
 
@@ -1567,10 +1566,10 @@ class DictCursor(Cursor):
     def fetchmany(self, size: int = 1) -> tuple[dict]:
         """Fetch the next set of rows of the query result `<'tuple[dict]'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: `tuple[dict]`, or an empty `tuple` when no more rows are available. .
+        :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
         """
         return self._fetchmany_dict(size)
 
@@ -1578,7 +1577,7 @@ class DictCursor(Cursor):
     def fetchall(self) -> tuple[dict]:
         """Fetch all (remaining) rows of the query result `<'tuple[dict]'>`.
 
-        :return: `tuple of dicts`, or an empty `tuple` when no more rows are available.
+        :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
         """
         return self._fetchall_dict()
 
@@ -1608,7 +1607,7 @@ class DfCursor(Cursor):
     def fetchone(self) -> DataFrame | None:
         """Fetch the next row of the query result set `<'DataFrame/None'>`.
 
-        :return: a `DataFrame`, or `None` when no more data is available.
+        :returns `<'DataFrame/None'>`: If no more rows, returns `None`.
         """
         return self._fetchone_df()
 
@@ -1616,10 +1615,10 @@ class DfCursor(Cursor):
     def fetchmany(self, size: int = 1) -> DataFrame:
         """Fetch the next set of rows of the query result `<'DataFrame'>`.
 
-        :param size: `<'int'>` Number of rows to be fetched. Defaults to `1`.
+        :param size `<'int'>`: Number of rows to be fetched. Defaults to `1`.
             - When 'size=0', defaults to 'cur.arraysize'.
 
-        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
+        :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
         """
         return self._fetchmany_df(size)
 
@@ -1627,7 +1626,7 @@ class DfCursor(Cursor):
     def fetchall(self) -> DataFrame:
         """Fetch all (remaining) rows of the query result `<'DataFrame'>`.
 
-        :return: a `DataFrame`, or an empty `DataFrame` when no more rows are available.
+        :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
         """
         return self._fetchall_df()
 
@@ -1657,7 +1656,7 @@ class SSCursor(Cursor):
     def __init__(self, conn: BaseConnection) -> None:
         """The cursor (UNBUFFERED) to interact with the database.
 
-        :param conn: `<'BaseConnection'>` The connection of the cursor.
+        :param conn `<'BaseConnection'>`: The connection of the cursor.
         """
         self._setup(conn, True)
 
@@ -1673,7 +1672,7 @@ class SSDictCursor(DictCursor):
     def __init__(self, conn: BaseConnection) -> None:
         """The cursor (UNBUFFERED) to interact with the database.
 
-        :param conn: `<'BaseConnection'>` The connection of the cursor.
+        :param conn `<'BaseConnection'>`: The connection of the cursor.
         """
         self._setup(conn, True)
 
@@ -1689,7 +1688,7 @@ class SSDfCursor(DfCursor):
     def __init__(self, conn: BaseConnection) -> None:
         """The cursor (UNBUFFERED) to interact with the database.
 
-        :param conn: `<'BaseConnection'>` The connection of the cursor.
+        :param conn `<'BaseConnection'>`: The connection of the cursor.
         """
         self._setup(conn, True)
 
@@ -1945,35 +1944,35 @@ class BaseConnection:
 
         #### Please do `NOT` create an instance of this class directly.
 
-        :param host: `<'str'>` The host of the server.
-        :param port: `<'int'>` The port of the server.
-        :param user: `<'bytes/None'>` The username to login as.
-        :param password: `<'bytes'>` The password for login authentication.
-        :param database: `<'bytes/None'>` The default database to use by the connection.
-        :param charset: `<'Charset'>` The charset for the connection.
-        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection.
-        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). `None` mean to use GLOBAL settings.
-        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). `None` mean to use GLOBAL settings.
-        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
-        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). `None` mean to use GLOBAL settings.
-        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
-        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). `None` mean to use GLOBAL settings.
-        :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address.
-        :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP.
-        :param autocommit_mode: `<'int'>` The autocommit mode for the connection. -1: Default, 0: OFF, 1: ON.
-        :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command.
-        :param max_allowed_packet: `<'int'>` The max size of packet sent to server in bytes.
-        :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection.
-        :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established.
-        :param cursor: `<'type[Cursor]'>` The default cursor type (class) to use.
-        :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'.
-        :param program_name: `<'str/None'>` The program name for the connection.
-        :param ssl_ctx: `<ssl.SSLContext/None>` The SSL context for the connection.
-        :param auth_plugin: `<'AuthPlugin/None'>` The authentication plugin handlers.
-        :param server_public_key: `<'bytes/None'>` The public key for the server authentication.
-        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>.
-        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes.
-        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string.
+        :param host `<'str'>`: The host of the server.
+        :param port `<'int'>`: The port of the server.
+        :param user `<'bytes/None'>`: The username to login as.
+        :param password `<'bytes'>`: The password for login authentication.
+        :param database `<'bytes/None'>`: The default database to use by the connection.
+        :param charset `<'Charset'>`: The charset for the connection.
+        :param connect_timeout `<'int'>`: Set timeout (in seconds) for establishing the connection.
+        :param read_timeout `<'int/None>`: Set SESSION 'net_read_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param write_timeout `<'int/None>`: Set SESSION 'net_write_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param wait_timeout `<'int/None>`: Set SESSION 'wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param interactive_timeout `<'int/None>`: Set SESSION 'interactive_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param lock_wait_timeout `<'int/None>`: Set SESSION 'innodb_lock_wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param execution_timeout `<'int/None>`: Set SESSION 'max_execution_time' (in milliseconds). `None` mean to use GLOBAL settings.
+        :param bind_address `<'str/None'>`: The interface from which to connect to the host. Accept both hostname or IP address.
+        :param unix_socket `<'str/None'>`: The unix socket for establishing connection rather than TCP/IP.
+        :param autocommit_mode `<'int'>`: The autocommit mode for the connection. -1: Default, 0: OFF, 1: ON.
+        :param local_infile `<'bool'>`: Enable/Disable LOAD DATA LOCAL command.
+        :param max_allowed_packet `<'int'>`: The max size of packet sent to server in bytes.
+        :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection.
+        :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established.
+        :param cursor `<'type[Cursor]'>`: The default cursor type (class) to use.
+        :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'.
+        :param program_name `<'str/None'>`: The program name for the connection.
+        :param ssl_ctx `<ssl.SSLContext/None>`: The SSL context for the connection.
+        :param auth_plugin `<'AuthPlugin/None'>`: The authentication plugin handlers.
+        :param server_public_key `<'bytes/None'>`: The public key for the server authentication.
+        :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>.
+        :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes.
+        :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string.
         """
         # . internal
         self._setup_internal()
@@ -2319,7 +2318,7 @@ class BaseConnection:
     def cursor(self, cursor: type[Cursor] | None = None) -> Cursor:
         """Acquire a new cursor `<'Cursor'>`.
 
-        :param cursor: `<'type[Cursor]/None'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+        :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
 
         ### Example (context manager):
         >>> with conn.cursor() as cur:
@@ -2345,7 +2344,7 @@ class BaseConnection:
         - 3a. If catches ANY exceptions during the transaction, close the connection.
         - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
 
-        :param cursor: `<'type[Cursor]/None'>` The cursor type (class) to use. Defaults to `None` (use connection default).
+        :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
 
         ### Example:
         >>> with conn.transaction() as cur:
@@ -2361,9 +2360,9 @@ class BaseConnection:
     def query(self, sql: str, unbuffered: cython.bint = False) -> cython.ulonglong:
         """Execute a SQL query `<'int'>`
 
-        :param sql: `<'str'>` The SQL query to execute.
-        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
-        :return: `<'int'>` The number of affected rows.
+        :param sql `<'str'>`: The SQL query to execute.
+        :param unbuffered `<'bool'>`: Query in unbuffered mode. Defaults to `False`.
+        :returns `<'int'>`: The number of affected rows.
         """
         self._execute_command(_COMMAND.COM_QUERY, self.encode_sql(sql))
         return self._read_query_result(unbuffered)
@@ -2443,7 +2442,7 @@ class BaseConnection:
     def kill(self, thread_id: cython.int) -> cython.bint:
         """Execute KILL command.
 
-        :param thread_id: `<'int'>` The thread ID to be killed.
+        :param thread_id `<'int'>`: The thread ID to be killed.
         """
         try:
             self._execute_command(
@@ -2469,7 +2468,7 @@ class BaseConnection:
     def select_database(self, db: str) -> cython.bint:
         """Select database for the connection (SESSION).
 
-        :param db: `<'str'>` The name of the database to select.
+        :param db `<'str'>`: The name of the database to select.
         """
         database: bytes = self.encode_sql(db)
         self._execute_command(_COMMAND.COM_INIT_DB, database)
@@ -2486,22 +2485,21 @@ class BaseConnection:
     ) -> object:
         """Escape 'args' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
-        ### Arguments
-        :param args: `<'object'>` The object to escape, supports:
+        :param args `<'object'>`: The object to escape, supports:
             - Python native:
               int, float, bool, str, None, datetime, date, time,
               timedelta, struct_time, bytes, bytearray, memoryview,
               Decimal, dict, list, tuple, set, frozenset, range.
             - Library [numpy](https://github.com/numpy/numpy):
-              np.int_, np.uint, np.float_, np.bool_, np.bytes_,
-              np.str_, np.datetime64, np.timedelta64, np.ndarray.
+              np.int, np.uint, np.float, np.bool, np.bytes,
+              np.str, np.datetime64, np.timedelta64, np.ndarray.
             - Library [pandas](https://github.com/pandas-dev/pandas):
               pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
               pd.TimedeltaIndex, pd.Series, pd.DataFrame.
             - Library [cytimes](https://github.com/AresJef/cyTimes):
               pydt, pddt.
 
-        :param itemize: `<'bool'>` Whether to escape each items of the 'args' individual. Defaults to `True`.
+        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
             - When 'itemize=True', the 'args' type determines how to escape.
                 * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
                   escapes to `<'tuple[str]'>`.
@@ -2515,7 +2513,7 @@ class BaseConnection:
             - When 'itemize=False', regardless of the 'args' type, all
               escapes to one single literal string `<'str'>`.
 
-        :param many: `<'bool'>` Wheter to escape 'args' as multi-rows. Defaults to `False`.
+        :param many `<'bool'>`: Wheter to escape 'args' as multi-rows. Defaults to `False`.
             * When 'many=True', the argument 'itemize' is ignored.
             * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
               escapes to `<'list[str/tuple[str]]'>`. Each element represents
@@ -2528,18 +2526,17 @@ class BaseConnection:
             * 4. Single object (such as `int`, `float`, `str`, etc) escapes
               to one literal string `<'str'>`.
 
-        ### Exceptions
         :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
 
-        ### Returns
-        - If returns a <'str'>, it represents a single literal string.
-        The 'sql' should only have one '%s' placeholder.
-        - If returns a <'tuple'>, it represents a single row of literal
-        strings. The 'sql' should have '%s' placeholders equal to the
-        tuple length.
-        - If returns a <'list'>, it represents multiple rows of literal
-        string(s). The 'sql' should have '%s' placeholders equal to the
-        item count in each row.
+        ## Returns
+        - If returns a `<'str'>`, it represents a single literal string.
+          The 'sql' should only have one '%s' placeholder.
+        - If returns a `<'tuple'>`, it represents a single row of literal
+          strings. The 'sql' should have '%s' placeholders equal to the
+          tuple length.
+        - If returns a `<'list'>`, it represents multiple rows of literal
+          string(s). The 'sql' should have '%s' placeholders equal to the
+          item count in each row.
         """
         return escape(args, self._encoding_c, itemize, many)
 
@@ -2547,7 +2544,7 @@ class BaseConnection:
     def encode_sql(self, sql: str) -> bytes:
         """Encode the 'sql' with connection's encoding `<'bytes'>`.
 
-        :param sql: `<'str'>` The sql to be encoded.
+        :param sql `<'str'>`: The sql to be encoded.
         """
         return utils.encode_str(sql, self._encoding_c)
 
@@ -2561,8 +2558,8 @@ class BaseConnection:
     ) -> cython.bint:
         """Set CHARSET and COLLATION of the connection.
 
-        :param charset: `<'str'>` The charset.
-        :param collation: `<'str/None'>` The collation. Defaults to `None`.
+        :param charset `<'str'>`: The charset.
+        :param collation `<'str/None'>`: The collation. Defaults to `None`.
         """
         ch: Charset = utils.validate_charset(charset, collation, DEFUALT_CHARSET)
         if ch._name != self._charset or ch._collation != self._collation:
@@ -2592,7 +2589,7 @@ class BaseConnection:
     def set_autocommit(self, value: cython.bint) -> cython.bint:
         """Set the 'autocommit' mode of the connection (SESSION).
 
-        :param value: `<'bool'>` Enable/Disable autocommit.
+        :param value `<'bool'>`: Enable/Disable autocommit.
             - `True` to operate in autocommit (non-transactional) mode.
             - `False` to operate in manual commit (transactional) mode.
         """
@@ -2611,7 +2608,7 @@ class BaseConnection:
     def set_read_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'net_read_timeout'.
 
-        :param value: `<'int/None'>` The timeout (in seconds) for reading data from the network during a query. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in seconds) for reading data from the network during a query. Defaults to `None`.
             - When 'value=None', if connection 'read_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2666,7 +2663,7 @@ class BaseConnection:
     def set_write_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'net_write_timeout'.
 
-        :param value: `<'int/None'>` The timeout (in seconds) for writing data to the network during a query. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in seconds) for writing data to the network during a query. Defaults to `None`.
             - When 'value=None', if connection 'write_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2715,7 +2712,7 @@ class BaseConnection:
     def set_wait_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'wait_timeout'.
 
-        :param value: `<'int/None'>` The timeout (in seconds) for waiting a non-interactive client activity before closing the connection. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in seconds) for waiting a non-interactive client activity before closing the connection. Defaults to `None`.
             - When 'value=None', if connection 'wait_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2762,7 +2759,7 @@ class BaseConnection:
     def set_interactive_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'interactive_timeout'.
 
-        :param value: `<'int/None'>` The timeout (in seconds) for waiting an interactive client activity before closing the connection. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in seconds) for waiting an interactive client activity before closing the connection. Defaults to `None`.
             - When 'value=None', if connection 'interactive_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2809,7 +2806,7 @@ class BaseConnection:
     def set_lock_wait_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'innodb_lock_wait_timeout'.
 
-        :param value: `<'int/None'>` The timeout (in seconds) for waiting for a row lock in the InnoDB storage engine. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in seconds) for waiting for a row lock in the InnoDB storage engine. Defaults to `None`.
             - When 'value=None', if connection 'lock_wait_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2862,7 +2859,7 @@ class BaseConnection:
     def set_execution_timeout(self, value: int | None) -> cython.bint:
         """Set connection (SESSION) 'max_execution_time'.
 
-        :param value: `<'int/None'>` The timeout (in milliseconds) for executing read-only SELECT statements. Defaults to `None`.
+        :param value `<'int/None'>`: The timeout (in milliseconds) for executing read-only SELECT statements. Defaults to `None`.
             - When 'value=None', if connection 'execution_timeout' is specified, set
               the timeout to the connection default value, else set to the server
               GLOBAL default value.
@@ -2912,8 +2909,8 @@ class BaseConnection:
     def _set_timeout(self, name: str, value: object) -> cython.bint:
         """(cfunc) Set connection (SESSION) timeout.
 
-        :param name: `<'str'>` The name of the timeout.
-        :param value: `<'int'>` The timeout value in seconds.
+        :param name `<'str'>`: The name of the timeout setting.
+        :param value `<'int'>`: The timeout value in seconds.
         """
         try:
             value = int(value)
@@ -2931,9 +2928,9 @@ class BaseConnection:
     def _get_timeout(self, name: str, session: cython.bint) -> cython.uint:
         """(cfunc) Get SESSION/GLOBAL timeout `<'int'>`.
 
-        :param name: `<'str'>` The name of the timeout.
-        :param session: `<'bool'> If True get SESSION timeout, else get GLOBAL timeout.
-        :return: `<'int'> The timeout value in seconds.
+        :param name `<'str'>`: The name of the timeout setting.
+        :param session `<'bool'>: If True get SESSION timeout, else get GLOBAL timeout.
+        :returns `<'int'>`: The timeout value in seconds.
         """
         if session:
             sql = "SHOW VARIABLES LIKE '%s'" % name
@@ -3009,7 +3006,7 @@ class BaseConnection:
     def set_use_decimal(self, value: cython.bint) -> cython.bint:
         """Set whether to use `<'DECIMAL'> to represent DECIMAL column data.
 
-        :param value: `<'bool'>` True to use <'DECIMAL>', else <'float'>.
+        :param value `<'bool'>`: Use <'DECIMAL>' if True, else use <'float'>.
         """
         self._use_decimal = value
         return True
@@ -3019,7 +3016,7 @@ class BaseConnection:
     def set_decode_bit(self, value: cython.bint) -> cython.bint:
         """Set whether to decode BIT column data to integer.
 
-        :param value: `<'bool'>` True to decode BIT column, else keep as original bytes.
+        :param value `<'bool'>`: True to decode BIT column, else keep as original bytes.
         """
         self._decode_bit = value
         return True
@@ -3029,7 +3026,7 @@ class BaseConnection:
     def set_decode_json(self, value: cython.bint) -> cython.bint:
         """Set whether to deserialize JSON column data.
 
-        :param value: `<'bool'>` True to deserialize JSON column, else keep as original JSON string.
+        :param value `<'bool'>`: True to deserialize JSON column, else keep as original JSON string.
         """
         self._decode_json = value
         return True
@@ -3231,7 +3228,7 @@ class BaseConnection:
     def ping(self, reconnect: cython.bint = True) -> cython.bint:
         """Check if the connection is alive.
 
-        :param reconnect: `<'bool'>` Whether to reconnect if disconnected. Defaults to `True`.
+        :param reconnect `<'bool'>`: Whether to reconnect if disconnected. Defaults to `True`.
             - If 'reconnect=False' and the connection is disconnected,
               raise 'ConnectionClosedError' directly.
         """
@@ -3650,8 +3647,8 @@ class BaseConnection:
     def _execute_command(self, command: cython.uint, sql: bytes) -> cython.bint:
         """(cfunc) Execute SQL command.
 
-        :param command: `<'int'> The command code, see 'constants.COMMAND'.
-        :param sql: `<'bytes'>` The query SQL encoded with connection's encoding.
+        :param command `<'int'>: The command code, see 'constants.COMMAND'.
+        :param sql `<'bytes'>`: The query SQL encoded with connection's encoding.
         """
         # Validate connection
         self._verify_connected()
@@ -3737,7 +3734,7 @@ class BaseConnection:
         """Go to the next query result, and returns
         the affected/selected rows `<'int'>`.
 
-        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
+        :param unbuffered `<'bool'>`: Query in unbuffered mode. Defaults to `False`.
         """
         return self._read_query_result(unbuffered)
 
@@ -3746,7 +3743,7 @@ class BaseConnection:
     def _read_ok_packet(self) -> MysqlPacket:
         """(cfunc) Read the next packet as OKPacket `<'MysqlPacket'>`
 
-        :raise `<'CommandOutOfSyncError'>`: If next packet is `NOT` OKPacket.
+        :raises `<'CommandOutOfSyncError'>`: If next packet is `NOT` OKPacket.
         """
         pkt = self._read_packet()
         if not pkt.read_ok_packet():
@@ -3762,7 +3759,7 @@ class BaseConnection:
         """(cfunc) Read the next query result, and returns
         the affected/selected rows `<'int'>`.
 
-        :param unbuffered: `<'bool'>` Query in unbuffered mode. Defaults to `False`.
+        :param unbuffered `<'bool'>`: Query in unbuffered mode. Defaults to `False`.
         """
         # Read result
         self._result = None
@@ -3789,8 +3786,8 @@ class BaseConnection:
         """(cfunc) Read the next packet in its entirety
         from the network and returns `<'MysqlPacket'>`.
 
-        :raise `<'OperationalError'>`: If the connection to the server is lost.
-        :raise `<'InternalError'>`: If the packet sequence number is wrong.
+        :raises `<'OperationalError'>`: If the connection to the server is lost.
+        :raises `<'InternalError'>`: If the packet sequence number is wrong.
 
         #### For FieldDescriptorPacket, use '_read_field_descriptor_packet()' instead.
         """
@@ -3807,8 +3804,8 @@ class BaseConnection:
     def _read_field_descriptor_packet(self) -> FieldDescriptorPacket:
         """(cfunc) Read the next packet as `<'FieldDescriptorPacket'>`.
 
-        :raise `<'OperationalError'>`: If the connection to the server is lost.
-        :raise `<'InternalError'>`: If the packet sequence number is wrong.
+        :raises `<'OperationalError'>`: If the connection to the server is lost.
+        :raises `<'InternalError'>`: If the packet sequence number is wrong.
         """
         buffer: bytes = self._read_packet_buffer()
         pkt = FieldDescriptorPacket(buffer, self._encoding)
@@ -3824,8 +3821,8 @@ class BaseConnection:
         """(cfunc) Read the next packet in its entirety from
         the network and returns the data buffer `<'bytes'>`.
 
-        :raise `<'OperationalError'>`: If the connection to the server is lost.
-        :raise `<'InternalError'>`: If the packet sequence number is wrong.
+        :raises `<'OperationalError'>`: If the connection to the server is lost.
+        :raises `<'InternalError'>`: If the packet sequence number is wrong.
         """
         # Read buffer data
         buffer: list[bytes] = []
@@ -3865,8 +3862,8 @@ class BaseConnection:
         """(cfunc) Read data from the network based on the
         given 'size', and returns the data in `<'bytes'>`.
 
-        :param size: `<'int'>` The number of bytes to read.
-        :raise `<'OperationalError'>`: If the connection to the server is lost.
+        :param size `<'int'>`: The number of bytes to read.
+        :raises `<'OperationalError'>`: If the connection to the server is lost.
         """
         while True:
             try:
@@ -3947,46 +3944,46 @@ class Connection(BaseConnection):
         """
         ### The socket connection to the server.
 
-        :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
-        :param port: `<'int'>` The port of the server. Defaults to `3306`.
-        :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
-        :param password: `<'str/bytes/None'>` The password for login authentication. Defaults to `None`.
-        :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
-        :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
-        :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection. Defaults to `5`.
-        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
-        :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
-        :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
-        :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
-        :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
-        :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
-        :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
-        :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
-        :param cursor: `<'type[Cursor]/None'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-        :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
-        :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
-        :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
+        :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
+        :param port `<'int'>`: The port of the server. Defaults to `3306`.
+        :param user `<'str/bytes/None'>`: The username to login as. Defaults to `None`.
+        :param password `<'str/bytes/None'>`: The password for login authentication. Defaults to `None`.
+        :param database `<'str/bytes/None'>`: The default database to use by the connection. Defaults to `None`.
+        :param charset `<'str/None'>`: The character set for the connection. Defaults to `'utf8mb4'`.
+        :param collation `<'str/None'>`: The collation for the connection. Defaults to `None`.
+        :param connect_timeout `<'int'>`: Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+        :param read_timeout `<'int/None>`: Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param write_timeout `<'int/None>`: Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param wait_timeout `<'int/None>`: Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param interactive_timeout `<'int/None>`: Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param lock_wait_timeout `<'int/None>`: Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param execution_timeout `<'int/None>`: Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
+        :param bind_address `<'str/None'>`: The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
+        :param unix_socket `<'str/None'>`: The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
+        :param autocommit `<'bool/None'>`: The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
+        :param local_infile `<'bool'>`: Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
+        :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
+        :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
+        :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
+        :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+        :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
+        :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
+        :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
             - Recommand use <'OptionFile'> to load MySQL option file.
             - If passed str/bytes/PathLike argument, it will be automatically converted
               to <'OptionFile'>, with option group defaults to 'client'.
 
-        :param ssl: `<'SSL/ssl.SSLContext/None'>` The SSL configuration for the connection. Defaults to `None`.
+        :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
             - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
 
-        :param auth_plugin: `<'AuthPlugin/dict/None'>` The authentication plugins handlers. Defaults to `None`.
+        :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
             - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
             - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
-        :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
-        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
+        :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
+        :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+        :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+        :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
         """
         # . internal
         self._setup_internal()

@@ -65,8 +65,9 @@ class AuthPlugin:
     def __init__(self, plugins: dict[str | bytes, type] | None = None) -> None:
         """The authentication pluging handlers for MySQL.
 
-        :param plugins `<'dict'>`: The plugin handlers for MySQL authentication, where key
-        is the plugin name <'str/bytes'> and value is the handler Class <'type'>. Defaults to `None`.
+        :param plugins `<'dict'>`: The plugin handlers for MySQL authentication,
+            where key is the plugin name <'str/bytes'> and value is the handler
+            Class <'type'>. Defaults to `None`.
         """
         if plugins is None:
             self._mysql_native_password = None

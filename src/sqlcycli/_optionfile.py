@@ -78,7 +78,6 @@ class OptionFile:
         It takes the responsibility of reading local MySQL option file
         from the 'PyMySQL' package's <'Connection'> class.
 
-        ### Arguments
         :param opt_file `<'str/bytes/Path'>`: The path to the MySQL option file (my.cnf or my.ini).
         :param opt_group `<'str'>`: The 'group' to read from the MySQL option file. Defaults to `'client'`.
         """

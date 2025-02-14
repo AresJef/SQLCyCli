@@ -149,8 +149,7 @@ class PoolConnection(async_conn.BaseConnection):
 
         #### Please do `NOT` create an instance of this class directly.
 
-        #### Pool args:
-        :param pool_id: `<'int'>` The unique identifier of the pool.
+        :param pool_id `<'int'>`: The unique identifier of the pool.
         """
         # . pool
         self._pool_id = pool_id
@@ -270,8 +269,7 @@ class PoolSyncConnection(sync_conn.BaseConnection):
 
         #### Please do `NOT` create an instance of this class directly.
 
-        #### Pool args:
-        :param pool_id: `<'int'>` The unique identifier of the pool.
+        :param pool_id `<'int'>`: The unique identifier of the pool.
         """
         # . pool
         self._pool_id = pool_id
@@ -345,7 +343,7 @@ class PoolConnectionManager:
     def __init__(self, pool: Pool) -> None:
         """The Context Manager for a PoolConnection
 
-        :param pool: `<'Pool'>` The pool to manage the connection.
+        :param pool `<'Pool'>`: The pool to manage the connection.
         """
         self._pool = pool
         self._sync_conn = None
@@ -534,57 +532,53 @@ class Pool:
     ):
         """The pool that manages and maintains connections to the server.
 
-        #### Pool args:
-
-        :param min_size: `<'int'>` The minimum number of active `async` connections to maintain. Defaults to `0`.
-        :param max_size: `<'int'>` The maximum number of active `async` connections to maintain. Defaults to `10`.
-        :param recycle: `<'int/None'>` The recycle time in seconds. Defaults to `None`.
+        :param min_size `<'int'>`: The minimum number of active `async` connections to maintain. Defaults to `0`.
+        :param max_size `<'int'>`: The maximum number of active `async` connections to maintain. Defaults to `10`.
+        :param recycle `<'int/None'>`: The recycle time in seconds. Defaults to `None`.
             - If set to positive integer, the pool will automatically close
               and remove any connections idling more than the 'recycle' time.
             - If 'recycle=None' (Default), recycling is disabled.
 
-        #### Connection args:
-
-        :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
-        :param port: `<'int'>` The port of the server. Defaults to `3306`.
-        :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
-        :param password: `<'str/bytes/None'>` The password for login authentication. Defaults to `None`.
-        :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
-        :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
-        :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection. Defaults to `5`.
-        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
-        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
-        :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
-        :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
-        :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
-        :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
-        :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
-        :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
-        :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
-        :param cursor: `<'type[Cursor]/None'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-        :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
-        :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
-        :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
+        :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
+        :param port `<'int'>`: The port of the server. Defaults to `3306`.
+        :param user `<'str/bytes/None'>`: The username to login as. Defaults to `None`.
+        :param password `<'str/bytes/None'>`: The password for login authentication. Defaults to `None`.
+        :param database `<'str/bytes/None'>`: The default database to use by the connection. Defaults to `None`.
+        :param charset `<'str/None'>`: The character set for the connection. Defaults to `'utf8mb4'`.
+        :param collation `<'str/None'>`: The collation for the connection. Defaults to `None`.
+        :param connect_timeout `<'int'>`: Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+        :param read_timeout `<'int/None>`: Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param write_timeout `<'int/None>`: Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param wait_timeout `<'int/None>`: Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param interactive_timeout `<'int/None>`: Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param lock_wait_timeout `<'int/None>`: Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param execution_timeout `<'int/None>`: Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
+        :param bind_address `<'str/None'>`: The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
+        :param unix_socket `<'str/None'>`: The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
+        :param autocommit `<'bool/None'>`: The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
+        :param local_infile `<'bool'>`: Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
+        :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
+        :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
+        :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
+        :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+        :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
+        :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
+        :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
             - Recommand use <'OptionFile'> to load MySQL option file.
             - If passed str/bytes/PathLike argument, it will be automatically converted
               to <'OptionFile'>, with option group defaults to 'client'.
 
-        :param ssl: `<'SSL/ssl.SSLContext/None'>` The SSL configuration for the connection. Defaults to `None`.
+        :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
             - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
 
-        :param auth_plugin: `<'AuthPlugin/dict/None'>` The authentication plugins handlers. Defaults to `None`.
+        :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
             - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
             - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
-        :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-        :param use_decimal: `<'bool'>` If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-        :param decode_bit: `<'bool'>` If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
-        :param decode_json: `<'bool'>` If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
+        :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
+        :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+        :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+        :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
         """
         # Sync Connection
         self._sync_conn = None
@@ -695,9 +689,9 @@ class Pool:
     ) -> cython.bint:
         """(internal) Setup the pool.
 
-        :param min_size: `<'int'>` The minimum number of active `async` connections to maintain.
-        :param max_size: `<'int'>` The maximum number of active `async` connections to maintain.
-        :param recycle: `<'int/None'>` The recycle time in seconds.
+        :param min_size `<'int'>`: The minimum number of active `async` connections to maintain.
+        :param max_size `<'int'>`: The maximum number of active `async` connections to maintain.
+        :param recycle `<'int/None'>`: The recycle time in seconds.
         """
         # . counting
         self._acqr = 0
@@ -960,7 +954,7 @@ class Pool:
     def set_min_size(self, size: cython.uint) -> cython.bint:
         """Change the minimum number of active `async` connections to maintain by the pool.
 
-        :param size: `<'int'>` New minium pool size.
+        :param size `<'int'>`: New minium pool size.
         """
         if size > self._max_size:
             raise errors.InvalidPoolArgsError(
@@ -974,7 +968,7 @@ class Pool:
     def set_recycle(self, recycle: int | None) -> cython.bint:
         """Change the recycle time.
 
-        :param recycle: `<'int/None'>` New recycle time in seconds.
+        :param recycle `<'int/None'>`: New recycle time in seconds.
             - If set to any positive integer, the pool will automatically close
               and remove any connections idling more than the 'recycle' time.
             - Set to `None` to disable recycling.
@@ -998,7 +992,7 @@ class Pool:
         """Set the default 'autocommit' mode of the pool. All acquired
         connections will comply to this setting.
 
-        :param value: `<'bool'>` Enable/Disable autocommit.
+        :param value `<'bool'>`: Enable/Disable autocommit.
             - `True` to operate in autocommit (non-transactional) mode.
             - `False` to operate in manual commit (transactional) mode.
         """
@@ -1014,7 +1008,7 @@ class Pool:
         use `<'DECIMAL'> to represent DECIMAL column data. All
         acquired connections will comply to this setting.
 
-        :param value: `<'bool'>` True to use <'DECIMAL>', else <'float'>.
+        :param value `<'bool'>`: True to use <'DECIMAL>', else <'float'>.
         """
         self._use_decimal = value
         return True
@@ -1026,7 +1020,7 @@ class Pool:
         decode BIT column data to integer. All acquired connections
         will comply to this settings.
 
-        :param value: `<'bool'>` True to decode BIT column, else keep as original bytes.
+        :param value `<'bool'>`: True to decode BIT column, else keep as original bytes.
         """
         self._decode_bit = value
         return True
@@ -1038,7 +1032,7 @@ class Pool:
         deserialize JSON column data. All acquired connections will
         comply to this settings.
 
-        :param value: `<'bool'>` True to deserialize JSON column, else keep as original JSON string.
+        :param value `<'bool'>`: True to deserialize JSON column, else keep as original JSON string.
         """
         self._decode_json = value
         return True
@@ -1136,7 +1130,7 @@ class Pool:
     async def fill(self, num: cython.int = 1) -> None:
         """Fill the pool with specific number of new `async` connections.
 
-        :param num: `<'int'>` The number of new `async` connections to fill. Defaults to `1`.
+        :param num `<'int'>`: The number of new `async` connections to fill. Defaults to `1`.
             - If the number plus the existing `async`  connections exceeds the
               maximum pool size, the pool will only fill to the 'max_size' limit.
             - If 'num=-1', the pool will fill to the 'min_size'.
@@ -1165,9 +1159,8 @@ class Pool:
     def release(self, conn: PoolConnection | PoolSyncConnection) -> object:
         """Release a connection back to the pool `<'Future'>`.
 
-        ### Arguments:
-        :param conn: `<'PoolConnection/PoolSyncConnection'>` The pool connection to release.
-        :raise <'PoolReleaseError'>: If the connection does not belong to this pool.
+        :param conn `<'PoolConnection/PoolSyncConnection'>`: The pool connection to release.
+        :raises `<'PoolReleaseError'>`: If the connection does not belong to this pool.
 
         ### For `async` connection, please await for the result:
         >>> await pool.release(conn)
@@ -1676,8 +1669,8 @@ class Pool:
         - Wait for all in-use connections to return and be released (closed).
 
         #### This method should only be called after 'Pool.close()'.
-        :raises <'PoolNotClosedError'>: If called before 'Pool.close()'.
-        Otherwise, this method does not raise any error.
+
+        :raises `<'PoolNotClosedError'>`: If called before 'Pool.close()'. Otherwise, this method does not raise any error.
         """
         # Pool already closed
         if self.closed():
@@ -1782,7 +1775,7 @@ class Pool:
     def _verify_open(self) -> cython.bint:
         """(internal) Verify the pool is not closed.
 
-        :raised `<'PoolClosedError'>`: If pool is already closed.
+        :raises `<'PoolClosedError'>`: If pool is already closed.
         """
         if self._closing or self.closed():
             raise errors.PoolClosedError(0, "Pool is closed.")

@@ -44,10 +44,10 @@ class Charset:
     ) -> None:
         """Charset for MySQL.
 
-        :param id: `<'int'>` The id of the charset.
-        :param name: `<'str'>` The name of the charset.
-        :param collation: `<'str'>` The collation of the charset.
-        :param is_default: `<'bool'>` Whether belongs to the defualt charsets of MySQL. Defaults to `False`.
+        :param id `<'int'>`: The id of the charset.
+        :param name `<'str'>`: The name of the charset.
+        :param collation `<'str'>`: The collation of the charset.
+        :param is_default `<'bool'>`: Whether belongs to the defualt charsets of MySQL. Defaults to `False`.
         """
         self._id = id
         self._name = name.lower().strip()
@@ -154,7 +154,7 @@ class Charsets:
     def add(self, charset: Charset) -> cython.bint:
         """Add MySQL charset to the collection.
 
-        :param charset: An instance of `<'Charset'>`.
+        :param charset `<'Charset'>`: An instance of `Charset`.
         """
         self._add_by_id(charset)
         self._add_by_name(charset)
@@ -231,7 +231,7 @@ class Charsets:
     def by_id(self, id: object) -> Charset:
         """Get MySQL charset by id `<'Charset'>`.
 
-        :param id: `<'int'>` The ID of the charset.
+        :param id `<'int'>`: The ID of the charset.
         """
         val = dict_getitem(self._by_id, id)
         if val == cython.NULL:
@@ -245,7 +245,7 @@ class Charsets:
     def by_name(self, name: object) -> Charset:
         """Get MySQL charset by name `<'Charset'>`.
 
-        :param name: `<'str'>` The name of the charset.
+        :param name `<'str'>`: The name of the charset.
         """
         if name in ("utf8mb4", "utf8", "utf-8"):
             return _default_utf8mb4
@@ -262,7 +262,7 @@ class Charsets:
     def by_collation(self, collation: object) -> Charset:
         """Get MySQL charset by collation `<'Charset'>`.
 
-        :param collation: `<'str'>` The collation of the charset.
+        :param collation `<'str'>`: The collation of the charset.
         """
         if collation == "utf8mb4_general_ci":
             return _default_utf8mb4
@@ -279,8 +279,8 @@ class Charsets:
     def by_name_n_collation(self, name: object, collation: object) -> Charset:
         """Get MySQL charset by name and collation `<'Charset'>`.
 
-        :param name: `<'str'>` The name of the charset.
-        :param collation: `<'str'>` The collation of the charset.
+        :param name `<'str'>`: The name of the charset.
+        :param collation `<'str'>`: The collation of the charset.
         """
         if name in ("utf8mb4", "utf8", "utf-8"):
             if collation == "utf8mb4_general_ci":
@@ -321,7 +321,7 @@ def all_charsets() -> Charsets:
 def by_id(id: object) -> Charset:
     """Get MySQL charset by id `<'Charset'>`.
 
-    :param id: `<'int'>` The ID of the charset.
+    :param id `<'int'>`: The ID of the charset.
     """
     return _charsets.by_id(id)
 
@@ -330,7 +330,7 @@ def by_id(id: object) -> Charset:
 def by_name(name: object) -> Charset:
     """Get MySQL charset by name `<'Charset'>`.
 
-    :param name: `<'str'>` The name of the charset.
+    :param name `<'str'>`: The name of the charset.
     """
     return _charsets.by_name(name)
 
@@ -339,7 +339,7 @@ def by_name(name: object) -> Charset:
 def by_collation(collation: object) -> Charset:
     """Get MySQL charset by collation `<'Charset'>`.
 
-    :param collation: `<'str'>` The collation of the charset.
+    :param collation `<'str'>`: The collation of the charset.
     """
     return _charsets.by_collation(collation)
 
@@ -348,8 +348,8 @@ def by_collation(collation: object) -> Charset:
 def by_name_n_collation(name: str | Any, collation: str | Any) -> Charset:
     """Get MySQL charset by name and collation `<'Charset'>`.
 
-    :param name: `<'str'>` The name of the charset.
-    :param collation: `<'str'>` The collation of the charset.
+    :param name `<'str'>`: The name of the charset.
+    :param collation `<'str'>`: The collation of the charset.
     """
     return _charsets.by_name_n_collation(name, collation)
 

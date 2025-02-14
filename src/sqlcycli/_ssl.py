@@ -85,7 +85,6 @@ class SSL:
         If Python `ssl` module is not available, a `RuntimeWarning` will be
         issued and the context attribute will be `None`.
 
-        ### Arguments
         :param ca_file `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted CA certificate. Defaults to `None`.
         :param ca_path `<'str/bytes/Path'>`: The path to the directory contains CA certificate files. Defaults to `None`.
         :param cert_file: `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted client certificate. Defaults to `None`.

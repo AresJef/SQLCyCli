@@ -162,8 +162,8 @@ del _map_error, ER
 def raise_mysql_exception(data: cython.pchar, size: cython.ulonglong) -> cython.bint:
     """Raise the MySQL exception based on the given data.
 
-    :param data: `<'bytes'>` The MySQL data contains the exception information.
-    :param size: `<'int'>` The size (length) of the data.
+    :param data `<'bytes'>`: The MySQL data contains the exception information.
+    :param size `<'int'>`: The size (length) of the data.
     """
     errno: cython.int = utils.unpack_int16(data, 1)
     # https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html

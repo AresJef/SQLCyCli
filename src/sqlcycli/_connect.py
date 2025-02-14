@@ -111,6 +111,9 @@ def connect(
     read_timeout: int | None = None,
     write_timeout: int | None = None,
     wait_timeout: int | None = None,
+    interactive_timeout: int | None = None,
+    lock_wait_timeout: int | None = None,
+    execution_timeout: int | None = None,
     bind_address: str | None = None,
     unix_socket: str | None = None,
     autocommit: bool | None = False,
@@ -126,49 +129,54 @@ def connect(
     auth_plugin: dict[str | bytes, type] | AuthPlugin | None = None,
     server_public_key: bytes | None = None,
     use_decimal: bool = False,
+    decode_bit: bool = False,
     decode_json: bool = False,
     loop: AbstractEventLoop | None = None,
 ) -> ConnectionManager:
     """Connect to the server and acquire a `sync` or `async`
     connection through context manager `<'ConnectionManager'>`.
 
-    :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
-    :param port: `<'int'>` The port of the server. Defaults to `3306`.
-    :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
-    :param password: `<'str/bytes/None'>` The password for login authentication. Defaults to `None`.
-    :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
-    :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
-    :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-    :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection. Defaults to `5`.
-    :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
-    :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
-    :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
-    :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
-    :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
-    :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
-    :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
-    :param cursor: `<'type[Cursor]'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-    :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
-    :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
-    :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
+    :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
+    :param port `<'int'>`: The port of the server. Defaults to `3306`.
+    :param user `<'str/bytes/None'>`: The username to login as. Defaults to `None`.
+    :param password `<'str/bytes/None'>`: The password for login authentication. Defaults to `None`.
+    :param database `<'str/bytes/None'>`: The default database to use by the connection. Defaults to `None`.
+    :param charset `<'str/None'>`: The character set for the connection. Defaults to `'utf8mb4'`.
+    :param collation `<'str/None'>`: The collation for the connection. Defaults to `None`.
+    :param connect_timeout `<'int'>`: Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+    :param read_timeout `<'int/None>`: Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param write_timeout `<'int/None>`: Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param wait_timeout `<'int/None>`: Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param interactive_timeout `<'int/None>`: Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param lock_wait_timeout `<'int/None>`: Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param execution_timeout `<'int/None>`: Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
+    :param bind_address `<'str/None'>`: The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
+    :param unix_socket `<'str/None'>`: The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
+    :param autocommit `<'bool/None'>`: The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
+    :param local_infile `<'bool'>`: Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
+    :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
+    :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
+    :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
+    :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+    :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
+    :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
+    :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
         - Recommand use <'OptionFile'> to load MySQL option file.
         - If passed str/bytes/PathLike argument, it will be automatically converted
             to <'OptionFile'>, with option group defaults to 'client'.
 
-    :param ssl: `<'SSL/ssl.SSLContext/None'>` The SSL configuration for the connection. Defaults to `None`.
+    :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
         - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
 
-    :param auth_plugin: `<'AuthPlugin/dict/None'>` The authentication plugins handlers. Defaults to `None`.
+    :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
         - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
         - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
-    :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-    :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-    :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string. Defaults to `False`.
-    :param loop: `<'AbstractEventLoop/None'>` The event loop for the `async` connection. Defaults to `None`.
+    :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
+    :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+    :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+    :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
+    :param loop `<'AbstractEventLoop/None'>`: The event loop for the `async` connection. Defaults to `None`.
         - Only applicable for `async` connection. `sync` connection will ignore this argument.
 
     ### Example (sync):
@@ -194,6 +202,9 @@ def connect(
             "read_timeout": read_timeout,
             "write_timeout": write_timeout,
             "wait_timeout": wait_timeout,
+            "interactive_timeout": interactive_timeout,
+            "lock_wait_timeout": lock_wait_timeout,
+            "execution_timeout": execution_timeout,
             "bind_address": bind_address,
             "unix_socket": unix_socket,
             "autocommit": autocommit,
@@ -208,6 +219,7 @@ def connect(
             "auth_plugin": auth_plugin,
             "server_public_key": server_public_key,
             "use_decimal": use_decimal,
+            "decode_bit": decode_bit,
             "decode_json": decode_json,
         },
         cursor,
@@ -297,6 +309,9 @@ def create_pool(
     read_timeout: int | None = None,
     write_timeout: int | None = None,
     wait_timeout: int | None = None,
+    interactive_timeout: int | None = None,
+    lock_wait_timeout: int | None = None,
+    execution_timeout: int | None = None,
     bind_address: str | None = None,
     unix_socket: str | None = None,
     autocommit: bool | None = False,
@@ -312,57 +327,59 @@ def create_pool(
     auth_plugin: dict[str | bytes, type] | AuthPlugin | None = None,
     server_public_key: bytes | None = None,
     use_decimal: bool = False,
+    decode_bit: bool = False,
     decode_json: bool = False,
 ) -> PoolManager:
     """Create a connection pool to manage and maintain `async`
     connections through context manager `<'PoolManager'>`.
 
-    #### Pool args:
-    :param min_size: `<'int'>` The minimum number of active connections to maintain. Defaults to `0`.
-    :param max_size: `<'int'>` The maximum number of active connections to maintain. Defaults to `10`.
-    :param recycle: `<'int/None'>` The recycle time in seconds. Defaults to `None`.
+    :param min_size `<'int'>`: The minimum number of active connections to maintain. Defaults to `0`.
+    :param max_size `<'int'>`: The maximum number of active connections to maintain. Defaults to `10`.
+    :param recycle `<'int/None'>`: The recycle time in seconds. Defaults to `None`.
         - If set to positive integer, the pool will automatically close
-            and remove any connections idling more than the 'recycle' time.
+          and remove any connections idling more than the 'recycle' time.
         - If 'recycle=None' (Default), recycling is disabled.
-    :param loop: `<'AbstractEventLoop/None'>` The event loop for the pool connections. Defaults to `None`.
 
-    #### Connection args:
-    :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
-    :param port: `<'int'>` The port of the server. Defaults to `3306`.
-    :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
-    :param password: `<'str/bytes/None'>` The password for login authentication. Defaults to `None`.
-    :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
-    :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
-    :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-    :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection. Defaults to `5`.
-    :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. Defaults to `None` (use GLOBAL settings).
-    :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
-    :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
-    :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
-    :param local_infile: `<'bool'>` Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
-    :param max_allowed_packet: `<'int/str/None'>` The max size of packet sent to server in bytes. Defaults to `None` (16MB).
-    :param sql_mode: `<'str/None'>` The default SQL_MODE for the connection. Defaults to `None`.
-    :param init_command: `<'str/None'>` The initial SQL statement to run when connection is established. Defaults to `None`.
-    :param cursor: `<'type[Cursor]/None'>` The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-    :param client_flag: `<'int'>` Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
-    :param program_name: `<'str/None'>` The program name for the connection. Defaults to `None`.
-    :param option_file: `<'OptionFile/PathLike/None>` The MySQL option file to load connection parameters. Defaults to `None`.
+    :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
+    :param port `<'int'>`: The port of the server. Defaults to `3306`.
+    :param user `<'str/bytes/None'>`: The username to login as. Defaults to `None`.
+    :param password `<'str/bytes/None'>`: The password for login authentication. Defaults to `None`.
+    :param database `<'str/bytes/None'>`: The default database to use by the connection. Defaults to `None`.
+    :param charset `<'str/None'>`: The character set for the connection. Defaults to `'utf8mb4'`.
+    :param collation `<'str/None'>`: The collation for the connection. Defaults to `None`.
+    :param connect_timeout `<'int'>`: Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+    :param read_timeout `<'int/None>`: Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param write_timeout `<'int/None>`: Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param wait_timeout `<'int/None>`: Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param interactive_timeout `<'int/None>`: Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param lock_wait_timeout `<'int/None>`: Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+    :param execution_timeout `<'int/None>`: Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
+    :param bind_address `<'str/None'>`: The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
+    :param unix_socket `<'str/None'>`: The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
+    :param autocommit `<'bool/None'>`: The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
+    :param local_infile `<'bool'>`: Enable/Disable LOAD DATA LOCAL command. Defaults to `False`.
+    :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
+    :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
+    :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
+    :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+    :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
+    :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
+    :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
         - Recommand use <'OptionFile'> to load MySQL option file.
         - If passed str/bytes/PathLike argument, it will be automatically converted
-            to <'OptionFile'>, with option group defaults to 'client'.
+          to <'OptionFile'>, with option group defaults to 'client'.
 
-    :param ssl: `<'SSL/ssl.SSLContext/None'>` The SSL configuration for the connection. Defaults to `None`.
+    :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
         - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
 
-    :param auth_plugin: `<'AuthPlugin/dict/None'>` The authentication plugins handlers. Defaults to `None`.
+    :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
         - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
         - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
-    :param server_public_key: `<'bytes/None'>` The public key for the server authentication. Defaults to `None`.
-    :param use_decimal: `<'bool'>` If `True` use <'decimal.Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-    :param decode_json: `<'bool'>` If `True` decode JSON column data, else keep as original json string. Defaults to `False`.
+    :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
+    :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
+    :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
+    :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
     """
     return PoolManager(
         {
@@ -380,6 +397,9 @@ def create_pool(
             "read_timeout": read_timeout,
             "write_timeout": write_timeout,
             "wait_timeout": wait_timeout,
+            "interactive_timeout": interactive_timeout,
+            "lock_wait_timeout": lock_wait_timeout,
+            "execution_timeout": execution_timeout,
             "bind_address": bind_address,
             "unix_socket": unix_socket,
             "autocommit": autocommit,
@@ -394,6 +414,7 @@ def create_pool(
             "auth_plugin": auth_plugin,
             "server_public_key": server_public_key,
             "use_decimal": use_decimal,
+            "decode_bit": decode_bit,
             "decode_json": decode_json,
         },
         cursor,

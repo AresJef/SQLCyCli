@@ -191,7 +191,7 @@ class _CustomType:
         Validation & escape (conversion) should only happens
         when executed by the 'escape()' function.
 
-        :param value: `<'object'>` The value.
+        :param value `<'object'>`: The value.
         """
         self._value = value
 
@@ -221,7 +221,7 @@ class BIT(_CustomType):
 
         - Validation & conversion only happens when executed by the 'escape()' function.
 
-        :param value: `<'bytes/int'>` The value for MySQL BIT column, accepts:
+        :param value `<'bytes/int'>`: The value for MySQL BIT column, accepts:
             - `<'bytes'>`: The raw bytes value, e.g. b'\\x01'.
             - `<'int'>`: An unsigned integer value, e.g. 1.
         """
@@ -247,7 +247,7 @@ class JSON(_CustomType):
         - Do `NOT` pass already serialized JSON string to this class.
         - Validation & conversion only happens when called by the 'escape()' function.
 
-        :param value: `<'object'>` The value for MySQL JSON column.
+        :param value `<'object'>`: The value for MySQL JSON column.
             - An objects that can be serialized to JSON format.
         """
         self._value = value
@@ -2664,15 +2664,14 @@ def escape(
 ) -> object:
     """Escape 'data' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
-    ### Arguments
-    :param data: `<'object'>` The object to escape, supports:
+    :param data `<'object'>`: The object to escape, supports:
         - Python native:
           int, float, bool, str, None, datetime, date, time,
           timedelta, struct_time, bytes, bytearray, memoryview,
           Decimal, dict, list, tuple, set, frozenset, range.
         - Library [numpy](https://github.com/numpy/numpy):
-          np.int_, np.uint, np.float_, np.bool_, np.bytes_,
-          np.str_, np.datetime64, np.timedelta64, np.ndarray.
+          np.int, np.uint, np.float, np.bool, np.bytes,
+          np.str, np.datetime64, np.timedelta64, np.ndarray.
         - Library [pandas](https://github.com/pandas-dev/pandas):
           pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
           pd.TimedeltaIndex, pd.Series, pd.DataFrame.
@@ -2681,7 +2680,7 @@ def escape(
 
     :param encoding `<'bytes'>`: The encoding for the data.
 
-    :param itemize: `<'bool'>` Whether to escape each items of the 'data' individual. Defaults to `True`.
+    :param itemize `<'bool'>`: Whether to escape each items of the 'data' individual. Defaults to `True`.
         - When 'itemize=True', the 'data' type determines how to escape.
             * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
               escapes to `<'tuple[str]'>`.
@@ -2695,7 +2694,7 @@ def escape(
         - When 'itemize=False', regardless of the 'data' type, all
           escapes to one single literal string `<'str'>`.
 
-    :param many: `<'bool'>` Wheter to escape 'data' as multi-rows. Defaults to `False`.
+    :param many `<'bool'>`: Wheter to escape 'data' as multi-rows. Defaults to `False`.
         * When 'many=True', the argument 'itemize' is ignored.
         * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
           escapes to `<'list[str/tuple[str]]'>`. Each element represents
@@ -2708,16 +2707,15 @@ def escape(
         * 4. Single object (such as `int`, `float`, `str`, etc) escapes
           to one literal string `<'str'>`.
 
-    ### Exceptions
     :raises `<'EscapeError'>`: If any error occurs during escaping.
 
-    ### Returns
-    - If returns a <'str'>, it represents a single literal string.
+    ## Returns
+    - If returns a `<'str'>`, it represents a single literal string.
       The 'sql' should only have one '%s' placeholder.
-    - If returns a <'tuple'>, it represents a single row of literal
+    - If returns a `<'tuple'>`, it represents a single row of literal
       strings. The 'sql' should have '%s' placeholders equal to the
       tuple length.
-    - If returns a <'list'>, it represents multiple rows of literal
+    - If returns a `<'list'>`, it represents multiple rows of literal
       strings. The 'sql' should have '%s' placeholders equal to the
       item count in each row.
     """
@@ -3035,7 +3033,7 @@ def decode(
     :param use_decimal `<'bool'>`: Whether to use <'Decimal'> to represent DECIMAL column, `False` use <'float'>.
     :param decode_bit `<'bool'>`: Whether to decode BIT column to integer, `False` keep as original <'bytes'>.
     :param decode_json `<'bool'>`: Whether to deserialize JSON column, `False` keep as original JSON <'str'>.
-    :raise `<'DecodeError'>`: When encountering unknown 'field_type'.
+    :raises `<'DecodeError'>`: When encountering unknown 'field_type'.
     """
     # Char / Binary
     if field_type in (
