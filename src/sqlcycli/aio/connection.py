@@ -1813,6 +1813,12 @@ class BaseConnection:
     _write_timeout_changed: cython.bint
     _wait_timeout: object  # uint | None
     _wait_timeout_changed: cython.bint
+    _interactive_timeout: object  # uint | None
+    _interactive_timeout_changed: cython.bint
+    _lock_wait_timeout: object  # uint | None
+    _lock_wait_timeout_changed: cython.bint
+    _execution_timeout: object  # uint | None
+    _execution_timeout_changed: cython.bint
     # Client
     _bind_address: str
     _unix_socket: str
@@ -1870,6 +1876,9 @@ class BaseConnection:
         read_timeout: int | None,
         write_timeout: int | None,
         wait_timeout: int | None,
+        interactive_timeout: int | None,
+        lock_wait_timeout: int | None,
+        execution_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
         autocommit_mode: cython.int,
@@ -1902,10 +1911,13 @@ class BaseConnection:
         :param password: `<'bytes'>` The password for login authentication.
         :param database: `<'bytes/None'>` The default database to use by the connection.
         :param charset: `<'Charset'>` The charset for the connection.
-        :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection.
-        :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. `None` mean to use GLOBAL settings.
-        :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. `None` mean to use GLOBAL settings.
-        :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. `None` mean to use GLOBAL settings.
+        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection.
+        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). `None` mean to use GLOBAL settings.
+        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). `None` mean to use GLOBAL settings.
         :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address.
         :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP.
         :param autocommit_mode: `<'int'>` The autocommit mode for the connection. -1: Default, 0: OFF, 1: ON.
@@ -1939,6 +1951,9 @@ class BaseConnection:
         self._read_timeout = read_timeout
         self._write_timeout = write_timeout
         self._wait_timeout = wait_timeout
+        self._interactive_timeout = interactive_timeout
+        self._lock_wait_timeout = lock_wait_timeout
+        self._execution_timeout = execution_timeout
         # . client
         self._bind_address = bind_address
         self._unix_socket = unix_socket
@@ -2017,6 +2032,9 @@ class BaseConnection:
         self._read_timeout_changed = False
         self._write_timeout_changed = False
         self._wait_timeout_changed = False
+        self._interactive_timeout_changed = False
+        self._lock_wait_timeout_changed = False
+        self._execution_timeout_changed = False
         # . server
         self._server_protocol_version = -1
         self._server_info = None
@@ -2491,86 +2509,311 @@ class BaseConnection:
             await self._read_ok_packet()
             self._charset_changed = True
 
+    @cython.ccall
+    @cython.exceptval(-1, check=False)
+    def get_autocommit(self) -> cython.bint:
+        """Get the 'autocommit' mode of the connection `<'bool'>`.
+
+        - `True` if the connection is operating in autocommit (non-transactional) mode.
+        - `False` if the connection is operating in manual commit (transactional) mode.
+
+        :raises `<'ConnectionClosedError'>`: If connection is not connected.
+        """
+        if self._server_status == -1:
+            raise errors.ConnectionClosedError(0, "Connection not connected.")
+        return self._server_status & _SERVER_STATUS.SERVER_STATUS_AUTOCOMMIT
+
+    async def set_autocommit(self, value: cython.bint) -> None:
+        """Set the 'autocommit' mode of the connection (SESSION).
+
+        :param value: `<'bool'>` Enable/Disable autocommit.
+            - `True` to operate in autocommit (non-transactional) mode.
+            - `False` to operate in manual commit (transactional) mode.
+        """
+        self._autocommit_mode = int(value)
+        if not self.closed() and value != self.get_autocommit():
+            await self._execute_command(
+                _COMMAND.COM_QUERY,
+                b"SET AUTOCOMMIT = 1" if value else b"SET AUTOCOMMIT = 0",
+            )
+            await self._read_ok_packet()
+
+    # timeouts
     async def set_read_timeout(self, value: int | None) -> None:
         """Set connection (SESSION) 'net_read_timeout'.
 
-        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
-        - When 'value=None', if connection 'read_timeout' is
-          specified, set the timeout to the connection value,
-          else set to the server GLOBAL value.
+        :param value: `<'int/None'>` The timeout (in seconds) for reading data from the network during a query. Defaults to `None`.
+            - When 'value=None', if connection 'read_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation:
+        - The 'net_read_timeout' defines the total seconds for reading data from the
+          network during a query.
+        - When the MySQL client or server is waiting to receive data over the network
+          (for example, when sending large result sets back to the client), this setting
+          specifies how long the server should wait before it gives up and times out.
+        - If a query is taking longer than expected to transfer data over the network
+          (perhaps due to slow network conditions or a large result set), this value
+          dictates how long MySQL will wait before throwing a timeout error.
         """
         name = "net_read_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
+
+        # Reset timeout
         if value is None:
-            # Global timeout
             if self._read_timeout is None:
                 value = await self._get_timeout(name, False)
-            # Setting timeout
             else:
                 value = self._read_timeout
+            await self._set_timeout(name, value)
+            self._read_timeout_changed = False
 
         # Set timeout
-        await self._set_timeout(name, value)
-        self._read_timeout_changed = True
+        else:
+            await self._set_timeout(name, value)
+            self._read_timeout_changed = True
 
     async def get_read_timeout(self) -> int:
-        """Get connection (SESSION) 'net_read_timeout' `<'int'>`."""
+        """Get connection (SESSION) 'net_read_timeout' `<'int'>`.
+
+        ## Explanation:
+        - The 'net_read_timeout' defines the total seconds for reading data from the
+          network during a query.
+        - When the MySQL client or server is waiting to receive data over the network
+          (for example, when sending large result sets back to the client), this setting
+          specifies how long the server should wait before it gives up and times out.
+        - If a query is taking longer than expected to transfer data over the network
+          (perhaps due to slow network conditions or a large result set), this value
+          dictates how long MySQL will wait before throwing a timeout error.
+        """
         return await self._get_timeout("net_read_timeout", True)
 
     async def set_write_timeout(self, value: int | None) -> None:
         """Set connection (SESSION) 'net_write_timeout'.
 
-        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
-        - When 'value=None', if connection 'write_timeout' is
-          specified, set the timeout to the connection value,
-          else set to the server GLOBAL value.
+        :param value: `<'int/None'>` The timeout (in seconds) for writing data to the network during a query. Defaults to `None`.
+            - When 'value=None', if connection 'write_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation
+        - The 'net_write_timeout' defines the total seconds for writing data to
+          the network during a query.
+        - Similar to 'net_read_timeout', but for writing operations, it determines
+          how long the server will attempt to send data before it stops and raises
+          an error.
         """
         name = "net_write_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
+
+        # Reset timeout
         if value is None:
-            # Global timeout
             if self._write_timeout is None:
                 value = await self._get_timeout(name, False)
-            # Setting timeout
             else:
                 value = self._write_timeout
+            await self._set_timeout(name, value)
+            self._write_timeout_changed = False
 
         # Set timeout
-        await self._set_timeout(name, value)
-        self._write_timeout_changed = True
+        else:
+            await self._set_timeout(name, value)
+            self._write_timeout_changed = True
 
     async def get_write_timeout(self) -> int:
-        """Get connection (SESSION) 'net_write_timeout' `<'int'>`."""
+        """Get connection (SESSION) 'net_write_timeout' `<'int'>`.
+
+        ## Explanation
+        - The 'net_write_timeout' defines the total seconds for writing data to
+          the network during a query.
+        - Similar to 'net_read_timeout', but for writing operations, it determines
+          how long the server will attempt to send data before it stops and raises
+          an error.
+        """
         return await self._get_timeout("net_write_timeout", True)
 
     async def set_wait_timeout(self, value: int | None) -> None:
         """Set connection (SESSION) 'wait_timeout'.
 
-        :param value: `<'int/None'>` The timeout in seconds. Defaults to `None`.
-        - When 'value=None', if connection 'wait_timeout' is
-          specified, set the timeout to the connection value,
-          else set to the server GLOBAL value.
+        :param value: `<'int/None'>` The timeout (in seconds) for waiting a non-interactive client activity before closing the connection. Defaults to `None`.
+            - When 'value=None', if connection 'wait_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation
+        - The 'wait_time' defines the amount of time (in seconds) the MySQL server will wait
+          for a new request from a non-interactive client before closing the connection.
+        - For long-running connections that do not perform any operations, this is the time
+          after which the server will disconnect the client if no query activity happens.
         """
         name = "wait_timeout"
         # Validate timeout
         value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
+
+        # Reset timeout
         if value is None:
-            # Global timeout
             if self._wait_timeout is None:
                 value = await self._get_timeout(name, False)
-            # Setting timeout
             else:
                 value = self._wait_timeout
+            await self._set_timeout(name, value)
+            self._wait_timeout_changed = False
 
         # Set timeout
-        await self._set_timeout(name, value)
-        self._wait_timeout_changed = True
+        else:
+            await self._set_timeout(name, value)
+            self._wait_timeout_changed = True
 
     async def get_wait_timeout(self) -> int:
-        """Get connection (SESSION) 'wait_timeout' `<'int'>`."""
+        """Get connection (SESSION) 'wait_timeout' `<'int'>`.
+
+        ## Explanation
+        - The 'wait_time' defines the amount of time (in seconds) the MySQL server will wait
+          for a new request from a non-interactive client before closing the connection.
+        - For long-running connections that do not perform any operations, this is the time
+          after which the server will disconnect the client if no query activity happens.
+        """
         return await self._get_timeout("wait_timeout", True)
+
+    async def set_interactive_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'interactive_timeout'.
+
+        :param value: `<'int/None'>` The timeout (in seconds) for waiting an interactive client activity before closing the connection. Defaults to `None`.
+            - When 'value=None', if connection 'interactive_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation
+        - The 'interactive_timeout' defines the amount of time (in seconds) the MySQL server
+          will wait for a new request from an interactive client before closing the connection.
+        - For long-running connections that do a long pause between queries, this is the time
+          after which the server will disconnect the client if no query activity happens.
+        """
+        name = "interactive_timeout"
+        # Validate timeout
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
+
+        # Reset timeout
+        if value is None:
+            if self._interactive_timeout is None:
+                value = await self._get_timeout(name, False)
+            else:
+                value = self._interactive_timeout
+            await self._set_timeout(name, value)
+            self._interactive_timeout_changed = False
+
+        # Set timeout
+        else:
+            await self._set_timeout(name, value)
+            self._interactive_timeout_changed = True
+
+    async def get_interactive_timeout(self) -> int:
+        """Get connection (SESSION) 'interactive_timeout' `<'int'>`.
+
+        ## Explanation
+        - The 'wait_time' defines the amount of time (in seconds) the MySQL server will wait
+          for a new request from a non-interactive client before closing the connection.
+        - For long-running connections that do not perform any operations, this is the time
+          after which the server will disconnect the client if no query activity happens.
+        """
+        return await self._get_timeout("interactive_timeout", True)
+
+    async def set_lock_wait_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'innodb_lock_wait_timeout'.
+
+        :param value: `<'int/None'>` The timeout (in seconds) for waiting for a row lock in the InnoDB storage engine. Defaults to `None`.
+            - When 'value=None', if connection 'lock_wait_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation
+        - The 'innodb_lock_wait_timeout' defines how long a transaction will wait
+          for an InnoDB row-level lock to be acquired.
+        - If a transaction tries to acquire a lock on a row or set of rows and another
+          transaction already holds the lock, it will wait for this period before
+          returning an error.
+        - This timeout does not apply to waits for table locks, since table lock
+          does not happen inside InnoDB.
+        """
+        name = "innodb_lock_wait_timeout"
+        # Validate timeout
+        value = utils.validate_arg_uint(value, name, 1, UINT_MAX)
+
+        # Reset timeout
+        if value is None:
+            if self._lock_wait_timeout is None:
+                value = await self._get_timeout(name, False)
+            else:
+                value = self._lock_wait_timeout
+            await self._set_timeout(name, value)
+            self._lock_wait_timeout_changed = False
+
+        # Set timeout
+        else:
+            await self._set_timeout(name, value)
+            self._lock_wait_timeout_changed = True
+
+    async def get_lock_wait_timeout(self) -> int:
+        """Get connection (SESSION) 'innodb_lock_wait_timeout' `<'int'>`.
+
+        ## Explanation
+        - The 'innodb_lock_wait_timeout' defines how long a transaction will wait
+          for an InnoDB row-level lock to be acquired.
+        - If a transaction tries to acquire a lock on a row or set of rows and another
+          transaction already holds the lock, it will wait for this period before
+          returning an error.
+        - This timeout does not apply to waits for table locks, since table lock
+          does not happen inside InnoDB.
+        """
+        return await self._get_timeout("innodb_lock_wait_timeout", True)
+
+    async def set_execution_timeout(self, value: int | None) -> None:
+        """Set connection (SESSION) 'max_execution_time'.
+
+        :param value: `<'int/None'>` The timeout (in milliseconds) for executing read-only SELECT statements. Defaults to `None`.
+            - When 'value=None', if connection 'execution_timeout' is specified, set
+              the timeout to the connection default value, else set to the server
+              GLOBAL default value.
+
+        ## Explanation
+        - The 'max_execution_time' defines the max execution time (in milliseconds) for read-only
+          SELECT statements. Statements that are not read only are those that invoke a stored
+          function that modifies data as a side effect.
+        - The 'max_execution_time' is ignored for SELECT statements in stored programs.
+        - Value is 0 mean to disable the timeout.
+        """
+        name = "max_execution_time"
+        # Validate timeout
+        value = utils.validate_arg_uint(value, name, 0, UINT_MAX)
+
+        # Reset timeout
+        if value is None:
+            if self._execution_timeout is None:
+                value = await self._get_timeout(name, False)
+            else:
+                value = self._execution_timeout
+            await self._set_timeout(name, value)
+            self._execution_timeout_changed = False
+
+        # Set timeout
+        else:
+            await self._set_timeout(name, value)
+            self._execution_timeout_changed = True
+
+    async def get_execution_timeout(self) -> int:
+        """Get connection (SESSION) 'max_execution_time' `<'int'>`.
+
+        ## Explanation
+        - The 'max_execution_time' defines the max execution time (in milliseconds) for read-only
+          SELECT statements. Statements that are not read only are those that invoke a stored
+          function that modifies data as a side effect.
+        - The 'max_execution_time' is ignored for SELECT statements in stored programs.
+        - Value is 0 mean the timeout is disabled.
+        """
+        return await self._get_timeout("max_execution_time", True)
 
     async def _set_timeout(self, name: str, value: object) -> None:
         """(internal) Set connection (SESSION) timeout.
@@ -2608,35 +2851,6 @@ class BaseConnection:
                 % ("SESSION" if session else "GLOBAL", name, err)
             ) from err
 
-    @cython.ccall
-    @cython.exceptval(-1, check=False)
-    def get_autocommit(self) -> cython.bint:
-        """Get the 'autocommit' mode of the connection `<'bool'>`.
-
-        - `True` if the connection is operating in autocommit (non-transactional) mode.
-        - `False` if the connection is operating in manual commit (transactional) mode.
-
-        :raises `<'ConnectionClosedError'>`: If connection is not connected.
-        """
-        if self._server_status == -1:
-            raise errors.ConnectionClosedError(0, "Connection not connected.")
-        return self._server_status & _SERVER_STATUS.SERVER_STATUS_AUTOCOMMIT
-
-    async def set_autocommit(self, value: cython.bint) -> None:
-        """Set the 'autocommit' mode of the connection (SESSION).
-
-        :param value: `<'bool'>` Enable/Disable autocommit.
-            - `True` to operate in autocommit (non-transactional) mode.
-            - `False` to operate in manual commit (transactional) mode.
-        """
-        self._autocommit_mode = int(value)
-        if not self.closed() and value != self.get_autocommit():
-            await self._execute_command(
-                _COMMAND.COM_QUERY,
-                b"SET AUTOCOMMIT = 1" if value else b"SET AUTOCOMMIT = 0",
-            )
-            await self._read_ok_packet()
-
     # . server
     @cython.ccall
     def get_server_version(self) -> tuple[int]:
@@ -2673,7 +2887,7 @@ class BaseConnection:
                 self._server_vendor = "mysql"
         return self._server_vendor
 
-    # . query
+    # . status
     @cython.ccall
     def get_affected_rows(self) -> cython.ulonglong:
         """Get the number of affected rows by the last query `<'int'>`."""
@@ -2803,6 +3017,16 @@ class BaseConnection:
                 await self._set_timeout("net_write_timeout", self._write_timeout)
             if self._wait_timeout is not None:
                 await self._set_timeout("wait_timeout", self._wait_timeout)
+            if self._interactive_timeout is not None:
+                await self._set_timeout(
+                    "interactive_timeout", self._interactive_timeout
+                )
+            if self._lock_wait_timeout is not None:
+                await self._set_timeout(
+                    "innodb_lock_wait_timeout", self._lock_wait_timeout
+                )
+            if self._execution_timeout is not None:
+                await self._set_timeout("max_execution_time", self._execution_timeout)
 
             # . sql mode
             if self._sql_mode is not None:
@@ -3594,6 +3818,9 @@ class Connection(BaseConnection):
         read_timeout: int | None = None,
         write_timeout: int | None = None,
         wait_timeout: int | None = None,
+        interactive_timeout: int | None = None,
+        lock_wait_timeout: int | None = None,
+        execution_timeout: int | None = None,
         bind_address: str | None = None,
         unix_socket: str | None = None,
         autocommit: bool | None = False,
@@ -3623,10 +3850,13 @@ class Connection(BaseConnection):
         :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
         :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
         :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-        :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection. Defaults to `5`.
-        :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. Defaults to `None` (use GLOBAL settings).
-        :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. Defaults to `None` (use GLOBAL settings).
-        :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. Defaults to `None` (use GLOBAL settings).
+        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
         :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
         :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
         :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
@@ -3706,6 +3936,9 @@ class Connection(BaseConnection):
         self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
         self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
         self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
+        self._interactive_timeout = utils.validate_arg_uint(interactive_timeout, "interactive_timeout", 1, UINT_MAX)
+        self._lock_wait_timeout = utils.validate_arg_uint(lock_wait_timeout, "lock_wait_timeout", 1, UINT_MAX)
+        self._execution_timeout = utils.validate_arg_uint(execution_timeout, "execution_timeout", 1, UINT_MAX)
         # . client
         self._bind_address = utils.validate_arg_str(bind_address, "bind_address", None)
         self._unix_socket = utils.validate_arg_str(unix_socket, "unix_socket", None)

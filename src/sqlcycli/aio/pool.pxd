@@ -71,6 +71,9 @@ cdef class Pool:
         object _read_timeout
         object _write_timeout
         object _wait_timeout
+        object _interactive_timeout
+        object _lock_wait_timeout
+        object _execution_timeout
         # . client
         str _bind_address
         str _unix_socket

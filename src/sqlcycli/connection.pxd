@@ -150,6 +150,12 @@ cdef class BaseConnection:
         bint _write_timeout_changed
         object _wait_timeout
         bint _wait_timeout_changed
+        object _interactive_timeout
+        bint _interactive_timeout_changed
+        object _lock_wait_timeout
+        bint _lock_wait_timeout_changed
+        object _execution_timeout
+        bint _execution_timeout_changed
         # Client
         str _bind_address
         str _unix_socket
@@ -213,22 +219,33 @@ cdef class BaseConnection:
     cpdef bint select_database(self, str db) except -1
     cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
     cpdef bytes encode_sql(self, str sql)
+    # . client
     cpdef bint set_charset(self, str charset, object collation=?) except -1
+    cpdef bint get_autocommit(self) except -1
+    cpdef bint set_autocommit(self, bint value) except -1
+    # . timeout
     cpdef bint set_read_timeout(self, object timeout) except -1
     cpdef unsigned int get_read_timeout(self)
     cpdef bint set_write_timeout(self, object timeout) except -1
     cpdef unsigned int get_write_timeout(self)
     cpdef bint set_wait_timeout(self, object timeout) except -1
     cpdef unsigned int get_wait_timeout(self)
+    cpdef bint set_interactive_timeout(self, object timeout) except -1
+    cpdef unsigned int get_interactive_timeout(self)
+    cpdef bint set_lock_wait_timeout(self, object timeout) except -1
+    cpdef unsigned int get_lock_wait_timeout(self)
+    cpdef bint set_execution_timeout(self, object timeout) except -1
+    cpdef unsigned int get_execution_timeout(self)
     cdef inline bint _set_timeout(self, str name, object timeout) except -1
     cdef inline unsigned int _get_timeout(self, str name, bint session)
-    cpdef bint get_autocommit(self) except -1
-    cpdef bint set_autocommit(self, bint value) except -1
+    # . server
     cpdef tuple get_server_version(self)
     cpdef str get_server_vendor(self)
+    # . status
     cpdef unsigned long long get_affected_rows(self)
     cpdef unsigned long long get_insert_id(self)
     cpdef bint get_transaction_status(self) except -1
+    # . decode
     cpdef bint set_use_decimal(self, bint value) except -1
     cpdef bint set_decode_bit(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1

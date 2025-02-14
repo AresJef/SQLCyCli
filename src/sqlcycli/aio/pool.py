@@ -120,6 +120,9 @@ class PoolConnection(async_conn.BaseConnection):
         read_timeout: int | None,
         write_timeout: int | None,
         wait_timeout: int | None,
+        interactive_timeout: int | None,
+        lock_wait_timeout: int | None,
+        execution_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
         autocommit_mode: cython.int,
@@ -167,6 +170,9 @@ class PoolConnection(async_conn.BaseConnection):
         self._read_timeout = read_timeout
         self._write_timeout = write_timeout
         self._wait_timeout = wait_timeout
+        self._interactive_timeout = interactive_timeout
+        self._lock_wait_timeout = lock_wait_timeout
+        self._execution_timeout = execution_timeout
         # . client
         self._bind_address = bind_address
         self._unix_socket = unix_socket
@@ -236,6 +242,9 @@ class PoolSyncConnection(sync_conn.BaseConnection):
         read_timeout: int | None,
         write_timeout: int | None,
         wait_timeout: int | None,
+        interactive_timeout: int | None,
+        lock_wait_timeout: int | None,
+        execution_timeout: int | None,
         bind_address: str | None,
         unix_socket: str | None,
         autocommit_mode: cython.int,
@@ -282,6 +291,9 @@ class PoolSyncConnection(sync_conn.BaseConnection):
         self._read_timeout = read_timeout
         self._write_timeout = write_timeout
         self._wait_timeout = wait_timeout
+        self._interactive_timeout = interactive_timeout
+        self._lock_wait_timeout = lock_wait_timeout
+        self._execution_timeout = execution_timeout
         # . client
         self._bind_address = bind_address
         self._unix_socket = unix_socket
@@ -456,6 +468,9 @@ class Pool:
     _read_timeout: object  # uint | None
     _write_timeout: object  # uint | None
     _wait_timeout: object  # uint | None
+    _interactive_timeout: object  # uint | None
+    _lock_wait_timeout: object  # uint | None
+    _execution_timeout: object  # uint | None
     # . client
     _bind_address: str
     _unix_socket: str
@@ -496,6 +511,9 @@ class Pool:
         read_timeout: int | None = None,
         write_timeout: int | None = None,
         wait_timeout: int | None = None,
+        interactive_timeout: int | None = None,
+        lock_wait_timeout: int | None = None,
+        execution_timeout: int | None = None,
         bind_address: str | None = None,
         unix_socket: str | None = None,
         autocommit: bool | None = False,
@@ -517,6 +535,7 @@ class Pool:
         """The pool that manages and maintains connections to the server.
 
         #### Pool args:
+
         :param min_size: `<'int'>` The minimum number of active `async` connections to maintain. Defaults to `0`.
         :param max_size: `<'int'>` The maximum number of active `async` connections to maintain. Defaults to `10`.
         :param recycle: `<'int/None'>` The recycle time in seconds. Defaults to `None`.
@@ -525,6 +544,7 @@ class Pool:
             - If 'recycle=None' (Default), recycling is disabled.
 
         #### Connection args:
+
         :param host: `<'str/None'>` The host of the server. Defaults to `'localhost'`.
         :param port: `<'int'>` The port of the server. Defaults to `3306`.
         :param user: `<'str/bytes/None'>` The username to login as. Defaults to `None`.
@@ -532,10 +552,13 @@ class Pool:
         :param database: `<'str/bytes/None'>` The default database to use by the connection. Defaults to `None`.
         :param charset: `<'str/None'>` The character set for the connection. Defaults to `'utf8mb4'`.
         :param collation: `<'str/None'>` The collation for the connection. Defaults to `None`.
-        :param connect_timeout: `<'int'>` Timeout in seconds for establishing the connection. Defaults to `5`.
-        :param read_timeout: `<'int/None>` Set connection (SESSION) 'net_read_timeout'. Defaults to `None` (use GLOBAL settings).
-        :param write_timeout: `<'int/None>` Set connection (SESSION) 'net_write_timeout'. Defaults to `None` (use GLOBAL settings).
-        :param wait_timeout: `<'int/None>` Set connection (SESSION) 'wait_timeout'. Defaults to `None` (use GLOBAL settings).
+        :param connect_timeout: `<'int'>` Set timeout (in seconds) for establishing the connection. Defaults to `5`.
+        :param read_timeout: `<'int/None>` Set SESSION 'net_read_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param write_timeout: `<'int/None>` Set SESSION 'net_write_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param wait_timeout: `<'int/None>` Set SESSION 'wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param interactive_timeout: `<'int/None>` Set SESSION 'interactive_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param lock_wait_timeout: `<'int/None>` Set SESSION 'innodb_lock_wait_timeout' (in seconds). Defaults to `None` (use GLOBAL settings).
+        :param execution_timeout: `<'int/None>` Set SESSION 'max_execution_time' (in milliseconds). Defaults to `None` (use GLOBAL settings).
         :param bind_address: `<'str/None'>` The interface from which to connect to the host. Accept both hostname or IP address. Defaults to `None`.
         :param unix_socket: `<'str/None'>` The unix socket for establishing connection rather than TCP/IP. Defaults to `None`.
         :param autocommit: `<'bool/None'>` The autocommit mode for the connection. `None` means use server default. Defaults to `False`.
@@ -619,6 +642,9 @@ class Pool:
         self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
         self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
         self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
+        self._interactive_timeout = utils.validate_arg_uint(interactive_timeout, "interactive_timeout", 1, UINT_MAX)
+        self._lock_wait_timeout = utils.validate_arg_uint(lock_wait_timeout, "lock_wait_timeout", 1, UINT_MAX)
+        self._execution_timeout = utils.validate_arg_uint(execution_timeout, "execution_timeout", 1, UINT_MAX)
         # . client
         self._bind_address = utils.validate_arg_str(bind_address, "bind_address", None)
         self._unix_socket = utils.validate_arg_str(unix_socket, "unix_socket", None)
@@ -1096,10 +1122,11 @@ class Pool:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
-        - If user changes 'charset', 'read_timeout', 'write_timeout' or
-          'wait_timeout' through connection built-in methods, such as
-          'set_charset()', 'set_read_timeout()', etc., these settings
-          will also be reset to pool defaults at release.
+        - If user changes 'charset', 'read_timeout', 'write_timeout',
+          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
+          and 'exeuction_timeout' through connection built-in 'set_*()'
+          methods, these settings will also be reset to pool defaults
+          at release.
         - Other changes made on the connection [SESSION] (especially
           through SQL queries), please manually call 'conn.schedule_close()'
           method before releasing back to the pool.
@@ -1149,10 +1176,11 @@ class Pool:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
-        - If user changes 'charset', 'read_timeout', 'write_timeout' or
-          'wait_timeout' through connection built-in methods, such as
-          'set_charset()', 'set_read_timeout()', etc., these settings
-          will also be reset to pool defaults at release.
+        - If user changes 'charset', 'read_timeout', 'write_timeout',
+          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
+          and 'exeuction_timeout' through connection built-in 'set_*()'
+          methods, these settings will also be reset to pool defaults
+          at release.
         - Other changes made on the connection [SESSION] (especially
           through SQL queries), please manually call 'conn.schedule_close()'
           method before releasing back to the pool.
@@ -1203,6 +1231,9 @@ class Pool:
                 self._read_timeout,
                 self._write_timeout,
                 self._wait_timeout,
+                self._interactive_timeout,
+                self._lock_wait_timeout,
+                self._execution_timeout,
                 self._bind_address,
                 self._unix_socket,
                 self._autocommit_mode if self.closed() else int(self._autocommit),
@@ -1291,25 +1322,43 @@ class Pool:
         # . read timeout
         if conn._read_timeout_changed:
             try:
-                conn.set_read_timeout(self._read_timeout)
-                conn._read_timeout_changed = False
+                conn.set_read_timeout(None)
             except:  # noqa
                 conn.close()
                 return self._close_sync_conn()
         # . write timeout
         if conn._write_timeout_changed:
             try:
-                conn.set_write_timeout(self._write_timeout)
-                conn._write_timeout_changed = False
+                conn.set_write_timeout(None)
             except:  # noqa
                 conn.close()
                 return self._close_sync_conn()
         # . wait timeout
         if conn._wait_timeout_changed:
             try:
-                conn.set_wait_timeout(self._wait_timeout)
-                conn._wait_timeout_changed = False
+                conn.set_wait_timeout(None)
             except:  # noqa
+                conn.close()
+                return self._close_sync_conn()
+        # . interactive timeout
+        if conn._interactive_timeout_changed:
+            try:
+                conn.set_interactive_timeout(None)
+            except:  # noqa
+                conn.close()
+                return self._close_sync_conn()
+        # . lock wait timeout
+        if conn._lock_wait_timeout_changed:
+            try:
+                conn.set_lock_wait_timeout(None)
+            except:
+                conn.close()
+                return self._close_sync_conn()
+        # . execution timeout
+        if conn._execution_timeout_changed:
+            try:
+                conn.set_execution_timeout(None)
+            except:
                 conn.close()
                 return self._close_sync_conn()
 
@@ -1444,6 +1493,9 @@ class Pool:
                 self._read_timeout,
                 self._write_timeout,
                 self._wait_timeout,
+                self._interactive_timeout,
+                self._lock_wait_timeout,
+                self._execution_timeout,
                 self._bind_address,
                 self._unix_socket,
                 self._autocommit_mode if self.closed() else int(self._autocommit),
@@ -1523,25 +1575,43 @@ class Pool:
         # . read timeout
         if conn._read_timeout_changed:
             try:
-                await conn.set_read_timeout(self._read_timeout)
-                conn._read_timeout_changed = False
+                await conn.set_read_timeout(None)
             except:  # noqa
                 await conn.close()
                 return await notify()
         # . write timeout
         if conn._write_timeout_changed:
             try:
-                await conn.set_write_timeout(self._write_timeout)
-                conn._write_timeout_changed = False
+                await conn.set_write_timeout(None)
             except:  # noqa
                 await conn.close()
                 return await notify()
         # . wait timeout
         if conn._wait_timeout_changed:
             try:
-                await conn.set_wait_timeout(self._wait_timeout)
-                conn._wait_timeout_changed = False
+                await conn.set_wait_timeout(None)
             except:  # noqa
+                await conn.close()
+                return await notify()
+        # . interactive timeout
+        if conn._interactive_timeout_changed:
+            try:
+                await conn.set_interactive_timeout(None)
+            except:
+                await conn.close()
+                return await notify()
+        # . lock wait timeout
+        if conn._lock_wait_timeout_changed:
+            try:
+                await conn.set_lock_wait_timeout(None)
+            except:
+                await conn.close()
+                return await notify()
+        # . execution timeout
+        if conn._execution_timeout_changed:
+            try:
+                await conn.set_execution_timeout(None)
+            except:
                 await conn.close()
                 return await notify()
 

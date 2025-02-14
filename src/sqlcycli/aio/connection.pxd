@@ -112,6 +112,12 @@ cdef class BaseConnection:
         bint _write_timeout_changed
         object _wait_timeout
         bint _wait_timeout_changed
+        object _interactive_timeout
+        bint _interactive_timeout_changed
+        object _lock_wait_timeout
+        bint _lock_wait_timeout_changed
+        object _execution_timeout
+        bint _execution_timeout_changed
         # Client
         str _bind_address
         str _unix_socket
@@ -167,12 +173,16 @@ cdef class BaseConnection:
     # Query
     cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
     cpdef bytes encode_sql(self, str sql)
+    # . client
     cpdef bint get_autocommit(self) except -1
     cpdef tuple get_server_version(self)
+    # . server
     cpdef str get_server_vendor(self)
+    # . status
     cpdef unsigned long long get_affected_rows(self)
     cpdef unsigned long long get_insert_id(self)
     cpdef bint get_transaction_status(self) except -1
+    # . decode
     cpdef bint set_use_decimal(self, bint value) except -1
     cpdef bint set_decode_bit(self, bint value) except -1
     cpdef bint set_decode_json(self, bint value) except -1
