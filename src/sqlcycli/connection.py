@@ -1736,7 +1736,7 @@ class CursorManager:
             if self._cur is not None:
                 try:
                     self._cur.close()
-                except:  # noqa
+                except Exception:
                     pass
                 self._cur = None
             self._cur_type = None
@@ -3152,7 +3152,7 @@ class BaseConnection:
             if sock is not None:
                 try:
                     sock.close()
-                except:  # noqa
+                except Exception:  # noqa
                     pass
             self._writer = None
             self._reader = None
@@ -3182,6 +3182,8 @@ class BaseConnection:
         if not self.closed():
             try:
                 self._write_bytes(utils.pack_IB(1, _COMMAND.COM_QUIT))
+            except Exception:
+                pass
             finally:
                 self.force_close()
         return True
@@ -3198,7 +3200,7 @@ class BaseConnection:
         if not self.closed():
             try:
                 self._writer.close()
-            except:  # noqa
+            except Exception:
                 pass
             self._writer, self._reader = None, None
         return True

@@ -1056,7 +1056,6 @@ class Pool:
                 self._free -= 1
             return conn
         except:  # noqa
-            # Counting error: should not happen
             self._free = 0
             return None
 
@@ -1309,49 +1308,49 @@ class Pool:
             try:
                 conn.set_charset(self._charset._name, self._charset._collation)
                 conn._charset_changed = False
-            except:  # noqa
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . read timeout
         if conn._read_timeout_changed:
             try:
                 conn.set_read_timeout(None)
-            except:  # noqa
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . write timeout
         if conn._write_timeout_changed:
             try:
                 conn.set_write_timeout(None)
-            except:  # noqa
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . wait timeout
         if conn._wait_timeout_changed:
             try:
                 conn.set_wait_timeout(None)
-            except:  # noqa
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . interactive timeout
         if conn._interactive_timeout_changed:
             try:
                 conn.set_interactive_timeout(None)
-            except:  # noqa
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . lock wait timeout
         if conn._lock_wait_timeout_changed:
             try:
                 conn.set_lock_wait_timeout(None)
-            except:
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
         # . execution timeout
         if conn._execution_timeout_changed:
             try:
                 conn.set_execution_timeout(None)
-            except:
+            except Exception:
                 conn.close()
                 return self._close_sync_conn()
 
@@ -1425,7 +1424,7 @@ class Pool:
             if conn.get_autocommit() != self._autocommit:
                 try:
                     await conn.set_autocommit(self._autocommit)
-                except:  # noqa
+                except Exception:
                     await conn.close()
                     continue
             # . decode
@@ -1562,49 +1561,49 @@ class Pool:
             try:
                 await conn.set_charset(self._charset._name, self._charset._collation)
                 conn._charset_changed = False
-            except:  # noqa
+            except Exception:
                 await conn.close()
                 return await notify()
         # . read timeout
         if conn._read_timeout_changed:
             try:
                 await conn.set_read_timeout(None)
-            except:  # noqa
+            except Exception:
                 await conn.close()
                 return await notify()
         # . write timeout
         if conn._write_timeout_changed:
             try:
                 await conn.set_write_timeout(None)
-            except:  # noqa
+            except Exception:
                 await conn.close()
                 return await notify()
         # . wait timeout
         if conn._wait_timeout_changed:
             try:
                 await conn.set_wait_timeout(None)
-            except:  # noqa
+            except Exception:
                 await conn.close()
                 return await notify()
         # . interactive timeout
         if conn._interactive_timeout_changed:
             try:
                 await conn.set_interactive_timeout(None)
-            except:
+            except Exception:
                 await conn.close()
                 return await notify()
         # . lock wait timeout
         if conn._lock_wait_timeout_changed:
             try:
                 await conn.set_lock_wait_timeout(None)
-            except:
+            except Exception:
                 await conn.close()
                 return await notify()
         # . execution timeout
         if conn._execution_timeout_changed:
             try:
                 await conn.set_execution_timeout(None)
-            except:
+            except Exception:
                 await conn.close()
                 return await notify()
 
