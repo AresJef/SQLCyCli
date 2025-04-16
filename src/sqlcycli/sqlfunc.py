@@ -7,15 +7,15 @@ This module provides a collection of classes to represent the MySQL functions.
 Each class corresponds to a distinct MySQL function (e.g., TO_DAYS, MD5, etc.),
 and all of them derive from a common base class `<'SQLFunction'>`.
 
-The function classes in this module are more like a wrapper for the function values 
+The function classes in this module are more like a wrapper for the function values
 so the 'escape()' method in the 'sqlcycli' package can handle them correctly.
 
-Among all the classes, the `<'RawText'>` class is a special case. It is not a MySQL 
-function but rather a wrapper for a string value that should not be escaped in a SQL 
+Among all the classes, the `<'RawText'>` class is a special case. It is not a MySQL
+function but rather a wrapper for a string value that should not be escaped in a SQL
 statement. Using this class requires users to validate the text to prevent potential
 SQL injection attacks.
 
-All other classes' values are escaped by the 'escape()' function and can be used 
+All other classes' values are escaped by the 'escape()' function and can be used
 directly in a SQL statement.
 
 For more information about MySQL functions, please refer to the MySQL official
@@ -248,7 +248,7 @@ class RawText:
     _value: str
     _hashcode: cython.Py_ssize_t
 
-    def __init__(self, value: str):
+    def __init__(self, value: object):
         """The RawText in a SQL statement.
 
         This class is not a MySQL function, but rather a wrapper for a `<'str'>`
@@ -263,7 +263,7 @@ class RawText:
         validate the text before using it in a SQL statement to prevent SQL
         injection attacks.
 
-        :param value `<'str'>`: The RawText in a SQL statement, or a string value that should not be escaped in a SQL statement.
+        :param value `<'object'>`: The RawText in a SQL statement, or a string value that should not be escaped in a SQL statement.
 
         ### Example
         ```python
@@ -276,6 +276,8 @@ class RawText:
         # Escape output: "USING utf8mb4"
         ```
         """
+        if not isinstance(value, str):
+            value = str(value)
         self._value = value
         self._hashcode = -1
 
