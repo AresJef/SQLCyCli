@@ -50,6 +50,10 @@ class OperationalError(DatabaseError):
     error occurred during processing, etc."""
 
 
+class OperationalTableNotExistsError(OperationalError):
+    """Exception raised when a table does not exist."""
+
+
 class OperationalTimeoutError(OperationalError, TimeoutError):
     """Exception raised when an operation times out."""
 
@@ -93,7 +97,6 @@ def _map_error(exc, *error_codes):
 
 _map_error(
     ProgrammingError,
-    ER.DB_CREATE_EXISTS,
     ER.SYNTAX_ERROR,
     ER.PARSE_ERROR,
     ER.NO_SUCH_TABLE,
@@ -106,6 +109,7 @@ _map_error(
     ER.CANT_DO_THIS_DURING_AN_TRANSACTION,
     ER.WRONG_DB_NAME,
     ER.WRONG_COLUMN_NAME,
+    ER.WRONG_AUTO_KEY,
 )
 _map_error(
     DataError,
@@ -138,14 +142,21 @@ _map_error(
 )
 _map_error(
     OperationalError,
-    ER.DBACCESS_DENIED_ERROR,
+    ER.DB_CREATE_EXISTS,
+    ER.DB_DROP_EXISTS,
+    ER.TABLE_EXISTS_ERROR,
+    ER.BAD_TABLE_ERROR,
+    ER.DUP_FIELDNAME,
+    ER.CANT_DROP_FIELD_OR_KEY,
     ER.ACCESS_DENIED_ERROR,
-    ER.CON_COUNT_ERROR,
+    ER.DBACCESS_DENIED_ERROR,
     ER.TABLEACCESS_DENIED_ERROR,
     ER.COLUMNACCESS_DENIED_ERROR,
     ER.CONSTRAINT_FAILED,
+    ER.CON_COUNT_ERROR,
     ER.LOCK_DEADLOCK,
 )
+_map_error(OperationalTableNotExistsError, ER.NO_SUCH_TABLE)
 _map_error(
     OperationalTimeoutError,
     ER.LOCK_WAIT_TIMEOUT,
