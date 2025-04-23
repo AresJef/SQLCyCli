@@ -16,7 +16,7 @@ from cython.cimports.cpython.unicode import PyUnicode_GET_LENGTH as str_len  # t
 from cython.cimports.cpython.unicode import PyUnicode_READ_CHAR as str_read  # type: ignore
 from cython.cimports.cpython.unicode import PyUnicode_Substring as str_substr  # type: ignore
 from cython.cimports.sqlcycli.sqlintvl import SQLInterval  # type: ignore
-from cython.cimports.sqlcycli.sqlfunc import SQLFunction, RawText  # type: ignore
+from cython.cimports.sqlcycli.sqlfunc import SQLFunction, RawText, ObjStr  # type: ignore
 from cython.cimports.sqlcycli.constants import _FIELD_TYPE  # type: ignore
 from cython.cimports.sqlcycli import typeref  # type: ignore
 
@@ -31,7 +31,7 @@ from pandas import Series, DataFrame
 from MySQLdb._mysql import string_literal as _string_literal
 from orjson import loads as _loads, dumps as _dumps, OPT_SERIALIZE_NUMPY
 from sqlcycli.sqlintvl import SQLInterval
-from sqlcycli.sqlfunc import SQLFunction, RawText
+from sqlcycli.sqlfunc import SQLFunction, RawText, ObjStr
 from sqlcycli.constants import _FIELD_TYPE
 from sqlcycli import typeref, errors
 
@@ -592,14 +592,14 @@ def _escape_sqlfunc(data: SQLFunction, encoding: cython.pchar) -> str:
     >>> _escape_sqlfunc(sqlfunc.ABS(1))
     >>> "ABS(1)"  # str
     """
-    syntax = data.generate()
+    syntax = data.syntax()
     if data._arg_count == 0:
         return syntax
     if data._arg_count == 1:
         return syntax % _escape_common(
             cython.cast(object, tuple_getitem(data._args, 0)), encoding
         )
-    return data.generate() % _escape_item_tuple(data._args, encoding, False)
+    return data.syntax() % _escape_item_tuple(data._args, encoding, False)
 
 
 @cython.cfunc
@@ -611,7 +611,7 @@ def _escape_sqlintvl(data: SQLInterval, encoding: cython.pchar) -> str:
     >>> _escape_sqlintvl(sqlintvl.INTERVAL(1, "DAY"))
     >>> "INTERVAL 1 DAY"  # str
     """
-    return data.generate() % _escape_common(data._expr, encoding)
+    return data.syntax() % _escape_common(data._expr, encoding)
 
 
 @cython.cfunc
@@ -623,7 +623,14 @@ def _escape_rawtext(data: RawText) -> str:
     >>> _escape_rawtext(sqlfunc.RawText("FROM"))
     >>> "FROM"  # str
     """
-    return data.generate()
+    return data._value
+
+
+@cython.cfunc
+@cython.inline(True)
+def _escape_objstr(data: ObjStr) -> str:
+    """(cfunc) Escape ObjStr 'data' to literal `<'str'>`."""
+    return str(data)
 
 
 # . Sequence types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1525,6 +1532,8 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
         return _escape_sqlintvl(data, encoding)
     if dtype is RawText:
         return _escape_rawtext(data)
+    if dtype is ObjStr:
+        return _escape_objstr(data)
 
     # Cytimes Types
     if typeref.CYTIMES_AVAILABLE:
@@ -2578,6 +2587,8 @@ def _escape_item_uncommon(
         return _escape_sqlintvl(data, encoding)
     if dtype is RawText:
         return _escape_rawtext(data)
+    if dtype is ObjStr:
+        return _escape_objstr(data)
 
     # Cytimes Types
     if typeref.CYTIMES_AVAILABLE:
