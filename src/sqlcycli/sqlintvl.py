@@ -3,12 +3,12 @@
 # cython: boundscheck=False
 
 """
-This module provides a collection of classes to represents the MySQL temporal intervals 
-in a structured way. Each class corresponds to a distinct MySQL interval unit (e.g., 
-YEAR, MONTH, DAY, HOUR_MINUTE, etc.), and all of them derive from a common base class 
+This module provides a collection of classes to represents the MySQL temporal intervals
+in a structured way. Each class corresponds to a distinct MySQL interval unit (e.g.,
+YEAR, MONTH, DAY, HOUR_MINUTE, etc.), and all of them derive from a common base class
 `<'SQLInterval'>`.
 
-The interval classes in this module are more like a wrapper for the INTERVAL value 
+The interval classes in this module are more like a wrapper for the INTERVAL value
 so the 'escape()' method in the 'sqlcycli' package can handle them correctly.
 """
 
@@ -95,9 +95,9 @@ class SQLInterval:
         return self._expr
 
     @cython.ccall
-    def generate(self) -> str:
-        """Generate the temporal interval syntax with
-        the correct placeholders for the value `<'str'>`.
+    def syntax(self) -> str:
+        """Generate the temporal interval syntax with the correct 
+        placeholders for the expression (expr) `<'str'>`.
         """
         return "INTERVAL %s " + self._name
 

@@ -9,4 +9,4 @@ cdef class SQLInterval:
         str _name
         object _expr
         Py_ssize_t _hashcode
-    cpdef str generate(self)
+    cpdef str syntax(self)
