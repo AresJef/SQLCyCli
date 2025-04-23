@@ -122,9 +122,9 @@ class SQLFunction:
         return " ".join(res) if res else None
 
     @cython.ccall
-    def generate(self) -> str:
-        """Generate the function syntax with the
-        correct placeholders for the arguments `<'str'>`.
+    def syntax(self) -> str:
+        """Generate the function syntax with the correct 
+        placeholders for the arguments (args) `<'str'>`.
         """
         if self._arg_count == 0:
             if self._kwargs is None:
@@ -133,7 +133,7 @@ class SQLFunction:
         elif self._arg_count == 1:
             if self._kwargs is None:
                 return self._name + "(%s)"
-            return self._name + f"(%s %s)" % ("%s", self._kwargs)
+            return self._name + "(%s %s)" % ("%s", self._kwargs)
         else:
             args: str = self._sep.join(["%s" for _ in range(self._arg_count)])
             if self._kwargs is None:
@@ -154,7 +154,7 @@ class SQLFunction:
             )
 
     def __str__(self) -> str:
-        return self.generate() % tuple([str(i) for i in self._args])
+        return self.syntax() % tuple([str(i) for i in self._args])
 
     def __hash__(self) -> int:
         if self._hashcode == -1:
@@ -170,6 +170,7 @@ class SQLFunction:
         return self._hashcode
 
 
+# Custom class -------------------------------------------------------------------------------------------------------
 @cython.cclass
 class Sentinel:
     """Represents a sentinel value for SQL functions."""
@@ -181,53 +182,6 @@ class Sentinel:
 IGNORED: Sentinel = Sentinel()
 
 
-# Utils --------------------------------------------------------------------------------------------------------------
-@cython.cfunc
-@cython.inline(True)
-@cython.exceptval(-1, check=False)
-def validate_args_paris(paris: tuple, func_name: str, pair_name: str) -> cython.bint:
-    """(internal) Validate pairs of arguments."""
-    size: cython.Py_ssize_t = tuple_len(paris)
-    if size == 0:
-        raise errors.SQLFunctionError(
-            "SQL function %s expects at least 1 pair of "
-            "'%s' arguments, instead got 0." % (func_name, pair_name)
-        )
-    elif size % 2:
-        raise errors.SQLFunctionError(
-            "SQL function %s expects an even number of "
-            "'%s' arguments, instead got %r." % (func_name, pair_name, size)
-        )
-    return True
-
-
-@cython.cfunc
-@cython.inline(True)
-def validate_interval_unit(unit: object, func_name: str) -> str:
-    """(internal) Validate the interval unit."""
-    if type(unit) is type and issubclass(unit, SQLInterval):
-        _unit: SQLInterval = unit("")
-        return _unit._name
-    if isinstance(unit, SQLInterval):
-        _unit: SQLInterval = unit
-        return _unit._name
-    if isinstance(unit, str):
-        _unit_s: str = unit
-        if not set_contains(INTERVAL_UNITS, _unit_s):
-            _unit_s = _unit_s.upper()
-            if not set_contains(INTERVAL_UNITS, _unit_s):
-                raise errors.SQLFunctionError(
-                    "SQL function %s 'unit' argument is invalid '%s'."
-                    % (func_name, unit)
-                )
-        return _unit_s
-    raise errors.SQLFunctionError(
-        "SQL function %s 'unit' expects <'str/SQLInterval'> type, "
-        "instead got %s '%r'." % (func_name, type(unit), unit)
-    )
-
-
-# Functions: Custom --------------------------------------------------------------------------------------------------
 @cython.cclass
 class RawText:
     """Represents the raw text in a SQL statement.
@@ -286,11 +240,6 @@ class RawText:
         """The raw text string that should not be escaped in a SQL statement `<'str'>."""
         return self._value
 
-    @cython.ccall
-    def generate(self) -> str:
-        """Return the RawText value directly `<'str'>`."""
-        return self._value
-
     def __repr__(self) -> str:
         return "<RawText: %s>" % self._value
 
@@ -303,6 +252,65 @@ class RawText:
         return self._hashcode
 
 
+@cython.cclass
+class ObjStr:
+    """For any subclass of <'ObjStr'>, the 'escape()' function will
+    call its '__str__()' method and use the result as the escaped value.
+
+    The '__str__()' method must be implemented in the subclass.
+    """
+
+    def __str__(self) -> str:
+        raise NotImplementedError("<'%s'> must implement its '__str__()' method")
+
+
+# Utils --------------------------------------------------------------------------------------------------------------
+@cython.cfunc
+@cython.inline(True)
+@cython.exceptval(-1, check=False)
+def _validate_args_paris(paris: tuple, func_name: str, pair_name: str) -> cython.bint:
+    """(internal) Validate pairs of arguments."""
+    size: cython.Py_ssize_t = tuple_len(paris)
+    if size == 0:
+        raise errors.SQLFunctionError(
+            "SQL function '%s' expects at least one pair of "
+            "'%s' arguments, instead got 0." % (func_name, pair_name)
+        )
+    elif size % 2:
+        raise errors.SQLFunctionError(
+            "SQL function '%s' expects an even number of "
+            "'%s' arguments, instead got %d." % (func_name, pair_name, size)
+        )
+    return True
+
+
+@cython.cfunc
+@cython.inline(True)
+def _validate_interval_unit(unit: object, func_name: str) -> str:
+    """(internal) Validate the interval unit."""
+    if type(unit) is type and issubclass(unit, SQLInterval):
+        _unit: SQLInterval = unit("")
+        return _unit._name
+    if isinstance(unit, SQLInterval):
+        _unit: SQLInterval = unit
+        return _unit._name
+    if isinstance(unit, str):
+        _unit_s: str = unit
+        if not set_contains(INTERVAL_UNITS, _unit_s):
+            _unit_s = _unit_s.upper()
+            if not set_contains(INTERVAL_UNITS, _unit_s):
+                raise errors.SQLFunctionError(
+                    "SQL function '%s' unit argument is invalid '%s'."
+                    % (func_name, unit)
+                )
+        return _unit_s
+    raise errors.SQLFunctionError(
+        "SQL function '%s' unit expects <'str/SQLInterval'> type, "
+        "instead got %s %r." % (func_name, type(unit), unit)
+    )
+
+
+# Functions: Custom --------------------------------------------------------------------------------------------------
 @cython.cclass
 class RANDINT(SQLFunction):
     """Represents the custom `RANDINT(i, j)` function.
@@ -2157,7 +2165,7 @@ class EXTRACT(SQLFunction):
         # Expect result: 200712
         ```
         """
-        unit = RawText(validate_interval_unit(unit, "EXTRACT") + " FROM")
+        unit = RawText(_validate_interval_unit(unit, "EXTRACT") + " FROM")
         super().__init__("EXTRACT", 2, unit, date, sep=" ")
 
 
@@ -3269,7 +3277,7 @@ class JSON_ARRAY_APPEND(SQLFunction):
         # Expect result: '["a", ["b", "c", 2, 3], "d"]'
         ```
         """
-        validate_args_paris(path_val_pairs, "JSON_ARRAY_APPEND", "path_val_pairs")
+        _validate_args_paris(path_val_pairs, "JSON_ARRAY_APPEND", "path_val_pairs")
         super().__init__("JSON_ARRAY_APPEND", -1, json_doc, *path_val_pairs)
 
 
@@ -3322,7 +3330,7 @@ class JSON_ARRAY_INSERT(SQLFunction):
         # Expect result: '["x", "a", {"b": [1, 2]}, [3, 4]]'
         ```
         """
-        validate_args_paris(path_val_pairs, "JSON_ARRAY_INSERT", "path_val_pairs")
+        _validate_args_paris(path_val_pairs, "JSON_ARRAY_INSERT", "path_val_pairs")
         super().__init__("JSON_ARRAY_INSERT", -1, json_doc, *path_val_pairs)
 
 
@@ -3569,7 +3577,7 @@ class JSON_INSERT(SQLFunction):
         # Escape output: "JSON_INSERT('{ "a": 1, "b": [2, 3]}','$.a',10,'$.c','[true, false]')"
         # Expect result: '{"a": 1, "b": [2, 3], "c": "[true, false]"}'
         """
-        validate_args_paris(path_val_pairs, "JSON_INSERT", "path_val_pairs")
+        _validate_args_paris(path_val_pairs, "JSON_INSERT", "path_val_pairs")
         super().__init__("JSON_INSERT", -1, json_doc, *path_val_pairs)
 
 
@@ -3814,7 +3822,7 @@ class JSON_OBJECT(SQLFunction):
         # Expect result: '{"id": 87, "name": "carrot"}'
         ```
         """
-        validate_args_paris(key_val_pairs, "JSON_OBJECT", "key_val_pairs")
+        _validate_args_paris(key_val_pairs, "JSON_OBJECT", "key_val_pairs")
         super().__init__("JSON_OBJECT", -1, *key_val_pairs)
 
 
@@ -4055,7 +4063,7 @@ class JSON_REPLACE(SQLFunction):
         # Expect result: NULL
         ```
         """
-        validate_args_paris(path_val_pairs, "JSON_REPLACE", "path_val_pairs")
+        _validate_args_paris(path_val_pairs, "JSON_REPLACE", "path_val_pairs")
         super().__init__("JSON_REPLACE", -1, json_doc, *path_val_pairs)
 
 
@@ -4180,7 +4188,7 @@ class JSON_SET(SQLFunction):
         # Expect result: '{"a": 10, "b": [2, 3], "c": "[true, false]"}'
         ```
         """
-        validate_args_paris(path_val_pairs, "JSON_SET", "path_val_pairs")
+        _validate_args_paris(path_val_pairs, "JSON_SET", "path_val_pairs")
         super().__init__("JSON_SET", -1, json_doc, *path_val_pairs)
 
 
@@ -11141,7 +11149,7 @@ class TIMESTAMPADD(SQLFunction):
         # Expect result: '2003-01-09 00:00:00'
         ```
         """
-        unit = RawText(validate_interval_unit(unit, "TIMESTAMPADD"))
+        unit = RawText(_validate_interval_unit(unit, "TIMESTAMPADD"))
         super().__init__("TIMESTAMPADD", 3, unit, interval, datetime_expr)
 
 
@@ -11189,7 +11197,7 @@ class TIMESTAMPDIFF(SQLFunction):
         # Expect result: 128885
         ```
         """
-        unit = RawText(validate_interval_unit(unit, "TIMESTAMPDIFF"))
+        unit = RawText(_validate_interval_unit(unit, "TIMESTAMPDIFF"))
         super().__init__("TIMESTAMPDIFF", 3, unit, datetime_expr1, datetime_expr2)
 
 
