@@ -40,6 +40,33 @@ class TestCase(unittest.TestCase):
         self.assertEqual(escape(obj, b"utf8"), expected)
 
 
+class TestCustomClass(TestCase):
+    name: str = "Custom Class"
+
+    def test_all(self) -> None:
+        self.test_rawtext()
+
+    def test_rawtext(self) -> None:
+        self.log_start("RawText")
+
+        arg = sqlfunc.RawText("apple")
+        self.assertEqual(escape(arg, b"utf8"), "apple")
+
+        self.log_ended("RawText")
+
+    def test_objstr(self) -> None:
+        self.log_start("ObjStr")
+
+        class CustomClass(sqlfunc.ObjStr):
+            def __str__(self) -> str:
+                return "apple"
+
+        arg = CustomClass()
+        self.assertEqual(escape(arg, b"utf8"), "apple")
+
+        self.log_ended("ObjStr")
+
+
 class TestSQLInterval(TestCase):
     name: str = "SQLInterval"
 
@@ -1203,22 +1230,6 @@ class TestSQLFunction(TestCase):
 
 
 if __name__ == "__main__":
+    TestCustomClass().test_all()
     TestSQLInterval().test_all()
     TestSQLFunction().test_all()
-
-    # import datetime
-    # from sqlcycli import Connection, sqlfunc
-
-    # HOST = "localhost"
-    # PORT = 3306
-    # USER = "root"
-    # PSWD = "Password_123456"
-
-    # conn = Connection(host=HOST, port=PORT, user=USER, password=PSWD)
-    # conn.connect()
-    # with conn.cursor() as cur:
-    #     cur.execute("SELECT %s", sqlfunc.TO_DAYS(datetime.date(2007, 10, 7)))
-    #     res = cur.fetchone()
-    #     print(cur.executed_sql)
-    #     print(res)
-    # conn.close()
