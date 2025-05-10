@@ -158,6 +158,8 @@ def connect(
     :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
     :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
     :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+
     :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
     :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
     :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
@@ -362,6 +364,8 @@ def create_pool(
     :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
     :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
     :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+
     :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
     :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
     :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
