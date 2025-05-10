@@ -179,12 +179,12 @@ def connect(
     :param loop `<'AbstractEventLoop/None'>`: The event loop for the `async` connection. Defaults to `None`.
         - Only applicable for `async` connection. `sync` connection will ignore this argument.
 
-    ### Example (sync):
+    ## Example (sync):
     >>> with connect("localhost", 3306, "root", "password") as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
 
-    ### Example (async):
+    ## Example (async):
     >>> async with connect("localhost", 3306, "root", "password") as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")

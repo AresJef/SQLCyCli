@@ -121,7 +121,7 @@ class MICROSECOND(SQLInterval):
     def __init__(self, expr):
         """The MySQL 'MICROSECONDS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -139,7 +139,7 @@ class SECOND(SQLInterval):
     def __init__(self, expr):
         """The MySQL 'SECONDS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -157,7 +157,7 @@ class MINUTE(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'MINUTES' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -175,7 +175,7 @@ class HOUR(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'HOURS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -193,7 +193,7 @@ class DAY(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'DAYS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -211,7 +211,7 @@ class WEEK(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'WEEKS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -229,7 +229,7 @@ class MONTH(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'MONTHS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -247,7 +247,7 @@ class QUARTER(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'QUARTERS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -265,7 +265,7 @@ class YEAR(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'YEARS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -283,7 +283,7 @@ class SECOND_MICROSECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'SS.US' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -301,7 +301,7 @@ class MINUTE_MICROSECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'MI:SS.US' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -319,7 +319,7 @@ class MINUTE_SECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'MI:SS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -337,7 +337,7 @@ class HOUR_MICROSECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'HH:MI:SS.US' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -355,7 +355,7 @@ class HOUR_SECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'HH:MI:SS' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -390,7 +390,7 @@ class DAY_MICROSECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'DD HH:MI:SS.US' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -408,7 +408,7 @@ class DAY_SECOND(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'DD HH:MI:SS' interval.
 
-        ### Exmple:
+        ## Exmple:
         ```python
         from sqlcycli import sqlintvl
 
@@ -426,7 +426,7 @@ class DAY_MINUTE(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'DD HH:MI interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -444,7 +444,7 @@ class DAY_HOUR(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'DD HH' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 
@@ -462,7 +462,7 @@ class YEAR_MONTH(SQLInterval):
     def __init__(self, expr: object):
         """The MySQL 'YY-MM' interval.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlintvl
 

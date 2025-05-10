@@ -113,7 +113,7 @@ class PoolConnection(async_conn.BaseConnection):
     It does not perform argument validations during initialization.
     Such validations are delegated to the class `<'aio.Pool'>`.
 
-    #### Please do `NOT` create an instance of this class directly.
+    ### Please do `NOT` create an instance of this class directly.
     """
 
     # . pool
@@ -160,7 +160,7 @@ class PoolConnection(async_conn.BaseConnection):
         It does not perform argument validations during initialization.
         Such validations are delegated to the class `<'aio.Pool'>`.
 
-        #### Please do `NOT` create an instance of this class directly.
+        ### Please do `NOT` create an instance of this class directly.
 
         :param pool_id `<'int'>`: The unique identifier of the pool.
         """
@@ -234,7 +234,7 @@ class PoolSyncConnection(sync_conn.BaseConnection):
     It does not perform argument validations during initialization.
     Such validations are delegated to the class `<'aio.Pool'>`.
 
-    #### Please do `NOT` create an instance of this class directly.
+    ### Please do `NOT` create an instance of this class directly.
     """
 
     # . pool
@@ -280,7 +280,7 @@ class PoolSyncConnection(sync_conn.BaseConnection):
         It does not perform argument validations during initialization.
         Such validations are delegated to the class `<'aio.Pool'>`.
 
-        #### Please do `NOT` create an instance of this class directly.
+        ### Please do `NOT` create an instance of this class directly.
 
         :param pool_id `<'int'>`: The unique identifier of the pool.
         """
@@ -1112,23 +1112,23 @@ class Pool:
     def acquire(self) -> PoolConnectionManager:
         """Acquire a free connection from the pool through context manager `<'PoolConnectionManager'>`.
 
-        ### Example (sync):
+        ## Example (sync):
         >>> with pool.acquire() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT * FROM table")
 
-        ### Example (async):
+        ## Example (async):
         >>> async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("SELECT * FROM table")
 
-        ### Example (direct async - NOT recommended):
+        ## Example (direct async - NOT recommended):
         >>> conn = await pool.acquire()
             async with conn.cursor() as cur:
                 await cur.execute("SELECT * FROM table")
             await pool.release(conn)  # manual release
 
-        ### Notice for Pool Connection Consistency:
+        ## Notice for Pool Connection Consistency:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
@@ -1178,10 +1178,10 @@ class Pool:
         :param conn `<'PoolConnection/PoolSyncConnection'>`: The pool connection to release.
         :raises `<'PoolReleaseError'>`: If the connection does not belong to this pool.
 
-        ### For `async` connection, please await for the result:
+        ## For `async` connection, please await for the result:
         >>> await pool.release(conn)
 
-        ### Notice for Pool Connection Consistency:
+        ## Notice for Pool Connection Consistency:
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
@@ -1219,7 +1219,7 @@ class Pool:
     def _acquire_sync_conn(self) -> PoolSyncConnection:
         """(internal) Acquired `sync` connection `<'PoolSyncConnection/None'>`.
 
-        #### This method returns `None` only when the pool is closing.
+        ### This method returns `None` only when the pool is closing.
         """
         # Pool is closing
         if self._closing:
@@ -1306,7 +1306,7 @@ class Pool:
     def _release_sync_conn(self, conn: PoolSyncConnection) -> cython.bint:
         """(internal) Release the `sync` connection back to the pool.
 
-        #### If the connection belongs to the pool, this method does not raise any error.
+        ### If the connection belongs to the pool, this method does not raise any error.
         """
         # Validate pool identity
         if conn._pool_id != self._id:
@@ -1381,7 +1381,7 @@ class Pool:
     async def _acquire_async_conn(self) -> PoolConnection | None:
         """(internal) Acquire a `async` connection from the pool `<'PoolConnection/None'>`.
 
-        #### This method returns `None` only when the pool is closing.
+        ### This method returns `None` only when the pool is closing.
         """
         async with self._condition:
             while True:
@@ -1415,7 +1415,7 @@ class Pool:
         are closed and removed. Also, 'autocommit', 'used_decimal',
         'decode_bit' and 'decode_json' will be reset to pool settings.
 
-        #### This method returns `None` if no free connection available.
+        ### This method returns `None` if no free connection available.
         """
         while self._free > 0 and not self._closing:
             conn = self._get_free_conn()
@@ -1462,7 +1462,7 @@ class Pool:
         and adds it to the pool. The connection is then acquired and
         returned to the caller.
 
-        #### This method returns `None` if pool max limit is reached.
+        ### This method returns `None` if pool max limit is reached.
         """
         await self._fill_async_new()
         return await self._acquire_async_free()
@@ -1546,7 +1546,7 @@ class Pool:
     async def _release_async_conn(self, conn: PoolConnection) -> None:
         """(internal) Release an `async` connection back to the pool.
 
-        #### If the connection belongs to the pool, this method does not raise any error.
+        ### If the connection belongs to the pool, this method does not raise any error.
         """
 
         async def notify() -> None:
@@ -1644,15 +1644,15 @@ class Pool:
         - If user acquires any `async` connections, please await of the 'Future'
           object or manual await 'Pool.wait_for_closed()' method.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
 
-        ### Example (await closure):
+        ## Example (await closure):
         >>> async with pool.acquire() as conn:
                 # some SQL queries
                 ...
             await pool.close()  # closing & await for closure
 
-        ### Example (manual closure):
+        ## Example (manual closure):
         >>> async with pool.acquire() as conn:
                 # some SQL queries
                 ...
@@ -1684,7 +1684,7 @@ class Pool:
         - Close all free connections.
         - Wait for all in-use connections to return and be released (closed).
 
-        #### This method should only be called after 'Pool.close()'.
+        ### This method should only be called after 'Pool.close()'.
 
         :raises `<'PoolNotClosedError'>`: If called before 'Pool.close()'. Otherwise, this method does not raise any error.
         """
@@ -1718,7 +1718,7 @@ class Pool:
     async def clear(self) -> None:
         """Clear (close) existing free connections in the pool.
 
-        #### This method does not affect in-use connections.
+        ### This method does not affect in-use connections.
         """
         self._close_sync_conn()
         async with self._condition:
@@ -1737,7 +1737,7 @@ class Pool:
         - Set 'closing' flag to `True, so no free/new connections can be acquired.
         - Close all existing free and in-use connections immediately.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
         """
         # Pool already closed
         if self.closed():

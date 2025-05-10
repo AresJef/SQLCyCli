@@ -47,7 +47,7 @@ class SSL:
     It takes the responsibility of creating the SSLContext
     for MySQL from 'PyMySQL' package's <'Connection'> class.
 
-    ### Notice
+    ## Notice
     Please access the generated <'SSLContext'> through `context` attribute.
     If Python `ssl` module is not available, a `RuntimeWarning` will be
     issued and the context attribute will be `None`.
@@ -80,11 +80,6 @@ class SSL:
         It takes the responsibility of creating the SSLContext
         for MySQL from 'PyMySQL' package's <'Connection'> class.
 
-        ### Notice
-        Please access the final <'SSLContext'> through `context` attribute.
-        If Python `ssl` module is not available, a `RuntimeWarning` will be
-        issued and the context attribute will be `None`.
-
         :param ca_file `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted CA certificate. Defaults to `None`.
         :param ca_path `<'str/bytes/Path'>`: The path to the directory contains CA certificate files. Defaults to `None`.
         :param cert_file: `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted client certificate. Defaults to `None`.
@@ -93,6 +88,11 @@ class SSL:
         :param verify_server_identity: `<'bool'>`: Whether to verify the server's identity. Defaults to `False`.
         :param verify_server_mode: `<'bool/str'>`: How to verify the server's certificate. Defaults to `None`.
         :param cipher: `<'str'>`: The cipher to use for the SSL communication. Defaults to `None`.
+
+        ## Notice
+        Please access the final <'SSLContext'> through `context` attribute.
+        If Python `ssl` module is not available, a `RuntimeWarning` will be
+        issued and the context attribute will be `None`.
         """
         self._has_ca = ca_file is not None or ca_path is not None
         self._ca_file = self._validate_path(ca_file, "ca_file")
@@ -124,7 +124,7 @@ class SSL:
     def context(self) -> object | None:
         """Access the generated `<'SSLContext'>`.
 
-        ### Notice
+        ## Notice
         If Python `ssl` module is not available, returns `None`.
         """
         return self._context

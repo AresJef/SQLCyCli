@@ -193,7 +193,7 @@ class RawText:
     This is usefull for SQL keywords such as 'FROM', 'USING', or a column
     name that should not be escaped in a SQL statement.
 
-    ### Notice:
+    ## Notice
     Since text wrapped in this class is not escaped, it is important to
     validate the text before using it in a SQL statement to prevent SQL
     injection attacks.
@@ -212,14 +212,14 @@ class RawText:
         This is usefull for SQL keywords such as 'FROM', 'USING', or a column
         name that should not be escaped in a SQL statement.
 
-        ### Notice:
+        ## Notice
         Since text wrapped in this class is not escaped, it is important to
         validate the text before using it in a SQL statement to prevent SQL
         injection attacks.
 
         :param value `<'object'>`: The RawText in a SQL statement, or a string value that should not be escaped in a SQL statement.
 
-        ### Example
+        ## Example
         ```python
         from sqlcycli import sqlfunc, escape
 
@@ -327,7 +327,7 @@ class RANDINT(SQLFunction):
         - Return a random integer R in the range i <= R < j,
           through the following expression: FLOOR(i + RAND() * (j - i)).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -359,7 +359,7 @@ class ABS(SQLFunction):
         MySQL description:
         - Returns the absolute value of X, or NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -391,7 +391,7 @@ class ACOS(SQLFunction):
         - Returns the arc cosine of X, that is, the value whose cosine is X.
         - Returns NULL if X is not in the range -1 to 1, or if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -431,7 +431,7 @@ class ADDDATE(SQLFunction):
         - When invoked with the days form of the second argument, MySQL
           treats it as an integer number of days to be added to expr.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -470,7 +470,7 @@ class ADDTIME(SQLFunction):
         - expr1 is a time or datetime expression, and expr2 is a time expression.
         - Returns NULL if expr1 or expr2 is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -509,7 +509,7 @@ class ASCII(SQLFunction):
         - Returns 0 if str is the empty string. Returns NULL if str is NULL.
         - ASCII() works for 8-bit characters.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -545,7 +545,7 @@ class ASIN(SQLFunction):
         - Returns the arc sine of X, that is, the value whose sine is X.
         - Returns NULL if X is not in the range -1 to 1, or if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -585,7 +585,7 @@ class ATAN(SQLFunction):
         - If only 'X' is invoked: Returns the arc tangent of X, that is, the
           value whose tangent is X. Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -627,7 +627,7 @@ class BIN(SQLFunction):
           is a longlong (BIGINT) number. This is equivalent to CONV(N,10,2).
         - Returns NULL if N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -677,7 +677,7 @@ class BIN_TO_UUID(SQLFunction):
           to have its time-low and time-high parts swapped. These parts are swapped
           back to their original position in the result value.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -714,7 +714,7 @@ class BIT_COUNT(SQLFunction):
         - Returns the number of bits that are set in the argument N as
           an unsigned 64-bit integer, or NULL if the argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -746,7 +746,7 @@ class BIT_LENGTH(SQLFunction):
         - Returns the length of the string str in bits.
         - Returns NULL if str is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -775,7 +775,7 @@ class CEIL(SQLFunction):
         - Returns the smallest integer value not less than X.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -809,7 +809,7 @@ class CHAR(SQLFunction):
           consisting of the characters given by the code values of those integers.
         - NULL values are skipped.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -853,7 +853,7 @@ class CHAR_LENGTH(SQLFunction):
           for a string containing two 3-byte characters, LENGTH() returns 6,
           whereas CHAR_LENGTH() returns 2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -885,7 +885,7 @@ class CHARSET(SQLFunction):
         - Returns the character set of the string argument.
         - Returns NULL if the argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -917,7 +917,7 @@ class COALESCE(SQLFunction):
         - Returns the first non-NULL value in the list, or NULL if there are no non-NULL values.
         - The return type of COALESCE() is the aggregated type of the argument types.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -947,7 +947,7 @@ class COERCIBILITY(SQLFunction):
         MySQL description:
         - Returns the collation coercibility value of the string argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -973,7 +973,7 @@ class COLLATION(SQLFunction):
         MySQL description:
         - Returns the collation of the string argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1007,7 +1007,7 @@ class COMPRESS(SQLFunction):
           The return value is also NULL if string_to_compress is NULL.
         - The compressed string can be uncompressed with UNCOMPRESS().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1047,7 +1047,7 @@ class CONCAT(SQLFunction):
           to its equivalent nonbinary string form.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1089,7 +1089,7 @@ class CONCAT_WS(SQLFunction):
           the rest of the arguments.
         - If the separator is NULL, the result is NULL
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1129,7 +1129,7 @@ class CONNECTION_ID(SQLFunction):
           of SHOW PROCESSLIST output, and the PROCESSLIST_ID column of the Performance
           Schema threads table.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1169,7 +1169,7 @@ class CONV(SQLFunction):
           signed number. Otherwise, N is treated as unsigned. CONV() works
           with 64-bit precision.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1203,7 +1203,7 @@ class CONVERT(SQLFunction):
           names are the same as the corresponding character set names.
         - Returns NULL if expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1242,7 +1242,7 @@ class CONVERT_TZ(SQLFunction):
           to the time zone given by to_tz and returns the resulting value.
         - Returns NULL if any of the arguments are invalid, or if any of them are NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1275,7 +1275,7 @@ class COS(SQLFunction):
         - Returns the cosine of X, where X is given in radians.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1307,7 +1307,7 @@ class COT(SQLFunction):
         - Returns the cotangent of X.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1343,7 +1343,7 @@ class CRC32(SQLFunction):
         - The argument is expected to be a string and (if possible) is
           treated as one if it is not.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1389,7 +1389,7 @@ class CUME_DIST(SQLFunction):
           the desired order. Without ORDER BY, all rows are peers and have value
           N/N = 1, where N is the partition size.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1416,7 +1416,7 @@ class CURRENT_DATE(SQLFunction):
         - Returns the current date as a value in 'YYYY-MM-DD' or YYYYMMDD format,
           depending on whether the function is used in string or numeric context.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1446,7 +1446,7 @@ class CURRENT_ROLE(SQLFunction):
           session, separated by commas, or NONE if there are none.
         - The value reflects the setting of the sql_quote_show_create system variable.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1483,7 +1483,7 @@ class CURRENT_TIME(SQLFunction):
           from 0 to 6, the return value includes a fractional seconds part of that
           many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1524,7 +1524,7 @@ class CURRENT_TIMESTAMP(SQLFunction):
         - If the fsp argument is given to specify a fractional seconds precision from
           0 to 6, the return value includes a fractional seconds part of that many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1563,7 +1563,7 @@ class CURRENT_USER(SQLFunction):
           access privileges. The return value is a string in the utf8mb3 character set.
         - The value of CURRENT_USER() can differ from the value of USER().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1596,7 +1596,7 @@ class DATABASE(SQLFunction):
           the default database is the database that the routine is associated with, which is
           not necessarily the same as the database that is the default in the calling context.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1624,7 +1624,7 @@ class DATE(SQLFunction):
         - Extracts the date part of the date or datetime expression expr.
         - Returns NULL if expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1663,7 +1663,7 @@ class DATE_ADD(SQLFunction):
           '-' for negative intervals. unit is a keyword indicating the units in which the expression
           should be interpreted.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -1702,7 +1702,7 @@ class DATE_FORMAT(SQLFunction):
         - For MySQL format specifiers, please refer to
           [link](https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_date-format).
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1741,7 +1741,7 @@ class DATE_SUB(SQLFunction):
           '-' for negative intervals. unit is a keyword indicating the units in which the expression
           should be interpreted.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -1778,7 +1778,7 @@ class DATEDIFF(SQLFunction):
           expressions.
         - Only the date parts of the values are used in the calculation.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1813,7 +1813,7 @@ class DAYNAME(SQLFunction):
           name is controlled by the value of the lc_time_names system variable.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1848,7 +1848,7 @@ class DAYOFMONTH(SQLFunction):
           dates such as '0000-00-00' or '2008-00-00' that have a zero day part.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1883,7 +1883,7 @@ class DAYOFWEEK(SQLFunction):
           These index values correspond to the ODBC standard.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1916,7 +1916,7 @@ class DAYOFYEAR(SQLFunction):
         - Returns the day of the year for date, in the range 1 to 366.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -1949,7 +1949,7 @@ class DEGREES(SQLFunction):
         - Returns the argument X, converted from radians to degrees.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -1983,7 +1983,7 @@ class DENSE_RANK(SQLFunction):
           than one do not produce noncontiguous rank numbers. For an example, see the
           RANK() function description.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2015,7 +2015,7 @@ class ELT(SQLFunction):
         - Returns NULL if N is less than 1, greater than the number of arguments,
           or NULL. ELT() is the complement of FIELD().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2047,7 +2047,7 @@ class EXP(SQLFunction):
         - Returns the value of e (the base of natural logarithms) raised to the power of X.
         - The inverse of this function is LOG() (using a single argument only) or LN().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2102,7 +2102,7 @@ class EXPORT_SET(SQLFunction):
           if not specified. number_of_bits is silently clipped to 64 if larger than 64. It
           is treated as an unsigned integer, so a value of '-1' is effectively the same as 64.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2147,7 +2147,7 @@ class EXTRACT(SQLFunction):
           date arithmetic.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -2196,7 +2196,7 @@ class FIELD(SQLFunction):
         - If str is NULL, the return value is 0 because NULL fails equality
           comparison with any value. FIELD() is the complement of ELT().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2244,7 +2244,7 @@ class FIND_IN_SET(SQLFunction):
           does not work properly if the first argument contains a comma
           (,) character.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2287,7 +2287,7 @@ class FLOOR(SQLFunction):
         - Returns the largest integer value not greater than X.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2335,7 +2335,7 @@ class FORMAT(SQLFunction):
           ([link](https://dev.mysql.com/doc/refman/8.4/en/locale-support.html)).
           If the locale is NULL or not specified, the default locale is 'en_US'.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2382,7 +2382,7 @@ class FORMAT_BYTES(SQLFunction):
           not rounded.
         - Returns NULL if count is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2422,7 +2422,7 @@ class FORMAT_PICO_TIME(SQLFunction):
           numbers and are not rounded.
         - If time_val is NULL, this function returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2454,7 +2454,7 @@ class FROM_DAYS(SQLFunction):
         - Given a day number N, returns a DATE value.
         - Returns NULL if N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2504,7 +2504,7 @@ class FROM_UNIXTIME(SQLFunction):
           of 6. When unix_timestamp is a floating point number, the fractional seconds
           precision of the datetime is 6.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2544,7 +2544,7 @@ class GeomCollection(SQLFunction):
           if a nonsupported geometry is present.
         - No arguments is permitted as a way to create an empty geometry.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2581,7 +2581,7 @@ class GET_FORMAT(SQLFunction):
           [table](https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_get-format)
           ISO format refers to ISO 9075, not ISO 8601.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2638,7 +2638,7 @@ class GET_LOCK(SQLFunction):
           or implicitly when your session terminates (either normally or abnormally). Locks
           obtained with GET_LOCK() are not released when transactions commit or roll back.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2665,7 +2665,7 @@ class GREATEST(SQLFunction):
         - With two or more arguments, returns the largest (maximum-valued) argument.
           The arguments are compared using the same rules as for LEAST().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2712,7 +2712,7 @@ class HEX(SQLFunction):
           number. This is equivalent to CONV(N,10,16). The inverse of
           this operation is performed by CONV(HEX(N),16,10).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2748,7 +2748,7 @@ class HOUR(SQLFunction):
           is much larger, so HOUR can return values greater than 23.
         - Returns NULL if time is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2779,7 +2779,7 @@ class IFNULL(SQLFunction):
         MySQL description:
         - If expr1 is not NULL, IFNULL() returns expr1; otherwise it returns expr2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2811,7 +2811,7 @@ class IN(SQLFunction):
         - Returns 1 (true) if proceeding expr is equal to any of the values
         in the IN() list, else returns 0 (false).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2844,7 +2844,7 @@ class INET_ATON(SQLFunction):
           byte order (big endian).
         - Returns NULL if it does not understand its argument, or if expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2880,7 +2880,7 @@ class INET6_ATON(SQLFunction):
           VARBINARY(16) for IPv6 addresses and VARBINARY(4) for IPv4 addresses.
         - If the argument is not a valid address, or if it is NULL, INET6_ATON() returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2914,7 +2914,7 @@ class INET_NTOA(SQLFunction):
           string representation of the address as a string in the connection character set.
         - Returns NULL if it does not understand its argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2944,7 +2944,7 @@ class INET6_NTOA(SQLFunction):
           returns the string representation of the address as a string in the connection character set.
         - If the argument is not a valid address, or if it is NULL, INET6_NTOA() returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -2984,7 +2984,7 @@ class INSERT(SQLFunction):
           of the rest of the string.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3028,7 +3028,7 @@ class INSTR(SQLFunction):
           least one argument is a binary string. If either argument is NULL,
           this functions returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3061,7 +3061,7 @@ class INTERVAL(SQLFunction):
           are treated as integers. It is required that N1 ≤ N2 ≤ N3 ≤ ... ≤ Nn for this
           function to work correctly. This is because a binary search is used (very fast).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3099,7 +3099,7 @@ class IS_FREE_LOCK(SQLFunction):
         - This function is unsafe for statement-based replication. A warning is
           logged if you use this function when binlog_format is set to STATEMENT.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3132,7 +3132,7 @@ class IS_USER_LOCK(SQLFunction):
         - This function is unsafe for statement-based replication. A warning is logged
           if you use this function when binlog_format is set to STATEMENT.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3159,7 +3159,7 @@ class IS_UUID(SQLFunction):
         - Returns 1 if the argument is a valid string-format UUID
         - Returns 0 if the argument is not a valid UUID, and NULL if the argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3189,7 +3189,7 @@ class ISNULL(SQLFunction):
         MySQL description:
         - If expr is NULL, ISNULL() returns 1, otherwise it returns 0.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3220,7 +3220,7 @@ class JSON_ARRAY(SQLFunction):
         MySQL description:
         - Evaluates a (possibly empty) list of values and returns a JSON array containing those values.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3262,7 +3262,7 @@ class JSON_ARRAY_APPEND(SQLFunction):
           and the new value is added to that array. Pairs for which the path does not identify
           any value in the JSON document are ignored.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3315,7 +3315,7 @@ class JSON_ARRAY_INSERT(SQLFunction):
           element position, shifting any following values to the right. If a path identifies an
           array position past the end of an array, the value is inserted at the end of the array.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3362,7 +3362,7 @@ class JSON_CONTAINS(SQLFunction):
           candidate is not a valid JSON document, or if the path argument is not
           a valid path expression or contains a * or ** wildcard.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3413,7 +3413,7 @@ class JSON_CONTAINS_PATH(SQLFunction):
           exists within the document, 0 otherwise; 'all' 1 if all paths exist within the
           document, 0 otherwise.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3455,7 +3455,7 @@ class JSON_DEPTH(SQLFunction):
           values of depth 1 has depth 2. Otherwise, a JSON document has depth greater
           than 2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3503,7 +3503,7 @@ class JSON_EXTRACT(SQLFunction):
           are autowrapped as an array, in the order corresponding to the paths that produced
           them. Otherwise, the return value is the single matched value.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3567,7 +3567,7 @@ class JSON_INSERT(SQLFunction):
         - Otherwise, a path-value pair for a nonexisting path in the document is ignored
           and has no effect.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3609,7 +3609,7 @@ class JSON_KEYS(SQLFunction):
         - The result array is empty if the selected object is empty. If the top-level value
           has nested subobjects, the return value does not include keys from those subobjects.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3658,7 +3658,7 @@ class JSON_LENGTH(SQLFunction):
           is the number of object members; the length does not count the length of nested
           arrays or objects.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3719,7 +3719,7 @@ class JSON_MERGE_PATCH(SQLFunction):
           of these members are the results of recursively merging the value in the first object
           with the value in the second object.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3772,7 +3772,7 @@ class JSON_MERGE_PRESERVE(SQLFunction):
           an adjacent array and object are merged by autowrapping the object as an
           array and merging the two arrays.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3813,7 +3813,7 @@ class JSON_OBJECT(SQLFunction):
         - Evaluates a (possibly empty) list of key-value pairs and returns a JSON object containing
           those pairs. An error occurs if any key name is NULL or the number of arguments is odd.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3856,7 +3856,7 @@ class JSON_OVERLAPS(SQLFunction):
           be optimized using multi-valued indexes. Multi-Valued Indexes, provides detailed information
           and examples.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3896,7 +3896,7 @@ class JSON_PRETTY(SQLFunction):
         - For a NULL value, the function returns NULL. If the value is not a JSON
           document, or if it cannot be parsed as one, the function fails with an error.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3934,7 +3934,7 @@ class JSON_QUOTE(SQLFunction):
         - This function is typically used to produce a valid JSON string literal for
           inclusion within a JSON document.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -3984,7 +3984,7 @@ class JSON_REMOVE(SQLFunction):
         - It is not an error if the element to be removed does not exist in the
           document; in that case, the path does not affect the document.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4040,7 +4040,7 @@ class JSON_REPLACE(SQLFunction):
           can be performed for an update statement that uses the JSON_REPLACE() function and meets the
           conditions outlined in Partial Updates of JSON Values.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4118,7 +4118,7 @@ class JSON_SEARCH(SQLFunction):
           The default is \ if the escape_char argument is missing or NULL. Otherwise, escape_char must be
           a constant that is empty or one character.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4177,7 +4177,7 @@ class JSON_SET(SQLFunction):
         - The path-value pairs are evaluated left to right. The document produced by evaluating
           one pair becomes the new value against which the next pair is evaluated.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4208,7 +4208,7 @@ class JSON_TYPE(SQLFunction):
         - Returns a utf8mb4 string indicating the type of a JSON value.
           This can be an object, an array, or a scalar type.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4247,7 +4247,7 @@ class JSON_UNQUOTE(SQLFunction):
           the argument is NULL. An error occurs if the value starts and ends with double
           quotes but is not a valid JSON string literal.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4279,7 +4279,7 @@ class JSON_VALID(SQLFunction):
         - Returns 0 or 1 to indicate whether a value is valid JSON.
         - Returns NULL if the argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4314,7 +4314,7 @@ class LAST_DAY(SQLFunction):
           for the last day of the month.
         - Returns NULL if the argument is invalid or NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -4369,7 +4369,7 @@ class LEAST(SQLFunction):
           nonbinary strings.
         - In all other cases, the arguments are compared as binary strings.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4401,7 +4401,7 @@ class LEFT(SQLFunction):
         - Returns the leftmost len characters from the string str.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4435,7 +4435,7 @@ class LENGTH(SQLFunction):
           CHAR_LENGTH() returns 5.
         - Returns NULL if str is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4465,7 +4465,7 @@ class LineString(SQLFunction):
           line segments.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4497,7 +4497,7 @@ class LN(SQLFunction):
           a warning “Invalid argument for logarithm” is reported.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4541,7 +4541,7 @@ class LOAD_FILE(SQLFunction):
         - If the file does not exist or cannot be read because one of the preceding conditions
           is not satisfied, the function returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4574,7 +4574,7 @@ class LOCALTIME(SQLFunction):
         - If the fsp argument is given to specify a fractional seconds precision from
           0 to 6, the return value includes a fractional seconds part of that many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4613,7 +4613,7 @@ class LOCATE(SQLFunction):
           occurrence of substring substr in string str, starting at position pos.
         - Returns 0 if substr is not in str. Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4658,7 +4658,7 @@ class LOG(SQLFunction):
           to 1, then NULL is returned.
         - Returns NULL if X or B is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4697,7 +4697,7 @@ class LOG2(SQLFunction):
           is reported.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4733,7 +4733,7 @@ class LOG10(SQLFunction):
           is reported.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4767,7 +4767,7 @@ class LOWER(SQLFunction):
           according to the current character set mapping.
         - Returns NULL if str is NULL. The default character set is utf8mb4.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4797,7 +4797,7 @@ class LPAD(SQLFunction):
           len characters. If str is longer than len, the return value is shortened
           to len characters.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4829,7 +4829,7 @@ class LTRIM(SQLFunction):
         - Returns the string str with leading space characters removed.
         - Returns NULL if str is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4862,7 +4862,7 @@ class MAKE_SET(SQLFunction):
           corresponds to bit 0, str2 to bit 1, and so on.
         - NULL values in str1, str2, ... are not appended to the result.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4904,7 +4904,7 @@ class MAKEDATE(SQLFunction):
           be greater than 0 or the result is NULL.
         - The result is also NULL if either argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4938,7 +4938,7 @@ class MAKETIME(SQLFunction):
           arguments. Returns NULL if any of its arguments are NULL.
         - The second argument can have a fractional part.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -4972,7 +4972,7 @@ class MBRContains(SQLFunction):
           of g1 contains the minimum bounding rectangle of g2.
         - This tests the opposite relationship as MBRWithin().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5019,7 +5019,7 @@ class MBRCoveredBy(SQLFunction):
           is covered by the minimum bounding rectangle of g2.
         - This tests the opposite relationship as MBRCovers().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5055,7 +5055,7 @@ class MBRCovers(SQLFunction):
           covers the minimum bounding rectangle of g2.
         - This tests the opposite relationship as MBRCoveredBy().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5089,7 +5089,7 @@ class MBRDisjoint(SQLFunction):
         - Returns 1 or 0 to indicate whether the minimum bounding rectangles
           of the two geometries g1 and g2 are disjoint (do not intersect).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5132,7 +5132,7 @@ class MBREquals(SQLFunction):
         - Returns 1 or 0 to indicate whether the minimum bounding rectangles
           of the two geometries g1 and g2 are the same.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5166,7 +5166,7 @@ class MBRIntersects(SQLFunction):
         - Returns 1 or 0 to indicate whether the minimum bounding
           rectangles of the two geometries g1 and g2 intersect.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5211,7 +5211,7 @@ class MBROverlaps(SQLFunction):
         - This function returns 1 or 0 to indicate whether the minimum bounding
           rectangles of the two geometries g1 and g2 overlap.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5247,7 +5247,7 @@ class MBRTouches(SQLFunction):
         - This function returns 1 or 0 to indicate whether the minimum bounding
           rectangles of the two geometries g1 and g2 touch.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5279,7 +5279,7 @@ class MBRWithin(SQLFunction):
           is within the minimum bounding rectangle of g2. This tests the opposite
           relationship as MBRContains().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5321,7 +5321,7 @@ class MD5(SQLFunction):
         - The return value is a string in the connection character set. If
           FIPS mode is enabled, MD5() returns NULL
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5351,7 +5351,7 @@ class MICROSECOND(SQLFunction):
           a number in the range from 0 to 999999.
         - Returns NULL if expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -5386,7 +5386,7 @@ class MINUTE(SQLFunction):
           the range from 0 to 59.
         - Returns NULL if expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -5419,7 +5419,7 @@ class MOD(SQLFunction):
         - Modulo operation. Returns the remainder of N divided by M.
         - Returns NULL if M or N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5455,7 +5455,7 @@ class MONTH(SQLFunction):
           that have a zero month part.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -5492,7 +5492,7 @@ class MONTHNAME(SQLFunction):
           [link](https://dev.mysql.com/doc/refman/8.4/en/locale-support.html).
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -5523,7 +5523,7 @@ class MultiLineString(SQLFunction):
         MySQL description:
         - Constructs a MultiLineString value using LineString or WKB LineString arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5551,7 +5551,7 @@ class MultiPoint(SQLFunction):
         MySQL description:
         - Constructs a MultiPoint value using Point or WKB Point arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5577,7 +5577,7 @@ class MultiPolygon(SQLFunction):
         MySQL description:
         - Constructs a MultiPolygon value from a set of Polygon or WKB Polygon arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5616,7 +5616,7 @@ class NOT_IN(SQLFunction):
         - Returns 1 (true) if the proceeding expr is not equal to any
           of the values in the NOT IN() list, else returns 0 (false).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5651,7 +5651,7 @@ class NOW(SQLFunction):
         - If the fsp argument is given to specify a fractional seconds precision from
           0 to 6, the return value includes a fractional seconds part of that many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5686,7 +5686,7 @@ class NULLIF(SQLFunction):
         - Returns NULL if expr1 = expr2 is true, otherwise returns expr1.
         - This is the same as CASE WHEN expr1 = expr2 THEN NULL ELSE expr1 END.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5720,7 +5720,7 @@ class OCT(SQLFunction):
           is a longlong (BIGINT) number. This is equivalent to CONV(N,10,8).
         - Returns NULL if N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5760,7 +5760,7 @@ class ORD(SQLFunction):
           the same value as the ASCII() function. The function returns NULL if str
           is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5791,7 +5791,7 @@ class PERIOD_ADD(SQLFunction):
           Returns a value in the format YYYYMM.
         - This function returns NULL if P or N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5827,7 +5827,7 @@ class PERIOD_DIFF(SQLFunction):
           that the period arguments P1 and P2 are not date values.
         - This function returns NULL if P1 or P2 is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5867,7 +5867,7 @@ class PI(SQLFunction):
           its exact representation may vary between platforms or implementations.
           This also applies to any expressions making use of PI().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5895,7 +5895,7 @@ class Point(SQLFunction):
         - Constructs a Point value using the given X and Y coordinates.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5927,7 +5927,7 @@ class Polygon(SQLFunction):
           LinearRing (that is, not a closed and simple LineString), the
           return value is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -5963,7 +5963,7 @@ class POW(SQLFunction):
         - Returns the value of X raised to the power of Y.
         - Returns NULL if X or Y is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6005,7 +6005,7 @@ class PS_CURRENT_THREAD_ID(SQLFunction):
           same way as for PS_THREAD_ID(). For details, see the description of
           that function.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6047,7 +6047,7 @@ class PS_THREAD_ID(SQLFunction):
         - The thread ID return value is a value of the type given in the THREAD_ID column
           of Performance Schema tables.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6075,7 +6075,7 @@ class QUARTER(SQLFunction):
         - Returns the quarter of the year for date, in the range 1 to 4.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -6116,7 +6116,7 @@ class QUOTE(SQLFunction):
         - If the argument is NULL, the return value is the word “NULL” without enclosing
           single quotation marks.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6150,7 +6150,7 @@ class RADIANS(SQLFunction):
           (Note that π radians equals 180 degrees.)
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6200,7 +6200,7 @@ class RAND(SQLFunction):
           SQLFunction 'RANDINT', which is implemented by the following expression:
           FLOOR(i + RAND() * (j - i)).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6256,7 +6256,7 @@ class RANDOM_BYTES(SQLFunction):
         - If RANDOM_BYTES() is invoked from within the mysql client, binary strings display
           using hexadecimal notation, depending on the value of the --binary-as-hex.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6292,7 +6292,7 @@ class RANK(SQLFunction):
         - This function should be used with ORDER BY to sort partition rows
           into the desired order. Without ORDER BY, all rows are peers.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6345,7 +6345,7 @@ class REGEXP_INSTR(SQLFunction):
         - `match_type`: A string that specifies how to perform matching. The meaning is as
           described for REGEXP_LIKE().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6427,7 +6427,7 @@ class REGEXP_LIKE(SQLFunction):
         - If characters specifying contradictory options are specified within match_type,
           the rightmost one takes precedence.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6486,7 +6486,7 @@ class REGEXP_REPLACE(SQLFunction):
         - `match_type`: A string that specifies how to perform matching. The meaning is as
           described for REGEXP_LIKE().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6553,7 +6553,7 @@ class REGEXP_SUBSTR(SQLFunction):
         - `match_type`: A string that specifies how to perform matching. The meaning is
           as described for REGEXP_LIKE().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6605,7 +6605,7 @@ class RELEASE_ALL_LOCKS(SQLFunction):
         - This function is unsafe for statement-based replication. A warning is
           logged if you use this function when binlog_format is set to STATEMENT.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6638,7 +6638,7 @@ class RELEASE_LOCK(SQLFunction):
           did not exist. The lock does not exist if it was never obtained by a call to
           GET_LOCK() or if it has previously been released.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6667,7 +6667,7 @@ class REPEAT(SQLFunction):
           If count is less than 1, returns an empty string.
         - Returns NULL if str or count is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6705,7 +6705,7 @@ class REPLACE(SQLFunction):
         - This function is multibyte safe. It returns NULL if any of
           its arguments are NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6733,7 +6733,7 @@ class REVERSE(SQLFunction):
         - Returns the string str with the order of the characters reversed.
         - Returns NULL if str is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6761,7 +6761,7 @@ class RIGHT(SQLFunction):
         - Returns the rightmost len characters from the string str.
         - Returns NULL if any argument is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6793,7 +6793,7 @@ class ROLES_GRAPHML(SQLFunction):
           SUPER privilege) is required to see content in the <graphml> element.
         - Otherwise, the result shows only an empty element
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6829,7 +6829,7 @@ class ROUND(SQLFunction):
           are truncated.
         - If X or D is NULL, the function returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6878,7 +6878,7 @@ class ROW_COUNT(SQLFunction):
           written to the file.
         - SIGNAL statements: 0.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6915,7 +6915,7 @@ class ROW_NUMBER(SQLFunction):
           the same value, use RANK() or DENSE_RANK(). For an example, see
           the RANK() function description.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6946,7 +6946,7 @@ class RPAD(SQLFunction):
           characters.
         - If str, padstr, or len is NULL, the function returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -6978,7 +6978,7 @@ class RTRIM(SQLFunction):
         - Returns the string str with trailing space characters removed.
         - Returns NULL if str is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7013,7 +7013,7 @@ class SEC_TO_TIME(SQLFunction):
           outside that range.
         - The function returns NULL if seconds is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7045,7 +7045,7 @@ class SECOND(SQLFunction):
         - Returns the second for time, in the range 0 to 59.
         - Returns NULL if time is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -7081,7 +7081,7 @@ class SHA1(SQLFunction):
         - Calculates an SHA-1 160-bit checksum for the string, as described in RFC 3174.
         - Returns NULL if the argument was NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7121,7 +7121,7 @@ class SHA2(SQLFunction):
           value containing the desired number of bits. See the notes at the beginning
           of this section about storing hash values efficiently.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7160,7 +7160,7 @@ class SIGN(SQLFunction):
           on whether X is negative, zero, or positive.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7196,7 +7196,7 @@ class SIN(SQLFunction):
         - Returns the sine of X, where X is given in radians.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7244,7 +7244,7 @@ class SLEEP(SQLFunction):
         - When SLEEP() is only part of a query that is interrupted, the query
           returns an error.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7283,7 +7283,7 @@ class SOUNDEX(SQLFunction):
         - All international alphabetic characters outside the A-Z range are treated
           as vowels.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7315,7 +7315,7 @@ class SPACE(SQLFunction):
         - Returns a string consisting of N space characters.
         - Returns NULL if N is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7343,7 +7343,7 @@ class SQRT(SQLFunction):
         - Returns the square root of a nonnegative number X.
         - If X is NULL, the function returns NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7423,7 +7423,7 @@ class ST_Area(SQLFunction):
         - Ranges shown are in degrees. The exact range limits deviate
           slightly due to floating-point arithmetic.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7465,7 +7465,7 @@ class ST_AsBinary(SQLFunction):
           that applies to the geometry argument. An optional options argument
           may be given to override the default axis order.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7508,7 +7508,7 @@ class ST_AsWKB(SQLFunction):
           that applies to the geometry argument. An optional options argument
           may be given to override the default axis order.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7564,7 +7564,7 @@ class ST_AsGeoJSON(SQLFunction):
           permitted flag values. If the geometry argument has an SRID of 0, no
           CRS object is produced even for those flag values that request one.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7611,7 +7611,7 @@ class ST_AsText(SQLFunction):
           geometry argument. An optional options argument may be given to override
           the default axis order.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7656,7 +7656,7 @@ class ST_AsWKT(SQLFunction):
           geometry argument. An optional options argument may be given to override
           the default axis order.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7702,7 +7702,7 @@ class ST_Buffer(SQLFunction):
           value g is less than or equal to a distance of d. The result is in the same SRS
           as the geometry argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7755,7 +7755,7 @@ class ST_Buffer_Strategy(SQLFunction):
           the points_per_circle argument must be given as a positive numeric value. The maximum
           points_per_circle value is the value of the max_points_in_geometry system variable.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7806,7 +7806,7 @@ class ST_Centroid(SQLFunction):
           has an SRID value for a geographic spatial reference system (SRS), an
           ER_NOT_IMPLEMENTED_FOR_GEOGRAPHIC_SRS error occurs.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7842,7 +7842,7 @@ class ST_Contains(SQLFunction):
         - ST_Contains() handles its arguments as described in the
           introduction to this section.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7893,7 +7893,7 @@ class ST_ConvexHull(SQLFunction):
           vertex points of all components of the collection, creating
           a MultiPoint value from them, and computing its convex hull.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7939,7 +7939,7 @@ class ST_Crosses(SQLFunction):
         - This function returns 1 or 0 to indicate whether g1 spatially
           crosses g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -7977,7 +7977,7 @@ class ST_Difference(SQLFunction):
           SRS, and handles its arguments as described in the introduction to this
           section.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8009,7 +8009,7 @@ class ST_Dimension(SQLFunction):
           dimension can be -1, 0, 1, or 2.
         - The meaning of these values, refer to [link](https://dev.mysql.com/doc/refman/8.4/en/gis-class-geometry.html).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8039,7 +8039,7 @@ class ST_Disjoint(SQLFunction):
         - Returns 1 or 0 to indicate whether g1 is spatially disjoint
           from (does not intersect) g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8075,7 +8075,7 @@ class ST_Distance(SQLFunction):
         - This function processes geometry collections by returning the shortest distance
           among all combinations of the components of the two geometry arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8138,7 +8138,7 @@ class ST_Distance_Sphere(SQLFunction):
           radius, defined as (2a+b)/3, where a is the semi-major axis and b is
           the semi-minor axis of the SRS.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8169,7 +8169,7 @@ class ST_EndPoint(SQLFunction):
         MySQL description:
         - Returns the Point that is the endpoint of the LineString value ls.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8207,7 +8207,7 @@ class ST_Envelope(SQLFunction):
           ST_Envelope() returns the point or the line segment as its MBR rather
           than returning an invalid polygon.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8243,7 +8243,7 @@ class ST_Equals(SQLFunction):
         - ST_Equals() handles its arguments as described in the introduction to this
           section, except that it does not return NULL for empty geometry arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8275,7 +8275,7 @@ class ST_ExteriorRing(SQLFunction):
         MySQL description:
         - Returns the exterior ring of the Polygon value poly as a LineString.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8321,7 +8321,7 @@ class ST_FrechetDistance(SQLFunction):
           the geometries are considered. Points on the line segments between these
           points are not considered.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8378,7 +8378,7 @@ class ST_GeoHash(SQLFunction):
           until it has created a string that is either an exact representation of
           the location or max_length characters, whichever comes first.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8416,7 +8416,7 @@ class ST_GeomCollFromText(SQLFunction):
         MySQL description:
         - Constructs a GeometryCollection value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8458,7 +8458,7 @@ class ST_GeomCollFromWKB(SQLFunction):
         MySQL description:
         - Constructs a GeometryCollection value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8493,7 +8493,7 @@ class ST_GeometryN(SQLFunction):
         - Returns the N-th geometry in the GeometryCollection value gc.
           Geometries are numbered beginning with 1.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8525,7 +8525,7 @@ class ST_GeometryType(SQLFunction):
           of which the geometry instance g is a member. The name corresponds
           to one of the instantiable Geometry subclasses.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8576,7 +8576,7 @@ class ST_GeomFromGeoJSON(SQLFunction):
         - The srid argument, if given, must be a 32-bit unsigned integer. If not given,
           the geometry return value has an SRID of 4326.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8618,7 +8618,7 @@ class ST_GeomFromText(SQLFunction):
         MySQL description:
         - Constructs a geometry value of any type using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8663,7 +8663,7 @@ class ST_GeomFromWKB(SQLFunction):
         MySQL description:
         - Constructs a geometry value of any type using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8718,7 +8718,7 @@ class ST_HausdorffDistance(SQLFunction):
           geometries are considered. Points on the line segments between these points
           are not considered.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8759,7 +8759,7 @@ class ST_InteriorRingN(SQLFunction):
         - Returns the N-th interior ring for the Polygon value poly as
           a LineString. Rings are numbered beginning with 1.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8791,7 +8791,7 @@ class ST_Intersection(SQLFunction):
           of the geometry values g1 and g2. The result is in the same
           SRS as the geometry arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8819,7 +8819,7 @@ class ST_Intersects(SQLFunction):
         MySQL description:
         - Returns 1 or 0 to indicate whether g1 spatially intersects g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8861,7 +8861,7 @@ class ST_IsClosed(SQLFunction):
           the same for each LineString in ls).
         - ST_IsClosed() returns 0 if ls is not closed, and NULL if ls is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8901,7 +8901,7 @@ class ST_IsEmpty(SQLFunction):
           an empty geometry collection value. MySQL does not support
           GIS EMPTY values such as POINT EMPTY.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -8957,7 +8957,7 @@ class ST_IsSimple(SQLFunction):
         - Ranges shown are in degrees. The exact range limits deviate slightly
           due to floating-point arithmetic.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9001,7 +9001,7 @@ class ST_IsValid(SQLFunction):
           an ER_GEOMETRY_PARAM_LONGITUDE_OUT_OF_RANGE error occurs; if a latitude value
           is not in the range (-90, 90), an ER_GEOMETRY_PARAM_LATITUDE_OUT_OF_RANGE error occurs.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9043,7 +9043,7 @@ class ST_LatFromGeoHash(SQLFunction):
           in the internal representation of coordinate values. Characters past the 433rd
           are ignored, even if they are otherwise illegal and produce an error.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9079,7 +9079,7 @@ class ST_Latitude(SQLFunction):
           value, ST_Latitude() returns a Point object like the first argument
           with its latitude equal to the second argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9120,7 +9120,7 @@ class ST_Length(SQLFunction):
           The length of a MultiLineString value is equal to the sum of the lengths
           of its elements.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9164,7 +9164,7 @@ class ST_LineFromText(SQLFunction):
         MySQL description:
         - Constructs a LineString value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9206,7 +9206,7 @@ class ST_LineFromWKB(SQLFunction):
         MySQL description:
         - Constructs a LineString value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9257,7 +9257,7 @@ class ST_LineInterpolatePoint(SQLFunction):
           exactly the last point of the LineString argument but a point close
           to it due to numerical inaccuracies in approximate-value computations.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9307,7 +9307,7 @@ class ST_LineInterpolatePoints(SQLFunction):
           but a point close to it due to numerical inaccuracies in approximate-value
           computations.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9341,7 +9341,7 @@ class ST_LongFromGeoHash(SQLFunction):
         - Returns the longitude from a geohash string value, as
           a double-precision number in the range [-180, 180].
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9377,7 +9377,7 @@ class ST_Longitude(SQLFunction):
           value, ST_Longitude() returns a Point object like the first argument
           with its longitude equal to the second argument.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9418,7 +9418,7 @@ class ST_MakeEnvelope(SQLFunction):
         - Calculations are done using the Cartesian coordinate system
           rather than on a sphere, spheroid, or on earth.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9451,7 +9451,7 @@ class ST_MLineFromText(SQLFunction):
         MySQL description:
         - Constructs a MultiLineString value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9493,7 +9493,7 @@ class ST_MLineFromWKB(SQLFunction):
         MySQL description:
         - Constructs a MultiLineString value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9535,7 +9535,7 @@ class ST_MPointFromText(SQLFunction):
         MySQL description:
         - Constructs a MultiPoint value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9577,7 +9577,7 @@ class ST_MPointFromWKB(SQLFunction):
         MySQL description:
         - Constructs a MultiPoint value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9619,7 +9619,7 @@ class ST_MPolyFromText(SQLFunction):
         MySQL description:
         - Constructs a MultiPolygon value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9660,7 +9660,7 @@ class ST_MPolyFromWKB(SQLFunction):
         MySQL description:
         - Constructs a MultiPolygon value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9697,7 +9697,7 @@ class ST_NumGeometries(SQLFunction):
         MySQL description:
         - Returns the number of geometries in the GeometryCollection value gc.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9725,7 +9725,7 @@ class ST_NumInteriorRing(SQLFunction):
         MySQL description:
         - Returns the number of interior rings in the Polygon value poly.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9753,7 +9753,7 @@ class ST_NumPoints(SQLFunction):
         MySQL description:
         - Returns the number of Point objects in the LineString value ls.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9789,7 +9789,7 @@ class ST_Overlaps(SQLFunction):
         - This function returns 1 or 0 to indicate whether g1 spatially
           overlaps g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9831,7 +9831,7 @@ class ST_PointAtDistance(SQLFunction):
         - The function is implemented for LineString geometries in all spatial
           reference systems, both Cartesian and geographic.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9869,7 +9869,7 @@ class ST_PointFromGeoHash(SQLFunction):
           respectively.
         - The srid argument is an 32-bit unsigned integer.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9900,7 +9900,7 @@ class ST_PointFromText(SQLFunction):
         MySQL description:
         - Constructs a Point value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9942,7 +9942,7 @@ class ST_PointFromWKB(SQLFunction):
         MySQL description:
         - Constructs a Point value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -9981,7 +9981,7 @@ class ST_PointN(SQLFunction):
         - Returns the N-th Point in the Linestring value ls.
           Points are numbered beginning with 1.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10014,7 +10014,7 @@ class ST_PolyFromText(SQLFunction):
         MySQL description:
         - Constructs a Polygon value using its WKT representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10056,7 +10056,7 @@ class ST_PolyFromWKB(SQLFunction):
         MySQL description:
         - Constructs a Polygon value using its WKB representation and SRID.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10115,7 +10115,7 @@ class ST_Simplify(SQLFunction):
           the simplification process, and the process might create self-intersections.
           To check the validity of the result, pass it to ST_IsValid().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10167,7 +10167,7 @@ class ST_SRID(SQLFunction):
         - For the single-argument syntax, ST_SRID() returns the geometry SRID even
           if it refers to an undefined SRS. An ER_SRS_NOT_FOUND error does not occur.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10202,7 +10202,7 @@ class ST_StartPoint(SQLFunction):
         MySQL description:
         - Returns the Point that is the start point of the LineString value ls.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10234,7 +10234,7 @@ class ST_SwapXY(SQLFunction):
           X and Y values of each coordinate pair within the geometry,
           and returns the result.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10264,7 +10264,7 @@ class ST_SymDifference(SQLFunction):
         - Returns a geometry that represents the point set symmetric difference
           of the geometry values g1 and g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10298,7 +10298,7 @@ class ST_Touches(SQLFunction):
           boundary or the interior of the other.
         - This function returns 1 or 0 to indicate whether g1 spatially touches g2.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10330,7 +10330,7 @@ class ST_Transform(SQLFunction):
           The return value is a geometry of the same type as the input geometry
           with all coordinates transformed to the target SRID, target_srid.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10360,7 +10360,7 @@ class ST_Union(SQLFunction):
         - Returns a geometry that represents the point set union of the geometry
           values g1 and g2. The result is in the same SRS as the geometry arguments.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10420,7 +10420,7 @@ class ST_Validate(SQLFunction):
           collection value. ST_Validate() returns it directly without further checks in
           this case.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10454,7 +10454,7 @@ class ST_Within(SQLFunction):
         - Returns 1 or 0 to indicate whether g1 is spatially within g2.
           This tests the opposite relationship as ST_Contains().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10505,7 +10505,7 @@ class ST_X(SQLFunction):
           Point object has a geographic SRS, the second argument must be in the proper
           range for longitude or latitude values.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10554,7 +10554,7 @@ class ST_Y(SQLFunction):
           Point object has a geographic SRS, the second argument must be in the proper
           range for longitude or latitude values.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10609,7 +10609,7 @@ class STR_TO_DATE(SQLFunction):
           Literal characters in format must match literally in str. Format specifiers
           in format must match a date or time part in str.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10643,7 +10643,7 @@ class STRCMP(SQLFunction):
           than the second according to the current sort order, and NULL if either
           argument is NULL. It returns 1 otherwise.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10683,7 +10683,7 @@ class SUBDATE(SQLFunction):
         - When invoked with the days form of the second argument, MySQL
           treats it as an integer number of days to be subtracted from expr.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -10732,7 +10732,7 @@ class SUBSTRING(SQLFunction):
           beginning. A negative value may be used for pos in any of the forms of this
           function. A value of 0 for pos returns an empty string.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10773,7 +10773,7 @@ class SUBSTRING_INDEX(SQLFunction):
           right of the final delimiter (counting from the right) is returned.
         - SUBSTRING_INDEX() performs a case-sensitive match when searching for delim.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10805,7 +10805,7 @@ class SUBTIME(SQLFunction):
         - Returns expr1 - expr2 expressed as a value in the same format as expr1.
         - expr1 is a time or datetime expression, and expr2 is a time expression.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -10860,7 +10860,7 @@ class SYSDATE(SQLFunction):
           function or trigger, NOW() returns the time at which the function
           or triggering statement began to execute.)
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10896,7 +10896,7 @@ class TAN(SQLFunction):
         - Returns the tangent of X, where X is given in radians.
         - Returns NULL if X is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -10927,7 +10927,7 @@ class TIME(SQLFunction):
         - This function is unsafe for statement-based replication. A warning
           is logged if you use this function when binlog_format is set to STATEMENT.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -10972,7 +10972,7 @@ class TIME_FORMAT(SQLFunction):
           range of 0..23. The other hour format specifiers produce the hour value
           modulo 12.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11005,7 +11005,7 @@ class TIME_TO_SEC(SQLFunction):
         - Returns the time argument, converted to seconds.
         - Returns NULL if time is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11048,7 +11048,7 @@ class TIMEDIFF(SQLFunction):
           for TIME values. Alternatively, you can use either of the functions
           TIMESTAMPDIFF() and UNIX_TIMESTAMP(), both of which return integers.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11089,7 +11089,7 @@ class TIMESTAMP(SQLFunction):
           value.
         - Returns NULL if expr, expr1, or expr2 is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11135,7 +11135,7 @@ class TIMESTAMPADD(SQLFunction):
           prefix of SQL_TSI_. For example, DAY and SQL_TSI_DAY both are legal.
         - This function returns NULL if interval or datetime_expr is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -11179,7 +11179,7 @@ class TIMESTAMPDIFF(SQLFunction):
           TIMESTAMPADD() function.
         - This function returns NULL if datetime_expr1 or datetime_expr2 is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc, sqlintvl
@@ -11227,7 +11227,7 @@ class TO_DAYS(SQLFunction):
           (and possibly a later year in other locales), results from this function
           are not reliable.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11271,7 +11271,7 @@ class TO_SECONDS(SQLFunction):
           were lost when the calendar was changed. For dates before 1582 (and possibly a
           later year in other locales), results from this function are not reliable.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11316,7 +11316,7 @@ class TRIM(SQLFunction):
           optional and, if not specified, spaces are removed.
         - This function is multibyte safe. It returns NULL if any of its arguments are NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11381,7 +11381,7 @@ class TRUNCATE(SQLFunction):
           TRUNCATE() follows the same rules that determine the return type
           of the ROUND() function; for details, see the description for ROUND().
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11427,7 +11427,7 @@ class UNCOMPRESS(SQLFunction):
           a compression library such as zlib.
         - Return value is always NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11458,7 +11458,7 @@ class UNCOMPRESSED_LENGTH(SQLFunction):
         - Returns the length that the compressed string had before being compressed.
         - Returns NULL if compressed_string is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11489,7 +11489,7 @@ class UNHEX(SQLFunction):
           converts it to the byte represented by the number.
         - The return value is a binary string.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11547,7 +11547,7 @@ class UNIX_TIMESTAMP(SQLFunction):
           not include a fractional seconds part, or DECIMAL if an argument is given
           that includes a fractional seconds part.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -11589,7 +11589,7 @@ class UPPER(SQLFunction):
           according to the current character set mapping.
         - Returns NULL if str is NULL. The default character set is utf8mb4.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11617,7 +11617,7 @@ class USER(SQLFunction):
         - Returns the current MySQL user name and host name as a string
           in the utf8mb3 character set.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11644,7 +11644,7 @@ class UTC_DATE(SQLFunction):
         - Returns the current UTC date as a value in 'YYYY-MM-DD' or YYYYMMDD format,
           depending on whether the function is used in string or numeric context.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11678,7 +11678,7 @@ class UTC_TIME(SQLFunction):
           from 0 to 6, the return value includes a fractional seconds part of
           that many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11721,7 +11721,7 @@ class UTC_TIMESTAMP(SQLFunction):
           from 0 to 6, the return value includes a fractional seconds part of
           that many digits.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11762,7 +11762,7 @@ class UUID(SQLFunction):
           Two calls to UUID() are expected to generate two different values, even if
           these calls are performed on two separate devices not connected to each other.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11806,7 +11806,7 @@ class UUID_SHORT(SQLFunction):
           restarts; you invoke UUID_SHORT() on average fewer than 16 million times
           per second between mysqld restarts.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11852,7 +11852,7 @@ class UUID_TO_BIN(SQLFunction):
           varying part to the right and can improve indexing efficiency if the result
           is stored in an indexed column.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11894,7 +11894,7 @@ class VALIDATE_PASSWORD_STRENGTH(SQLFunction):
         - Returns NULL if the argument is NULL. The return value ranges from
           0 (weak) to 100 (strong).
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11923,7 +11923,7 @@ class VERSION(SQLFunction):
           uses the utf8mb3 character set. The value might have a suffix in
           addition to the version number.
 
-        ### Example:
+        ## Example:
         ```python
         from sqlcycli import sqlfunc
 
@@ -11981,7 +11981,7 @@ class WEEK(SQLFunction):
         7	 Monday	        1-53  with a Monday in this year
         ```
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -12017,7 +12017,7 @@ class WEEKDAY(SQLFunction):
         - Returns the weekday index for date (0 = Monday, 1 = Tuesday, … 6 = Sunday).
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -12050,7 +12050,7 @@ class WEEKOFYEAR(SQLFunction):
         - Returns the calendar week of the date as a number in the range from 1 to 53.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -12084,7 +12084,7 @@ class YEAR(SQLFunction):
         - Returns the year for date, in the range 1000 to 9999, or 0 for the “zero” date.
         - Returns NULL if date is NULL.
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc
@@ -12145,7 +12145,7 @@ class YEARWEEK(SQLFunction):
         7	 Monday	        1-53  with a Monday in this year
         ```
 
-        ### Example:
+        ## Example:
         ```python
         import datetime
         from sqlcycli import sqlfunc

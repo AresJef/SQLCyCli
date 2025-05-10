@@ -152,7 +152,7 @@ class OptionFile:
     def ssl(self) -> SSL:
         """The 'SSL' from the MySQL option `<'SSL'>`.
 
-        ### Notice
+        ## Notice
         If Python `ssl` module is not available, returns `None`.
         """
         return self._ssl

@@ -161,7 +161,7 @@ class MysqlResult:
     async def init_unbuffered_query(self) -> None:
         """Initiate unbuffered query mode.
 
-        #### Used in unbuffered mode."""
+        ### Used in unbuffered mode."""
         self._unbuffered_active = True
         try:
             pkt: MysqlPacket = await self._conn._read_packet()
@@ -344,7 +344,7 @@ class MysqlResult:
         """(internal) Read and decode one row of data
         from unbuffered query `<'tuple/None'>`
 
-        #### Used in unbuffered mode."""
+        ### Used in unbuffered mode."""
         # Check if in an active query
         if not self._unbuffered_active:
             return None
@@ -365,7 +365,7 @@ class MysqlResult:
     async def _drain_result_packet_unbuffered(self) -> None:
         """(internal) Drain all the remaining unbuffered data `<'bool'>`.
 
-        #### Used in unbuffered mode."""
+        ### Used in unbuffered mode."""
         # After much reading on the protocol, it appears that there is,
         # in fact, no way to stop from sending all the data after
         # executing a query, so we just spin, and wait for an EOF packet.
@@ -506,7 +506,7 @@ class Cursor:
     def lastrowid(self) -> int:
         """The LAST INSERT ID of the query result `<'int'>`.
 
-        #### Compliance with PEP-0249, alias for 'insert_id'.
+        ### Compliance with PEP-0249, alias for 'insert_id'.
         """
         return self._insert_id
 
@@ -518,7 +518,7 @@ class Cursor:
 
         For UNBUFFERED cursor, the value is either 0 or 18446744073709551615.
 
-        #### Compliance with PEP-0249, alias for 'affected_rows'.
+        ### Compliance with PEP-0249, alias for 'affected_rows'.
         """
         return self._affected_rows
 
@@ -527,7 +527,7 @@ class Cursor:
         """The 0-based row number (index) of the
         cursor for the query result `<'int'>`.
 
-        #### Compliance with PEP-0249.
+        ### Compliance with PEP-0249.
         """
         return self._row_idx
 
@@ -547,7 +547,7 @@ class Cursor:
         or if the cursor has not had an operation invoked via
         the 'cur.execute*()' method yet.
 
-        #### Compliance with PEP-0249.
+        ### Compliance with PEP-0249.
         """
         if self._fields is None:
             return None
@@ -559,7 +559,7 @@ class Cursor:
         """The default number of rows to fetch at a time
         with 'cur.fetchmany()'. Defaults to `1` `<'int'>`.
 
-        #### Compliance with PEP-0249.
+        ### Compliance with PEP-0249.
         """
         return self._arraysize
 
@@ -617,7 +617,7 @@ class Cursor:
               behaves the SAME as the 'executemany()' method. For more information
               and related examples, see 'cur.executemany()'.
 
-        ### Example (sequence & mapping [flat] | itemize=True):
+        ## Example (sequence & mapping [flat] | itemize=True):
         >>> await cur.execute(
                 "INSERT INTO table (name, age, height) VALUES (%s, %s, %s)",
                 ["John", 25, 170]  # defalut: itemize=True & many=False,
@@ -627,7 +627,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age, height) VALUES ('John', 25, 170);"
 
-        ### Example (sequence & mapping [nested] | itemize=True):
+        ## Example (sequence & mapping [nested] | itemize=True):
         >>> await cur.execute(
                 "SELECT * FROM table WHERE name=%s AND age IN %s",
                 ["John", (25, 26)]  # defalut: itemize=True & many=False,
@@ -637,7 +637,7 @@ class Cursor:
             # executed as:
             "SELECT * FROM table WHERE name='John' AND age IN (25,26);"
 
-        ### Example (sequence & mapping [flat] | itemize=False):
+        ## Example (sequence & mapping [flat] | itemize=False):
         >>> await cur.execute(
                 "INSERT INTO table (name, age, height) VALUES %s",
                 ["John", 25, 170], itemize=False  # defalut: many=False
@@ -647,7 +647,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age, height) VALUES ('John',25,170);"
 
-        ### Example (sequence & mapping [nested] | itemize=False):
+        ## Example (sequence & mapping [nested] | itemize=False):
         >>> await cur.execute(
                 "INSERT INTO table (name, age, height) VALUES %s",
                 [["John", 25, 170], ["Doe", 26, 180]], itemize=False  # defalut: many=False
@@ -657,7 +657,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age, height) VALUES ('John',25,170),('Doe',26,180);"
 
-        ### Example (single object):
+        ## Example (single object):
         >>> await cur.execute("INSERT INTO table (name) VALUES (%s)", "John")
             # escaped as:
             "'John'"
@@ -755,7 +755,7 @@ class Cursor:
             - Library [cytimes](https://github.com/AresJef/cyTimes):
               pydt, pddt.
 
-        ### Escape of 'args'
+        ## Escape of 'args'
         * 1. Sequence and Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes
           to `<'list[str/tuple[str]]'>`. Each element represents one row of the
           'args', and the 'sql' should have '%s' placeholders equal to the item
@@ -768,7 +768,7 @@ class Cursor:
           literal string `<'str'>`. This function behaves the SAME as the
           'execute()' method, and the 'sql' should have one '%s' placeholder.
 
-        ### Example (sequence & mapping [flat]):
+        ## Example (sequence & mapping [flat]):
         >>> await cur.executemany(
                 "INSERT INTO table (name) VALUES (%s)",
                 ["John", "Doe"],
@@ -778,7 +778,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name) VALUES ('John'),('Doe');"
 
-        ### Example (sequence & mapping [nested]):
+        ## Example (sequence & mapping [nested]):
         >>> await cur.executemany(
                 "INSERT INTO table (name, age) VALUES (%s, %s)",
                 [["John", 25], ["Doe", 26]],
@@ -788,7 +788,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age) VALUES ('John', 25),('Doe', 26);"
 
-        ### Example (pd.Series):
+        ## Example (pd.Series):
         >>> await cur.executemany(
                 "INSERT INTO table (age) VALUES (%s)",
                 pd.Series([25, 26]),
@@ -798,7 +798,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (age) VALUES (25),(26);"
 
-        ### Example (1D ndarray):
+        ## Example (1D ndarray):
         >>> await cur.executemany(
                 "INSERT INTO table (age) VALUES (%s)",
                 np.array([25, 26]),
@@ -808,7 +808,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (age) VALUES (25),(26);"
 
-        ### Example (pd.DataFrame):
+        ## Example (pd.DataFrame):
         >>> await cur.executemany(
                 "INSERT INTO table (name, age) VALUES (%s, %s)",
                 pd.DataFrame({"name": ["John", "Doe"], "age": [25, 26]}),
@@ -818,7 +818,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age) VALUES ('John', 25),('Doe', 26);"
 
-        ### Example (2D ndarray):
+        ## Example (2D ndarray):
         >>> await cur.executemany(
                 "INSERT INTO table (age, height) VALUES (%s, %s)",
                 np.array([[25, 170], [26, 180]]),
@@ -905,7 +905,7 @@ class Cursor:
         :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
         :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
 
-        ### Explanation
+        ## Explanation
         - When 'many=False' & 'itemize=True' (default), this method behaves
           similar to 'PyMySQL.Cursor.mogrify()'.
         - For multi-row 'args', ONLY the 'first' row [item] will be bound
@@ -985,7 +985,7 @@ class Cursor:
 
         :returns `<'tuple/None'>`: If no more rows, returns `None`.
 
-        #### Used by Cursor & SSCursor.
+        ### Used by Cursor & SSCursor.
         """
         self._verify_executed()
         # Buffered
@@ -1010,7 +1010,7 @@ class Cursor:
 
         :returns `<'dict/None'>`: If no more rows, returns `None`.
 
-        #### Used by DictCursor & SSDictCursor.
+        ### Used by DictCursor & SSDictCursor.
         """
         # Fetch & validate
         row: tuple = await self._fetchone_tuple()
@@ -1027,7 +1027,7 @@ class Cursor:
 
         :returns `<'DataFrame/None'>`: If no more rows, returns `None`.
 
-        #### Used by DfCursor & SSDfCursor.
+        ### Used by DfCursor & SSDfCursor.
         """
         # Fetch & validate
         row = await self._fetchone_tuple()
@@ -1058,7 +1058,7 @@ class Cursor:
 
         :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
 
-        #### Used by Cursor & SSCursor.
+        ### Used by Cursor & SSCursor.
         """
         self._verify_executed()
         if size == 0:
@@ -1095,7 +1095,7 @@ class Cursor:
 
         :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
 
-        #### Used by DictCursor & SSDictCursor.
+        ### Used by DictCursor & SSDictCursor.
         """
         # Fetch & validate
         rows: tuple = await self._fetchmany_tuple(size)
@@ -1118,7 +1118,7 @@ class Cursor:
 
         :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
 
-        #### Used by DfCursor & SSDfCursor.
+        ### Used by DfCursor & SSDfCursor.
         """
         # Fetch & validate
         rows = await self._fetchmany_tuple(size)
@@ -1145,7 +1145,7 @@ class Cursor:
 
         :returns `<'tuple[tuple]'>`: If no more rows, returns an empty `tuple`.
 
-        #### Used by Cursor & SSCursor.
+        ### Used by Cursor & SSCursor.
         """
         self._verify_executed()
         # Buffered
@@ -1181,7 +1181,7 @@ class Cursor:
 
         :returns `<'tuple[dict]'>`: If no more rows, returns an empty `tuple`.
 
-        #### Used by DictCursor & SSDictCursor.
+        ### Used by DictCursor & SSDictCursor.
         """
         # Fetch & validate
         rows: tuple = await self._fetchall_tuple()
@@ -1201,7 +1201,7 @@ class Cursor:
 
         :returns `<'DataFrame'>`: If no more rows, returns an empty `DataFrame`.
 
-        #### Used by DfCursor & SSDfCursor.
+        ### Used by DfCursor & SSDfCursor.
         """
         # Fetch & validate
         rows = await self._fetchall_tuple()
@@ -1676,7 +1676,7 @@ class CursorManager:
     async def _close(self) -> None:
         """(internal) Close the cursor and cleanup the context manager.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
         """
         if not self._closed:
             if self._cur is not None:
@@ -1788,7 +1788,7 @@ class BaseConnection:
     argument validations during initialization. Such validations are
     delegated to the subclass `<'aio.Connection'>`.
 
-    #### Please do `NOT` create an instance of this class directly.
+    ### Please do `NOT` create an instance of this class directly.
     """
 
     # Basic
@@ -1902,7 +1902,7 @@ class BaseConnection:
         argument validations during initialization. Such validations are
         delegated to the subclass `<'aio.Connection'>`.
 
-        #### Please do `NOT` create an instance of this class directly.
+        ### Please do `NOT` create an instance of this class directly.
 
         :param host `<'str'>`: The host of the server.
         :param port `<'int'>`: The port of the server.
@@ -2287,11 +2287,11 @@ class BaseConnection:
         :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
             Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
 
-        ### Example (context manager):
+        ## Example (context manager):
         >>> async with conn.cursor() as cur:
                 await cur.execute("SELECT * FROM table")
 
-        ### Example (direct - NOT recommended):
+        ## Example (direct - NOT recommended):
         >>> cur = await conn.cursor()
             await cur.execute("SELECT * FROM table")
             await cur.close()  # close manually
@@ -2317,7 +2317,7 @@ class BaseConnection:
         :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
             Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
 
-        ### Example:
+        ## Example:
         >>> async with conn.transaction() as cur:
                 await cur.execute("INSERT INTO table VALUES (1, 'name')")
                 # COMMIT automatically if no error
@@ -2978,7 +2978,7 @@ class BaseConnection:
     async def _connect(self) -> None:
         """(internal) Establish connection with server.
 
-        #### This method will establish connection REGARDLESS of the connection state.
+        ### This method will establish connection REGARDLESS of the connection state.
         """
         # Connect
         try:
@@ -3122,7 +3122,7 @@ class BaseConnection:
         socket. The connection will be unusable after
         this method is called.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
         """
         # Close connection
         if not self.closed():
@@ -3141,7 +3141,7 @@ class BaseConnection:
         sending a QUIT command. The connection will be
         unusable after this method is called.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
         """
         if not self.closed():
             try:
@@ -3159,7 +3159,7 @@ class BaseConnection:
         setting the closed reason. The connection will be
         unusable after this method is called.
 
-        #### This method does not raise any error.
+        ### This method does not raise any error.
         """
         self._close_reason = "Connection closed: %s" % reason
         self.force_close()
@@ -3870,8 +3870,7 @@ class Connection(BaseConnection):
         decode_json: bool = False,
         loop: AbstractEventLoop | None = None,
     ):
-        """
-        ### The `async` socket connection to the server.
+        """The `async` socket connection to the server.
 
         :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
         :param port `<'int'>`: The port of the server. Defaults to `3306`.

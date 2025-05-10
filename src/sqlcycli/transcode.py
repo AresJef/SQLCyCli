@@ -261,7 +261,7 @@ class JSON(_CustomType):
 def _escape_bool(data: object) -> str:
     """(cfunc) Escape boolean 'data' to literal `<'str'>.
 
-    ### Example:
+    ## Example:
     >>> _escape_bool(True)
     >>> "1"  # str
     """
@@ -273,7 +273,7 @@ def _escape_bool(data: object) -> str:
 def _escape_int(data: object) -> str:
     """(cfunc) Escape integer 'data' to literal `<'str'>.
 
-    ### Example:
+    ## Example:
     >>> _escape_int(123)
     >>> "123"  # str
     """
@@ -285,7 +285,7 @@ def _escape_int(data: object) -> str:
 def _escape_float(data: object) -> str:
     """(cfunc) Escape float 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_float(123.456)
     >>> "123.456"  # str
     """
@@ -303,7 +303,7 @@ def _escape_float(data: object) -> str:
 def _escape_str(data: object, encoding: cython.pchar) -> str:
     """(cfunc) Escape string 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_str("Hello, World!")
     >>> "'Hello, World!'"  # str
     """
@@ -315,7 +315,7 @@ def _escape_str(data: object, encoding: cython.pchar) -> str:
 def _escape_none(_) -> str:
     """(cfunc) Escape None 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_none(None)
     >>> "NULL"  # str
     """
@@ -328,7 +328,7 @@ def _escape_none(_) -> str:
 def _escape_datetime(data: object) -> str:
     """(cfunc) Escape datetime 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_datetime(datetime.datetime(2021, 1, 1, 12, 0, 0, 100))
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
@@ -359,7 +359,7 @@ def _escape_datetime(data: object) -> str:
 def _escape_struct_time(data: object) -> str:
     """(cfunc) Escape struct_time 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_struct_time(time.localtime())
     >>> "'2021-01-01 12:00:00'"  # str
     """
@@ -376,7 +376,7 @@ def _escape_struct_time(data: object) -> str:
 def _escape_date(data: object) -> str:
     """(cfunc) Escape date 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_date(datetime.date(2021, 1, 1))
     >>> "'2021-01-01'"  # str
     """
@@ -392,7 +392,7 @@ def _escape_date(data: object) -> str:
 def _escape_time(data: object) -> str:
     """(cfunc) Escape time 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_time(datetime.time(12, 0, 0, 100))
     >>> "'12:00:00.00100'"  # str
     """
@@ -417,7 +417,7 @@ def _escape_time(data: object) -> str:
 def _escape_timedelta(data: object) -> str:
     """(cfunc) Escape timedelta 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_timedelta(
             datetime.timedelta(hours=12, minutes=0, seconds=0, microseconds=100))
     >>> "'12:00:00.000100'"  # str
@@ -485,7 +485,7 @@ def _escape_bytes(data: object) -> str:
     """(cfunc) Escape bytes 'data' to literal
     ('_binary' prefixed) `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_bytes(b"Hello, World!")
     >>> "_binary'Hello, World!'"  # str
     """
@@ -498,7 +498,7 @@ def _escape_bytearray(data: object) -> str:
     """(cfunc) Escape bytearray 'data' to literal
     ('_binary' prefixed) `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_bytearray(bytearray(b"Hello, World!"))
     >>> "_binary'Hello, World!'"  # str
     """
@@ -511,7 +511,7 @@ def _escape_memoryview(data: memoryview) -> str:
     """(cfunc) Escape memoryview 'data' to literal
     ('_binary' prefixed) `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_memoryview(memoryview(b"Hello, World!"))
     >>> "_binary'Hello, World!'"  # str
     """
@@ -524,7 +524,7 @@ def _escape_memoryview(data: memoryview) -> str:
 def _escape_decimal(data: object) -> str:
     """(cfunc) Escape decimal 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_decimal(decimal.Decimal("123.456"))
     >>> "123.456"  # str
     """
@@ -537,11 +537,11 @@ def _escape_decimal(data: object) -> str:
 def _escape_bit(data: BIT) -> str:
     """(cfunc) Escape BIT 'data' to literal `<'str'>`.
 
-    ### Example (bytes):
+    ## Example (bytes):
     >>> _escape_bit(BIT(b'\\x01'))
     >>> '1'  # str
 
-    ### Example (int):
+    ## Example (int):
     >>> _escape_bit(BIT(1))
     >>> '1'  # str
     """
@@ -571,7 +571,7 @@ def _escape_bit(data: BIT) -> str:
 def _escape_json(data: JSON, encoding: cython.pchar) -> str:
     """(cfunc) Escape JSON 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_json(JSON({"key": "value"}))
     >>> "'{\\"key\\":\\"value\\"}'"  # str
     """
@@ -588,7 +588,7 @@ def _escape_json(data: JSON, encoding: cython.pchar) -> str:
 def _escape_sqlfunc(data: SQLFunction, encoding: cython.pchar) -> str:
     """(cfunc) Escape SqlFunction 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_sqlfunc(sqlfunc.ABS(1))
     >>> "ABS(1)"  # str
     """
@@ -607,7 +607,7 @@ def _escape_sqlfunc(data: SQLFunction, encoding: cython.pchar) -> str:
 def _escape_sqlintvl(data: SQLInterval, encoding: cython.pchar) -> str:
     """(cfunc) Escape SQLInterval 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_sqlintvl(sqlintvl.INTERVAL(1, "DAY"))
     >>> "INTERVAL 1 DAY"  # str
     """
@@ -619,7 +619,7 @@ def _escape_sqlintvl(data: SQLInterval, encoding: cython.pchar) -> str:
 def _escape_rawtext(data: RawText) -> str:
     """(cfunc) Escape RawText 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_rawtext(sqlfunc.RawText("FROM"))
     >>> "FROM"  # str
     """
@@ -639,12 +639,12 @@ def _escape_objstr(data: ObjStr) -> str:
 def _escape_list(data: list, encoding: cython.pchar) -> str:
     """(cfunc) Escape list 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_list(
         ["val1", 1, 1.1])
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_list(
         [["val1", 1, 1.1], ["val2", 2, 2.2]])
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -658,12 +658,12 @@ def _escape_list(data: list, encoding: cython.pchar) -> str:
 def _escape_tuple(data: tuple, encoding: cython.pchar) -> str:
     """(cfunc) Escape tuple 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_tuple(
         ("val1", 1, 1.1))
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_tuple(
         (("val1", 1, 1.1), ("val2", 2, 2.2)))
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -677,12 +677,12 @@ def _escape_tuple(data: tuple, encoding: cython.pchar) -> str:
 def _escape_set(data: set, encoding: cython.pchar) -> str:
     """(cfunc) Escape set 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_set(
         {"val1", 1, 1.1})
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_set(
         {("val1", 1, 1.1), ("val2", 2, 2.2)})
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -696,12 +696,12 @@ def _escape_set(data: set, encoding: cython.pchar) -> str:
 def _escape_frozenset(data: frozenset, encoding: cython.pchar) -> str:
     """(cfunc) Escape frozenset 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_frozenset(frozenset(
         {"val1", 1, 1.1}))
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_frozenset(frozenset(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}))
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -715,12 +715,12 @@ def _escape_frozenset(data: frozenset, encoding: cython.pchar) -> str:
 def _escape_sequence(data: Iterable, encoding: cython.pchar) -> str:
     """(cfunc) Escape sequence 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_sequence(
         {"key1": "val1", "key2": 1, "key3": 1.1}.values())
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_sequence(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values())
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -734,7 +734,7 @@ def _escape_sequence(data: Iterable, encoding: cython.pchar) -> str:
 def _escape_range(data: object) -> str:
     """(cfunc) Escape range 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_range(range(1, 4))
     >>> "(1,2,3)"  # str
     """
@@ -747,12 +747,12 @@ def _escape_range(data: object) -> str:
 def _escape_dict(data: dict, encoding: cython.pchar) -> str:
     """(cfunc) Escape dict 'data' to literal `<'str'>`.
 
-    ### Example (flat):
+    ## Example (flat):
     >>> _escape_dict(
         {"key1": "val1", "key2": 1, "key3": 1.1})
     >>> "('val1',1,1.1)"  # str
 
-    ### Example (nested):
+    ## Example (nested):
     >>> _escape_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]})
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
@@ -769,7 +769,7 @@ def _escape_float64(data: object) -> str:
 
     :raises `<'ValueError'>`: If float value is invalid.
 
-    ### Example:
+    ## Example:
     >>> _escape_float64(np.float64(123.456))
     >>> "123.456"  # str
     """
@@ -786,7 +786,7 @@ def _escape_float64(data: object) -> str:
 def _escape_datetime64(data: object) -> str:
     """(cfunc) Escape numpy.datetime64 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_datetime64(np.datetime64('2021-01-01T12:00:00.001'))
     >>> "'2021-01-01 12:00:00.00100'"  # str
     """
@@ -823,7 +823,7 @@ def _escape_datetime64_fr_us(us: cython.longlong) -> str:
 def _escape_timedelta64(data: object) -> str:
     """(cfunc) Escape numpy.timedelta64 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_timedelta64(np.timedelta64('12:00:00.000100'))
     >>> "'12:00:00.000100'"  # str
     """
@@ -860,11 +860,11 @@ def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
 def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
     """(cfunc) Escape numpy.ndarray 'data' to literal `<'str'>`.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray(np.array([1, 2, 3], dtype=np.int64))
     >>> "(1,2,3)"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray(np.array(
         [[1, 2, 3], [3, 4, 5]], dtype=np.int64))
     >>> "(1,2,3),(3,4,5)"  # str
@@ -909,13 +909,13 @@ def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
 def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"O" (object)` only.
+    ### This function is for ndarray dtype `"O" (object)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"))
     >>> "(1,1.23,'abc')"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_object(np.array(
         [[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O"))
     >>> "(1,1.23,'abc'),(2,4.56,'def')"  # str
@@ -959,13 +959,13 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
 def _escape_ndarray_int(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
+    ### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_int(np.array([-1, -2, -3], dtype=int))
     >>> "(-1,-2,-3)"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_int(np.array(
         [[1, 2], [3, 4]], dtype=np.uint64))
     >>> "(1,2),(3,4)"  # str
@@ -1004,13 +1004,13 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
 
     :raises `<'ValueError'>`: If float value is invalid (not finite).
 
-    #### This function is for ndarray dtype `"f" (float)` only.
+    ### This function is for ndarray dtype `"f" (float)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_float(np.array([-1.1, 0.0, 1.1], dtype=float))
     >>> "(-1.1,0.0,1.1)"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_float(np.array(
         [[-1.1, 0.0], [1.1, 2.2]], dtype=float))
     >>> "(-1.1,0.0),(1.1,2.2)"  # str
@@ -1053,13 +1053,13 @@ def _escape_ndarray_float(arr: np.ndarray) -> str:
 def _escape_ndarray_bool(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"b" (bool)` only.
+    ### This function is for ndarray dtype `"b" (bool)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_bool(np.array([True, False, True], dtype=bool))
     >>> "(1,0,1)"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_bool(np.array(
         [[True, False], [False, True]], dtype=bool))
     >>> "(1,0),(0,1)"  # str
@@ -1100,13 +1100,13 @@ def _escape_ndarray_bool(arr: np.ndarray) -> str:
 def _escape_ndarray_dt64(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"M" (datetime64)` only.
+    ### This function is for ndarray dtype `"M" (datetime64)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"))
     >>> "('1970-01-01 00:00:01','1970-01-01 00:00:02','1970-01-01 00:00:03')"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_dt64(np.array(
         [[1, 2], [3, 4]], dtype="datetime64[s]"))
     >>> "('1970-01-01 00:00:01','1970-01-01 00:00:02'),('1970-01-01 00:00:03','1970-01-01 00:00:04')"  # str
@@ -1146,13 +1146,13 @@ def _escape_ndarray_dt64(arr: np.ndarray) -> str:
 def _escape_ndarray_td64(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"m" (timedelta64)` only.
+    ### This function is for ndarray dtype `"m" (timedelta64)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_td64(np.array([-1, 0, 1], dtype="timedelta64[s]"))
     >>> "('-00:00:01','00:00:00','00:00:01')"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_td64(np.array(
         [[-1, 0], [1, 2]], dtype="timedelta64[s]"))
     >>> "('-00:00:01','00:00:00'),('00:00:01','00:00:02')"  # str
@@ -1201,13 +1201,13 @@ def _escape_ndarray_td64(arr: np.ndarray) -> str:
 def _escape_ndarray_bytes(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"S" (bytes string)` only.
+    ### This function is for ndarray dtype `"S" (bytes string)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_bytes(np.array([1, 2, 3], dtype="S"))
     >>> "(_binary'1',_binary'2',_binary'3')"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_bytes(np.array(
         [[1, 2], [3, 4]], dtype="S"))
     >>> "(_binary'1',_binary'2'),(_binary'3',_binary'4')"  # str
@@ -1245,13 +1245,13 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
 def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
-    #### This function is for ndarray dtype `"U" (unicode string)` only.
+    ### This function is for ndarray dtype `"U" (unicode string)` only.
 
-    ### Example (1-dimension):
+    ## Example (1-dimension):
     >>> _escape_ndarray_unicode(np.array([1, 2, 3], dtype="U"))
     >>> "('1','2','3')"  # str
 
-    ### Example (2-dimension):
+    ## Example (2-dimension):
     >>> _escape_ndarray_unicode(np.array(
         [[1, 2], [3, 4]], dtype="U"))
     >>> "('1','2'),('3','4')"  # str
@@ -1307,7 +1307,7 @@ def _raise_unsupported_array_dim_error(ndim: cython.int) -> cython.bint:
 def _escape_series(data: Series, encoding: cython.pchar) -> str:
     """(cfunc) Escape pandas.Series 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_series(pd.Series([1, 2, 3]))
     >>> "(1,2,3)"  # str
     """
@@ -1323,7 +1323,7 @@ def _escape_series(data: Series, encoding: cython.pchar) -> str:
 def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
     """(cfunc) Escape pandas.DataFrame 'data' to literal `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_dataframe(pd.DataFrame({
             "a": [1, 2, 3],
             "b": [1.1, 2.2, 3.3],
@@ -1616,22 +1616,22 @@ def _escape_item_list(
     """(cfunc) Escape items of list 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Example (many=False | flat):
+    ## Example (many=False | flat):
     >>> _escape_item_list(
         ["val1", 1, 1.1], False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Exmaple (many=False | nested):
+    ## Exmaple (many=False | nested):
     >>> _escape_item_list(
         [["val1", 1, 1.1], ["val2", 2, 2.2]], False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Example (many=True | flat):
+    ## Example (many=True | flat):
     >>> _escape_item_list(
         ["val1", 1, 1.1], True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_list(
         [["val1", 1, 1.1], ["val2", 2, 2.2]], False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1651,22 +1651,22 @@ def _escape_item_tuple(
     """(cfunc) Escape items of tuple 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Example (many=False | flat):
+    ## Example (many=False | flat):
     >>> _escape_item_list(
         ("val1", 1, 1.1), False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Exmaple (many=False | nested):
+    ## Exmaple (many=False | nested):
     >>> _escape_item_list(
         (("val1", 1, 1.1), ("val2", 2, 2.2)), False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Example (many=True | flat):
+    ## Example (many=True | flat):
     >>> _escape_item_list(
         ("val1", 1, 1.1), True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_list(
         (("val1", 1, 1.1), ("val2", 2, 2.2)), False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1686,22 +1686,22 @@ def _escape_item_set(
     """(cfunc) Escape items of set 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Example (many=False | flat):
+    ## Example (many=False | flat):
     >>> _escape_item_set(
         {"val1", 1, 1.1}, False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Exmaple (many=False | nested):
+    ## Exmaple (many=False | nested):
     >>> _escape_item_set(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}, False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Example (many=True | flat):
+    ## Example (many=True | flat):
     >>> _escape_item_set(
         {"val1", 1, 1.1}, True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_set(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}, False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1721,22 +1721,22 @@ def _escape_item_frozenset(
     """(cfunc) Escape items of frozenset 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Example (many=False | flat):
+    ## Example (many=False | flat):
     >>> _escape_item_frozenset(frozenset(
         {"val1", 1, 1.1}), False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Exmaple (many=False | nested):
+    ## Exmaple (many=False | nested):
     >>> _escape_item_frozenset(frozenset(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}), False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Example (many=True | flat):
+    ## Example (many=True | flat):
     >>> _escape_item_frozenset(frozenset(
         {"val1", 1, 1.1}), True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_frozenset(frozenset(
         {("val1", 1, 1.1), ("val2", 2, 2.2)}), False)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1756,22 +1756,22 @@ def _escape_item_sequence(
     """(cfunc) Escape items of sequence 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Exmaple (many=False | flat):
+    ## Exmaple (many=False | flat):
     >>> _escape_item_dict(
         {"key1": "val1", "key2": 1, "key3": 1.1}.values(), False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Example (many=False | nested):
+    ## Example (many=False | nested):
     >>> _escape_item_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values(), False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Exmaple (many=True | flat):
+    ## Exmaple (many=True | flat):
     >>> _escape_item_dict(
         {"key1": "val1", "key2": 1, "key3": 1.1}.values(), True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values(), True)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1787,11 +1787,11 @@ def _escape_item_range(data: object, many: cython.bint) -> object:
     """(cfunc) Escape items of range 'data' to
     sequence of literals `<'tuple/list'>`.
 
-    ### Example (many=False):
+    ## Example (many=False):
     >>> _escape_item_range(range(1, 4), False)
     >>> ("1", "2", "3")  # tuple[str]
 
-    ### Example (many=True):
+    ## Example (many=True):
     >>> _escape_item_range(range(1, 4), True)
     >>> ["1", "2", "3"]  # list[str]
     """
@@ -1810,22 +1810,22 @@ def _escape_item_dict(
     """(cfunc) Escape items of dict 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Exmaple (many=False | flat):
+    ## Exmaple (many=False | flat):
     >>> _escape_item_dict(
         {"key1": "val1", "key2": 1, "key3": 1.1}, False)
     >>> ("'val1'", "1", "1.1")  # tuple[str]
 
-    ### Example (many=False | nested):
+    ## Example (many=False | nested):
     >>> _escape_item_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}, False)
     >>> ("('val1',1,1.1)", "('val2',2,2.2)")  # tuple[str]
 
-    ### Exmaple (many=True | flat):
+    ## Exmaple (many=True | flat):
     >>> _escape_item_dict(
         {"key1": "val1", "key2": 1, "key3": 1.1}, True)
     >>> ["'val1'", "1", "1.1"]  # list[str]
 
-    ### Example (many=True | nested):
+    ## Example (many=True | nested):
     >>> _escape_item_dict(
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}, True)
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
@@ -1846,15 +1846,15 @@ def _escape_item_ndarray(
     """(cfunc) Escape items of numpy.ndarray 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray(np.array([1, 2, 3]), False)
     >>> ("1", "2", "3")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray(np.array([1, 2, 3]), True)
     >>> ["1", "2", "3"]  # list[tuple[str]]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray(np.array(
         [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]]), True)
     >>> [("1.1", "2.2", "3.3"), ("4.4", "5.5", "6.6")]  # list[tuple[str]]
@@ -1903,17 +1903,17 @@ def _escape_item_ndarray_object(
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"O" (object)` only.
+    ### This function is for ndarray dtype `"O" (object)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"), False)
     >>> ("1", "1.23", "'abc'")           # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_object(np.array([1, 1.23, "abc"], dtype="O"), True)
     >>> ["1", "1.23", "'abc'"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_object(np.array(
         [[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O"))
     >>> [("1", "1.23", "'abc'"), ("2", "4.56", "'def'")]  # list[tupe[str]]
@@ -1964,17 +1964,17 @@ def _escape_item_ndarray_int(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
+    ### This function is ndarray dtype `"i" (int)` and `"u" (uint)`.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), False)
     >>> ("-1", "0", "1")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_int(np.array([-1, 0, 1], dtype=int), True)
     >>> ["-1", "0", "1"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_int(np.array(
         [[0, 1], [2, 3]], dtype=np.uint))
     >>> [("0", "1"), ("2", "3")]  # list[tupe[str]]
@@ -2014,17 +2014,17 @@ def _escape_item_ndarray_float(arr: np.ndarray, many: cython.bint) -> object:
 
     :raises `<'ValueError'>`: If float value is invalid (not finite).
 
-    #### This function is for ndarray dtype `"f" (float)` only.
+    ### This function is for ndarray dtype `"f" (float)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_float(np.array([-1.1, 0.0, 1.1], dtype=float), False)
     >>> ("-1.1", "0.0", "1.1")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_float(np.array([-1.1, 0.0, 1.1], dtype=float), True)
     >>> ["-1.1", "0.0", "1.1"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_float(np.array(
         [[-1.1, 0.0], [1.1, 2.2]], dtype=float))
     >>> [("-1.1", "0.0"), ("1.1", "2.2")]  # list[tupe[str]]
@@ -2068,17 +2068,17 @@ def _escape_item_ndarray_bool(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"b" (bool)` only.
+    ### This function is for ndarray dtype `"b" (bool)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_bool(np.array([True, False, True], dtype=bool), False)
     >>> ("1", "0", "1")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_bool(np.array([True, False, True], dtype=bool), True)
     >>> ["1", "0", "1"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_bool(np.array(
         [[True, False], [False, True]], dtype=bool))
     >>> [("1", "0"), ("0", "1")]  # list[tupe[str]]
@@ -2120,17 +2120,17 @@ def _escape_item_ndarray_dt64(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"M" (datetime64)` only.
+    ### This function is for ndarray dtype `"M" (datetime64)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"), False)
     >>> ("'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_dt64(np.array([1, 2, 3], dtype="datetime64[s]"), True)
     >>> ["'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_dt64(np.array(
         [[1, 2], [3, 4]], dtype="datetime64[s]))
     >>> [
@@ -2176,17 +2176,17 @@ def _escape_item_ndarray_td64(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"m" (timedelta64)` only.
+    ### This function is for ndarray dtype `"m" (timedelta64)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_td64(np.array([-1, 0, 1], dtype="timedelta64[s]"), False)
     >>> ("'-00:00:01'", "'00:00:00'", "'00:00:01'")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_td64(np.array([-1, 0, 1], dtype="timedelta64[s]"), True)
     >>> ["'-00:00:01'", "'00:00:00'", "'00:00:01'"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_td64(np.array(
         [[-1, 0], [1, 2]], dtype="timedelta64[s]"))
     >>> [("'-00:00:01'", "'00:00:00'"), ("'00:00:01'", "'00:00:02'")]  # list[tuple[str]]
@@ -2236,17 +2236,17 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"S" (bytes string)` only.
+    ### This function is for ndarray dtype `"S" (bytes string)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="S"), False)
     >>> ("_binary'1'", "_binary'2'", "_binary'3'")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="S"), True)
     >>> ["_binary'1'", "_binary'2'", "_binary'3'"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_bytes(np.array(
         [[1, 2], [3, 4]], dtype="S"))
     >>> [("_binary'1'", "_binary'2'"), ("_binary'3'", "_binary'4'")]  # list[tuple[str]]
@@ -2290,17 +2290,17 @@ def _escape_item_ndarray_unicode(
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
-    #### This function is for ndarray dtype `"U" (unicode string)` only.
+    ### This function is for ndarray dtype `"U" (unicode string)` only.
 
-    ### Example (1-dimension | many=False)
+    ## Example (1-dimension | many=False)
     >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="U"), False)
     >>> ("'1'", "'2'", "'3'")  # tuple[str]
 
-    ### Example (1-dimension | many=True)
+    ## Example (1-dimension | many=True)
     >>> _escape_item_ndarray_bytes(np.array([1, 2, 3], dtype="U"), True)
     >>> ["'1'", "'2'", "'3'"]  # list[str]
 
-    ### Example (2-dimension | many [ignored])
+    ## Example (2-dimension | many [ignored])
     >>> _escape_item_ndarray_bytes(np.array(
         [[1, 2], [3, 4]], dtype="U"))
     >>> [("'1'", "'2'"), ("'3'", "'4'")]  # list[tuple[str]]
@@ -2345,7 +2345,7 @@ def _escape_item_series(
     """(cfunc) Escape items of pandas.Series 'data' to
     tuple of literals `<'tuple[str]'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_item_series(pd.Series([1, 2, 3]))
     >>> ("1", "2", "3")  # tuple[str]
     """
@@ -2362,7 +2362,7 @@ def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
     """(cfunc) Escape items of pandas.DataFrame 'data' to
     sequences of literals `<'list[tuple[str]]'>`.
 
-    ### Example:
+    ## Example:
     >>> _escape_item_dataframe(pd.DataFrame({
             "a": [1, 2, 3],
             "b": [1.1, 2.2, 3.3],
@@ -2754,11 +2754,11 @@ def _decode_string(
     Argument 'is_binary' determines whether to return the bytes
     value untouched or decode the value to `<'str'>`.
 
-    ### Example (is_binary=True):
+    ## Example (is_binary=True):
     >>> _decode_string(b'hello world', b'utf-8', True)
     >>> b'hello world'
 
-    ### Example (is_binary=False):
+    ## Example (is_binary=False):
     >>> _decode_string(b'hello world', b'utf-8', False)
     >>> 'hello world'
     """
@@ -2773,11 +2773,11 @@ def _decode_bit(value: bytes, decode_bit: cython.bint) -> object:
     Argument 'decode_bit' determines whether to return the bytes
     value untouched or decode the value to `<'int'>`.
 
-    ### Example (decode_bit=True)
+    ## Example (decode_bit=True)
     >>> _decode_bit(b"\\x01", True)
     >>> 1
 
-    ### Example (decode_bit=False)
+    ## Example (decode_bit=False)
     >>> _decode_bit(b"\\x01", False)
     >>> b'\\x01'
     """
@@ -2793,7 +2793,7 @@ def _decode_bit(value: bytes, decode_bit: cython.bint) -> object:
 def _decode_int(value: bytes) -> object:
     """(cfunc) Decode an INTEGER column value to `<'int'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_int(b'-9223372036854775808')
     >>> -9223372036854775808
     """
@@ -2809,7 +2809,7 @@ def _decode_int(value: bytes) -> object:
 def _decode_float(value: bytes) -> object:
     """(cfunc) Decode an FLOAT column value to `<'float'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_float(b'-3.141592653589793')
     >>> -3.141592653589793
     """
@@ -2824,11 +2824,11 @@ def _decode_decimal(value: bytes, use_decimal: cython.bint) -> object:
     Argument 'use_decimal' determines whether to parse
     the value as `<'Decimal'>` object.
 
-    ### Example (use_decimal=True):
+    ## Example (use_decimal=True):
     >>> _decode_decimal(b'-3.141592653589793')
     >>> Decimal('-3.141592653589793')
 
-    ### Example (use_decimal=False):
+    ## Example (use_decimal=False):
     >>> _decode_decimal(b'-3.141592653589793')
     >>> -3.141592653589793
     """
@@ -2843,11 +2843,11 @@ def _decode_decimal(value: bytes, use_decimal: cython.bint) -> object:
 def _decode_datetime(value: bytes) -> object:
     """(cfunc) Decode a DATETIME or TIMESTAMP column value to `<'datetime.datetime'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_datetime(b'2007-02-25 23:06:20')
     >>> datetime.datetime(2007, 2, 25, 23, 6, 20)
 
-    ### Example (illegal value):
+    ## Example (illegal value):
     >>> _decode_datetime(b'2007-02-31 23:06:20')
     >>> None
     """
@@ -2862,11 +2862,11 @@ def _decode_datetime(value: bytes) -> object:
 def _decode_date(value: bytes) -> object:
     """(cfunc) Decode a DATE column value to `<'datetime.date'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_date(b'2007-02-26')
     >>> datetime.date(2007, 2, 26)
 
-    ### Example (illegal value):
+    ## Example (illegal value):
     >>> _decode_date(b'2007-02-31')
     >>> None
     """
@@ -2885,11 +2885,11 @@ def _decode_timedelta(value: bytes) -> object:
     can accept values as (+|-)DD HH:MM:SS. The latter format will not
     be parsed correctly by this function.
 
-    ### Example:
+    ## Example:
     >>> _decode_timedelta(b'-25:06:17')
     >>> datetime.timedelta(-2, 83177)
 
-    ### Example (illegal value):
+    ## Example (illegal value):
     >>> _decode_timedelta(b'random crap')
     >>> None
     """
@@ -2980,7 +2980,7 @@ def _decode_timedelta(value: bytes) -> object:
 def _decode_enum(value: bytes, encoding: cython.pchar) -> object:
     """(cfunc) Decode an ENUM column value to `<'str'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_enum(b'enum1', b'utf-8')
     >>> 'enum1'
     """
@@ -2992,7 +2992,7 @@ def _decode_enum(value: bytes, encoding: cython.pchar) -> object:
 def _decode_set(value: bytes, encoding: cython.pchar) -> object:
     """(cfunc) Decode a SET column value to `<'set'>`.
 
-    ### Example:
+    ## Example:
     >>> _decode_set(b'val1,val2,val3', b'utf-8')
     >>> {'val1', 'val2', 'val3'}
     """
@@ -3012,11 +3012,11 @@ def _decode_json(
     string untouched or deserialize JSON to the corresponding
     python object.
 
-    ### Example (decode_json=False):
+    ## Example (decode_json=False):
     >>> _decode_json(b'{"a":1,"b":2,"c":3}', b'utf-8', False)
     >>> '{"a":1,"b":2,"c":3}'
 
-    ### Example (decode_json=True):
+    ## Example (decode_json=True):
     >>> _decode_json(b'{"a":1,"b":2,"c":3}', b'utf-8', True)
     >>> {"a": 1, "b": 2, "c": 3}
     """
