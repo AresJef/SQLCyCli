@@ -206,6 +206,7 @@ cdef class BaseConnection:
     # Cursor
     cpdef Cursor cursor(self, object cursor=?)
     cpdef TransactionManager transaction(self, object cursor=?)
+    cdef inline type _validate_cursor(self, object cursor)
     # Query
     cpdef unsigned long long query(self, str sql, bint unbuffered=?)
     cpdef bint begin(self) except -1

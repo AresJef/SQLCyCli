@@ -170,6 +170,7 @@ cdef class BaseConnection:
     # Cursor
     cpdef CursorManager cursor(self, object cursor=?)
     cpdef TransactionManager transaction(self, object cursor=?)
+    cdef inline type _validate_cursor(self, object cursor)
     # Query
     cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
     cpdef bytes encode_sql(self, str sql)

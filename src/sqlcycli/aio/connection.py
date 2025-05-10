@@ -2278,10 +2278,14 @@ class BaseConnection:
 
     # Cursor ----------------------------------------------------------------------------------
     @cython.ccall
-    def cursor(self, cursor: type[Cursor] | None = None) -> CursorManager:
+    def cursor(
+        self,
+        cursor: type[Cursor | tuple | dict | DataFrame] | None = None,
+    ) -> CursorManager:
         """Acquire a new `async` cursor through context manager `<'CursorManager'>`.
 
         :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
 
         ### Example (context manager):
         >>> async with conn.cursor() as cur:
@@ -2293,11 +2297,14 @@ class BaseConnection:
             await cur.close()  # close manually
         """
         self._verify_connected()
-        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        cur = self._validate_cursor(cursor)
         return CursorManager(self, cur)
 
     @cython.ccall
-    def transaction(self, cursor: type[Cursor] | None = None) -> TransactionManager:
+    def transaction(
+        self,
+        cursor: type[Cursor | tuple | dict | DataFrame] | None = None,
+    ) -> TransactionManager:
         """Acquire a new `async` cursor in `TRANSACTION` mode
         through context manager `<'TransactionManager'>`.
 
@@ -2308,6 +2315,7 @@ class BaseConnection:
         - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
 
         :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
 
         ### Example:
         >>> async with conn.transaction() as cur:
@@ -2315,8 +2323,31 @@ class BaseConnection:
                 # COMMIT automatically if no error
         """
         self._verify_connected()
-        cur = self._cursor if cursor is None else utils.validate_cursor(cursor, Cursor)
+        cur = self._validate_cursor(cursor)
         return TransactionManager(self, cur)
+
+    @cython.cfunc
+    @cython.inline(True)
+    def _validate_cursor(self, cursor: object) -> type:
+        """(internal) Validate if the 'cursor' argument is valid `<'type'>`."""
+        # Default cursor
+        if cursor is None:
+            return Cursor if self._cursor is None else self._cursor
+
+        # Validate cursor
+        if type(cursor) is type:
+            if issubclass(cursor, Cursor):
+                return cursor
+            if cursor is tuple:
+                return Cursor
+            if cursor is dict:
+                return DictCursor
+            if cursor is DataFrame:
+                return DfCursor
+        raise errors.InvalidConnectionArgsError(
+            "Invalid 'cursor' argument: %r.\n"
+            "Expects type (subclass) of %r." % (cursor, Cursor)
+        )
 
     # Query -----------------------------------------------------------------------------------
     async def query(self, sql: str, unbuffered: bool = False) -> int:
@@ -3827,7 +3858,7 @@ class Connection(BaseConnection):
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[Cursor] | None = Cursor,
+        cursor: type[Cursor | tuple | dict | DataFrame] | None = Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -3864,6 +3895,7 @@ class Connection(BaseConnection):
         :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
         :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
         :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
         :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
         :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
         :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
@@ -3947,7 +3979,8 @@ class Connection(BaseConnection):
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
         self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
-        self._cursor = utils.validate_cursor(cursor, Cursor)
+        self._cursor = None
+        self._cursor = self._validate_cursor(cursor)
         self._setup_client_flag(utils.validate_arg_uint(client_flag, "client_flag", 0, UINT_MAX))
         self._setup_connect_attrs(utils.validate_arg_str(program_name, "program_name", None))
         # . ssl

@@ -235,23 +235,6 @@ def validate_sql_mode(sql_mode: object, encoding: cython.pchar) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def validate_cursor(cursor: object, cursor_class: object) -> object:
-    """(cfunc) Validate if the 'cursor' argument is valid `<'type'>`."""
-    if cursor is None:
-        return cursor_class
-    try:
-        if not issubclass(cursor, cursor_class):
-            raise TypeError("Invalid cursor class.")
-    except Exception as err:
-        raise errors.InvalidConnectionArgsError(
-            "Invalid 'cursor' argument: %r.\n"
-            "Expects type [class] of %r." % (cursor, cursor_class)
-        ) from err
-    return cursor
-
-
-@cython.cfunc
-@cython.inline(True)
 def validate_ssl(ssl: object) -> object:
     """(cfunc) Validate if the 'ssl' argument is valid `<'ssl.SSLContext'>`."""
     if ssl is None:

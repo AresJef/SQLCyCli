@@ -357,5 +357,4 @@ cdef Charset validate_charset(object charset, object collation, str default_char
 cdef int validate_autocommit(object auto) except -2
 cdef int validate_max_allowed_packet(object max_allowed_packet, int default, int maximum)
 cdef str validate_sql_mode(object sql_mode, char* encoding)
-cdef object validate_cursor(object cursor, object cursor_class)
 cdef object validate_ssl(object ssl)

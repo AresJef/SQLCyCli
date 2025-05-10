@@ -2,6 +2,7 @@ from os import PathLike
 from asyncio import Future
 from typing_extensions import Self
 from typing import Literal, Generator, Any
+import pandas as pd
 from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
@@ -66,7 +67,9 @@ class Pool:
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[async_conn.Cursor] | None = async_conn.Cursor,
+        cursor: (
+            type[async_conn.Cursor | tuple | dict | pd.DataFrame] | None
+        ) = async_conn.Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,

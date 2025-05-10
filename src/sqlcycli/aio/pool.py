@@ -24,6 +24,7 @@ from collections import deque
 from typing import Literal, Generator, Any
 from asyncio import AbstractEventLoop, Condition
 from asyncio import gather as _gather, get_event_loop as _get_event_loop
+from pandas import DataFrame
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
@@ -36,7 +37,7 @@ __all__ = ["PoolConnection", "PoolSyncConnection", "PoolConnectionManager", "Poo
 
 # Utils ---------------------------------------------------------------------------------------
 @cython.ccall
-def validate_sync_cursor(cursor: object) -> object:
+def validate_sync_cursor(cursor: object) -> type:
     """Validate and map the given 'cursor' to the corresponding
     `sync` cursor type `<'type[Cursor]/None'>`.
     """
@@ -45,6 +46,12 @@ def validate_sync_cursor(cursor: object) -> object:
     if type(cursor) is type:
         if issubclass(cursor, sync_conn.Cursor):
             return cursor
+        if cursor is tuple:
+            return sync_conn.Cursor
+        if cursor is dict:
+            return sync_conn.DictCursor
+        if cursor is DataFrame:
+            return sync_conn.DfCursor
         if cursor is async_conn.Cursor:
             return sync_conn.Cursor
         if cursor is async_conn.DictCursor:
@@ -58,13 +65,13 @@ def validate_sync_cursor(cursor: object) -> object:
         if cursor is async_conn.SSDfCursor:
             return sync_conn.SSDfCursor
     raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' argument: %r. "
-        "Must be subclass of %r." % (cursor, sync_conn.Cursor)
+        "Invalid 'cursor' argument: %r.\n"
+        "Expects type (subclass) of %r." % (cursor, sync_conn.Cursor)
     )
 
 
 @cython.ccall
-def validate_async_cursor(cursor: object) -> object:
+def validate_async_cursor(cursor: object) -> type:
     """Validate and map the given 'cursor' to the corresponding
     `async` cursor type `<'type[Cursor]/None'>`.
     """
@@ -73,6 +80,12 @@ def validate_async_cursor(cursor: object) -> object:
     if type(cursor) is type:
         if issubclass(cursor, async_conn.Cursor):
             return cursor
+        if cursor is tuple:
+            return async_conn.Cursor
+        if cursor is dict:
+            return async_conn.DictCursor
+        if cursor is DataFrame:
+            return async_conn.DfCursor
         if cursor is sync_conn.Cursor:
             return async_conn.Cursor
         if cursor is sync_conn.DictCursor:
@@ -86,8 +99,8 @@ def validate_async_cursor(cursor: object) -> object:
         if cursor is sync_conn.SSDfCursor:
             return async_conn.SSDfCursor
     raise errors.InvalidConnectionArgsError(
-        "Invalid 'cursor' argument: %r. "
-        "Must be subclass of %r." % (cursor, async_conn.Cursor)
+        "Invalid 'cursor' argument: %r.\n"
+        "Expects type (subclass) of %r." % (cursor, async_conn.Cursor)
     )
 
 
@@ -519,7 +532,9 @@ class Pool:
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[async_conn.Cursor] | None = async_conn.Cursor,
+        cursor: (
+            type[async_conn.Cursor | tuple | dict | DataFrame] | None
+        ) = async_conn.Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -561,6 +576,8 @@ class Pool:
         :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
         :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
         :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+
         :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
         :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
         :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.

@@ -198,8 +198,14 @@ class BaseConnection:
     @property
     def decode_json(self) -> bool: ...
     # Cursor
-    def cursor(self, cursor: type[Cursor] | None = None) -> CursorManager: ...
-    def transaction(self, cursor: type[Cursor] | None = None) -> TransactionManager: ...
+    def cursor(
+        self,
+        cursor: type[Cursor | tuple | dict | pd.DataFrame] | None = None,
+    ) -> CursorManager: ...
+    def transaction(
+        self,
+        cursor: type[Cursor | tuple | dict | pd.DataFrame] | None = None,
+    ) -> TransactionManager: ...
     # Query
     def query(self, sql: str, unbuffered: bool = False) -> int: ...
     def begin(self) -> bool: ...
@@ -287,7 +293,7 @@ class Connection(BaseConnection):
         max_allowed_packet: int | str | None = None,
         sql_mode: str | None = None,
         init_command: str | None = None,
-        cursor: type[Cursor] | None = Cursor,
+        cursor: type[Cursor | tuple | dict | pd.DataFrame] | None = Cursor,
         client_flag: int = 0,
         program_name: str | None = None,
         option_file: str | bytes | PathLike | OptionFile | None = None,

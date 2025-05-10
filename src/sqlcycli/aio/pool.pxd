@@ -5,8 +5,8 @@ from sqlcycli cimport connection as sync_conn
 from sqlcycli.aio cimport connection as async_conn
 
 # Utils
-cpdef object validate_sync_cursor(object cursor)
-cpdef object validate_async_cursor(object cursor)
+cpdef type validate_sync_cursor(object cursor)
+cpdef type validate_async_cursor(object cursor)
 
 # Connection
 cdef class PoolConnection(async_conn.BaseConnection):
