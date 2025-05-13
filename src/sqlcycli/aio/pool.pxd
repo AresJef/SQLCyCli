@@ -29,7 +29,10 @@ cdef class PoolConnectionManager:
         PoolConnection _async_conn
     # Sync
     cdef inline PoolSyncConnection _acquire_sync_conn(self)
-    cdef inline bint _release_sync_conn(self) except -1
+    cdef inline bint _release_sync_conn(self, bint close) except -1
+
+cdef class PoolTransactionManager(PoolConnectionManager):
+    pass
 
 cdef class Pool:
     cdef:
@@ -112,8 +115,9 @@ cdef class Pool:
     cdef inline unsigned int _get_used(self) except -1
     cdef inline unsigned int _get_total(self) except -1
     cdef inline object _get_loop(self)
-    # Acquire / Fill / Release
+    # Acquire / Transaction / Fill / Release
     cpdef PoolConnectionManager acquire(self)
+    cpdef PoolTransactionManager transaction(self)
     cpdef object release(self, object conn)
     cdef inline PoolSyncConnection _acquire_sync_conn(self)
     cdef inline bint _release_sync_conn(self, PoolSyncConnection conn) except -1

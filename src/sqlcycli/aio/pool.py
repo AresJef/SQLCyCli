@@ -347,14 +347,14 @@ class PoolSyncConnection(sync_conn.BaseConnection):
 # Pool ----------------------------------------------------------------------------------------
 @cython.cclass
 class PoolConnectionManager:
-    """The Context Manager for a PoolConnection"""
+    """The Context Manager for a PoolConnection."""
 
     _pool: Pool
     _sync_conn: PoolSyncConnection
     _async_conn: PoolConnection
 
     def __init__(self, pool: Pool) -> None:
-        """The Context Manager for a PoolConnection
+        """The Context Manager for a PoolConnection.
 
         :param pool `<'Pool'>`: The pool to manage the connection.
         """
@@ -370,7 +370,7 @@ class PoolConnectionManager:
         try:
             conn = self._pool._acquire_sync_conn()
         except:  # noqa
-            self._release_sync_conn()
+            self._release_sync_conn(False)
             raise
         if conn is None:
             self._pool._verify_open()
@@ -382,10 +382,12 @@ class PoolConnectionManager:
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _release_sync_conn(self) -> cython.bint:
+    def _release_sync_conn(self, close: cython.bint) -> cython.bint:
         """(internal) Release the `sync` connection back to the pool."""
         conn: PoolSyncConnection = self._sync_conn
         if conn is not None:
+            if close:
+                conn.schedule_close()
             self._pool._release_sync_conn(conn)
             self._sync_conn = None
         return True
@@ -395,7 +397,7 @@ class PoolConnectionManager:
         return self._sync_conn
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._release_sync_conn()
+        self._release_sync_conn(False)
 
     # Async --------------------------------------------------------------------------------------
     async def _acquire_async_conn(self) -> PoolConnection:
@@ -403,7 +405,7 @@ class PoolConnectionManager:
         try:
             conn = await self._pool._acquire_async_conn()
         except:  # noqa
-            await self._release_async_conn()
+            await self._release_async_conn(False)
             raise
         if conn is None:
             self._pool._verify_open()
@@ -412,10 +414,15 @@ class PoolConnectionManager:
             )
         return conn
 
-    async def _release_async_conn(self) -> None:
-        """(internal) Release the `async` connection back to the pool."""
+    async def _release_async_conn(self, close: cython.bint) -> None:
+        """(internal) Release the `async` connection back to the pool.
+
+        :param close `<'bool'>`: Whether to close the connection at Pool release.
+        """
         conn: PoolConnection = self._async_conn
         if conn is not None:
+            if close:
+                conn.schedule_close()
             await self._pool._release_async_conn(conn)
             self._async_conn = None
         return None
@@ -428,13 +435,79 @@ class PoolConnectionManager:
         return self._async_conn
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._release_async_conn()
+        await self._release_async_conn(False)
 
     # Special ------------------------------------------------------------------------------------
     def __del__(self):
         self._sync_conn = None
         self._async_conn = None
         self._pool = None
+
+
+@cython.cclass
+class PoolTransactionManager(PoolConnectionManager):
+    """The Context Manager for a PoolConnection in transaction mode."""
+
+    def __init__(self, pool: Pool):
+        """The Context Manager for a PoolConnection.
+
+        :param pool `<'Pool'>`: The pool to manage the connection.
+        """
+        self._pool = pool
+        self._sync_conn = None
+        self._async_conn = None
+
+    # Sync ---------------------------------------------------------------------------------------
+    def __enter__(self) -> PoolSyncConnection:
+        self._sync_conn = self._acquire_sync_conn()
+        try:
+            self._sync_conn.begin()
+        except:  # noqa
+            self._release_sync_conn(False)
+            raise
+        return self._sync_conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Encounter error
+        if exc_val is not None:
+            self._release_sync_conn(True)
+            raise exc_val
+
+        # Try commit transaction
+        try:
+            # exit: commit successfully
+            self._sync_conn.commit()
+            self._release_sync_conn(False)
+        except:
+            # fail to commit
+            self._release_sync_conn(True)
+            raise
+
+    # Async --------------------------------------------------------------------------------------
+    async def __aenter__(self) -> PoolConnection:
+        self._async_conn = await self._acquire_async_conn()
+        try:
+            await self._async_conn.begin()
+        except:  # noqa
+            await self._release_async_conn(False)
+            raise
+        return self._async_conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Encounter error
+        if exc_val is not None:
+            await self._release_async_conn(True)
+            raise exc_val
+
+        # Try commit transaction
+        try:
+            # exit: commit successfully
+            await self._async_conn.commit()
+            await self._release_async_conn(False)
+        except:  # noqa
+            # fail to commit
+            await self._release_async_conn(True)
+            raise
 
 
 @cython.cclass
@@ -1107,10 +1180,23 @@ class Pool:
             self._loop = _get_event_loop()
         return self._loop
 
-    # Acquire / Fill / Release ----------------------------------------------------------------
+    # Acquire / Transaction / Fill / Release --------------------------------------------------
     @cython.ccall
     def acquire(self) -> PoolConnectionManager:
         """Acquire a free connection from the pool through context manager `<'PoolConnectionManager'>`.
+
+        ## Notice
+        - To maintain consistency, connection 'autocommit', 'used_decimal',
+          'decode_bit' and 'decode_json' will be reset to pool settings
+          when acquired.
+        - If user changes 'charset', 'read_timeout', 'write_timeout',
+          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
+          and 'exeuction_timeout' through connection built-in 'set_*()'
+          methods, these settings will also be reset to pool defaults
+          at release.
+        - For connection consistency, other changes made on the connection
+          [SESSION] (especially through SQL queries), please manually call
+          'conn.schedule_close()' method before releasing back to the pool.
 
         ## Example (sync):
         >>> with pool.acquire() as conn:
@@ -1127,8 +1213,25 @@ class Pool:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT * FROM table")
             await pool.release(conn)  # manual release
+        """
+        return PoolConnectionManager(self)
 
-        ## Notice for Pool Connection Consistency:
+    @cython.ccall
+    def transaction(self) -> PoolTransactionManager:
+        """Acquire a free connection from the pool in `TRANSACTION` mode
+        through context manager `<'PoolTransactionManager'>`.
+
+        ## Explanation
+        By acquiring connection through this method, the following happens:
+        - 1. Acquire a free connection from the Pool.
+        - 2. Use the connection to `BEGIN` a transaction.
+        - 3. Returns the connection.
+        - 4a. If catches ANY exceptions during the transaction, close and relase the connection by the Pool.
+        - 4b. If the transaction executed successfully, execute `COMMIT` and release the connection back to the Pool.
+
+        ## Notice
+        - Do `NOT` use 'conn.transaction()' to restart a TRANSACTION,
+          only use the 'conn.cursor()' method to acquire the cursor.
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
@@ -1137,17 +1240,35 @@ class Pool:
           and 'exeuction_timeout' through connection built-in 'set_*()'
           methods, these settings will also be reset to pool defaults
           at release.
-        - Other changes made on the connection [SESSION] (especially
-          through SQL queries), please manually call 'conn.schedule_close()'
-          method before releasing back to the pool.
+        - For connection consistency, other changes made on the connection
+          [SESSION] (especially through SQL queries), please manually call
+          'conn.schedule_close()' method before releasing back to the pool.
+
+        ## Example (sync):
+        >>> with pool.transaction() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("INSERT INTO tb (id, name) VALUES (1, 'test')")
+            # Equivalent to:
+            BEGIN;
+            INSERT INTO tb (id, name) VALUES (1, 'test');
+            COMMIT;
+
+        ## Example (async):
+        >>> async with pool.transaction() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("INSERT INTO tb (id, name) VALUES (1, 'test')")
+            # Equivalent to:
+            BEGIN;
+            INSERT INTO tb (id, name) VALUES (1, 'test');
+            COMMIT;
         """
-        return PoolConnectionManager(self)
+        return PoolTransactionManager(self)
 
     async def fill(self, num: cython.int = 1) -> None:
         """Fill the pool with specific number of new `async` connections.
 
         :param num `<'int'>`: The number of new `async` connections to fill. Defaults to `1`.
-            - If the number plus the existing `async`  connections exceeds the
+            - If the number plus the existing `async` connections exceeds the
               maximum pool size, the pool will only fill to the 'max_size' limit.
             - If 'num=-1', the pool will fill to the 'min_size'.
         """
@@ -1174,14 +1295,15 @@ class Pool:
     @cython.ccall
     def release(self, conn: PoolConnection | PoolSyncConnection) -> object:
         """Release a connection back to the pool `<'Future'>`.
+        This method is `NOT` needed if the connection is acquired through the 
+        'acquire()' or 'transaction()' methods. The context manager will
+        automatically release the connection back to the pool.
 
         :param conn `<'PoolConnection/PoolSyncConnection'>`: The pool connection to release.
         :raises `<'PoolReleaseError'>`: If the connection does not belong to this pool.
 
-        ## For `async` connection, please await for the result:
-        >>> await pool.release(conn)
-
-        ## Notice for Pool Connection Consistency:
+        ## Notice
+        - For `async` connection, please await for the result: `await pool.release(conn)`.
         - To maintain consistency, connection 'autocommit', 'used_decimal',
           'decode_bit' and 'decode_json' will be reset to pool settings
           when acquired.
@@ -1190,9 +1312,9 @@ class Pool:
           and 'exeuction_timeout' through connection built-in 'set_*()'
           methods, these settings will also be reset to pool defaults
           at release.
-        - Other changes made on the connection [SESSION] (especially
-          through SQL queries), please manually call 'conn.schedule_close()'
-          method before releasing back to the pool.
+        - For connection consistency, other changes made on the connection
+          [SESSION] (especially through SQL queries), please manually call
+          'conn.schedule_close()' method before releasing back to the pool.
         """
         # Async connection
         loop: AbstractEventLoop = self._get_loop()

@@ -785,6 +785,7 @@ class TestConnection(TestCase):
         await self.test_connection_exception()
         await self.test_transaction_exception()
         await self.test_warnings()
+        await self.test_pool_transaction_manager()
 
     async def test_properties(self) -> None:
         test = "PROPERTIES"
@@ -1220,6 +1221,34 @@ class TestConnection(TestCase):
 
                     ##################################################################
                     await self.drop(conn)
+        self.log_ended(test)
+
+    async def test_pool_transaction_manager(self):
+        test = "POOL TRANSACTION MANAGER"
+        self.log_start(test)
+
+        try:
+            async with await self.get_pool() as pool:
+                async with pool.transaction() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("DROP DATABASE IF EXISTS test_db")
+                        await cur.execute("CREATE DATABASE IF NOT EXISTS test_db")
+                        await cur.execute(
+                            "CREATE TABLE IF NOT EXISTS test_db.tb (a INT)"
+                        )
+                        await cur.execute("INSERT INTO test_db.tb (a) VALUES (1)")
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT * FROM test_db.tb")
+                        self.assertEqual(await cur.fetchall(), ((1,),))
+        except:
+            raise
+        finally:
+            async with await self.get_pool() as pool:
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("DROP DATABASE IF EXISTS test_db")
+
         self.log_ended(test)
 
 
