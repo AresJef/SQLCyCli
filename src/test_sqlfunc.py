@@ -37,7 +37,7 @@ class TestCase(unittest.TestCase):
 
     def compare(self, obj: object, expected: str) -> None:
         self.validate_hash(obj)
-        self.assertEqual(escape(obj, b"utf8"), expected)
+        self.assertEqual(escape(obj), expected)
 
 
 class TestCustomClass(TestCase):
@@ -50,7 +50,7 @@ class TestCustomClass(TestCase):
         self.log_start("RawText")
 
         arg = sqlfunc.RawText("apple")
-        self.assertEqual(escape(arg, b"utf8"), "apple")
+        self.assertEqual(escape(arg), "apple")
 
         self.log_ended("RawText")
 
@@ -62,7 +62,7 @@ class TestCustomClass(TestCase):
                 return "apple"
 
         arg = CustomClass()
-        self.assertEqual(escape(arg, b"utf8"), "apple")
+        self.assertEqual(escape(arg), "apple")
 
         self.log_ended("ObjStr")
 
