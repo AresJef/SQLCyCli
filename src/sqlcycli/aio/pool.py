@@ -1232,7 +1232,7 @@ class Pool:
         - 1. Acquire a free connection from the Pool.
         - 2. Use the connection to `BEGIN` a transaction.
         - 3. Returns the connection.
-        - 4a. If catches ANY exceptions during the transaction, close and relase the connection by the Pool.
+        - 4a. If catches ANY exceptions during the transaction, close and release the connection by the Pool.
         - 4b. If the transaction executed successfully, execute `COMMIT` and release the connection back to the Pool.
 
         ## Notice
