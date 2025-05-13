@@ -28,7 +28,6 @@ datetime.import_datetime()
 from typing import Iterable
 import datetime, numpy as np
 from pandas import Series, DataFrame
-from MySQLdb._mysql import string_literal as _string_literal
 from orjson import loads as _loads, dumps as _dumps, OPT_SERIALIZE_NUMPY
 from sqlcycli.sqlintvl import SQLInterval
 from sqlcycli.sqlfunc import SQLFunction, RawText, ObjStr
@@ -154,24 +153,24 @@ def _orjson_dumps_numpy(obj: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _bytes_to_literal(obj: object) -> object:
-    """(cfunc) Escape bytes object to literal `<'bytes'>`.
+def _string_to_literal(obj: object) -> str:
+    """(cfunc) Escape string object to literal `<'str'>`.
 
-    Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
-    `'string_literal()'` function.
+    For more information, refer to [PyMySQL](https://github.com/PyMySQL/PyMySQL)
+    `'converters.escape_string()'` function.
     """
-    return _string_literal(obj)
+    return "'" + translate_str(obj, STR_ESCAPE_TABLE) + "'"  # type: ignore
 
 
 @cython.cfunc
 @cython.inline(True)
-def _string_to_literal(obj: object, encoding: cython.pchar) -> str:
-    """(cfunc) Escape string object to literal `<'str'>`.
+def _bytes_to_literal(obj: object) -> object:
+    """(cfunc) Escape bytes object to literal `<'bytes'>`.
 
-    Based on [mysqlclient](https://github.com/PyMySQL/mysqlclient)
-    `'string_literal()'` function.
+    For more information, refer to [PyMySQL](https://github.com/PyMySQL/PyMySQL)
+    `'converters.escape_bytes()'` function.
     """
-    return decode_bytes(_string_literal(encode_str(obj, encoding)), encoding)  # type: ignore
+    return "'" + translate_str(decode_bytes_ascii(obj), STR_ESCAPE_TABLE) + "'"  # type: ignore
 
 
 # Custom types ================================================================================
@@ -300,14 +299,14 @@ def _escape_float(data: object) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_str(data: object, encoding: cython.pchar) -> str:
+def _escape_str(data: object) -> str:
     """(cfunc) Escape string 'data' to literal `<'str'>`.
 
     ## Example:
     >>> _escape_str("Hello, World!")
     >>> "'Hello, World!'"  # str
     """
-    return _string_to_literal(data, encoding)
+    return _string_to_literal(data)
 
 
 @cython.cfunc
@@ -489,7 +488,7 @@ def _escape_bytes(data: object) -> str:
     >>> _escape_bytes(b"Hello, World!")
     >>> "_binary'Hello, World!'"  # str
     """
-    return "_binary" + decode_bytes_ascii(_bytes_to_literal(data))  # type: ignore
+    return "_binary'" + translate_str(decode_bytes_ascii(data), STR_ESCAPE_TABLE) + "'"  # type: ignore
 
 
 @cython.cfunc
@@ -568,7 +567,7 @@ def _escape_bit(data: BIT) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_json(data: JSON, encoding: cython.pchar) -> str:
+def _escape_json(data: JSON) -> str:
     """(cfunc) Escape JSON 'data' to literal `<'str'>`.
 
     ## Example:
@@ -576,7 +575,7 @@ def _escape_json(data: JSON, encoding: cython.pchar) -> str:
     >>> "'{\\"key\\":\\"value\\"}'"  # str
     """
     try:
-        return decode_bytes(_bytes_to_literal(_dumps(data._value)), encoding)  # type: ignore
+        return _bytes_to_literal(_dumps(data._value))  # type: ignore
     except Exception as err:
         raise ValueError(
             "Invalid JSON value %s\n%r." % (type(data._value), data._value)
@@ -585,7 +584,7 @@ def _escape_json(data: JSON, encoding: cython.pchar) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_sqlfunc(data: SQLFunction, encoding: cython.pchar) -> str:
+def _escape_sqlfunc(data: SQLFunction) -> str:
     """(cfunc) Escape SqlFunction 'data' to literal `<'str'>`.
 
     ## Example:
@@ -597,21 +596,21 @@ def _escape_sqlfunc(data: SQLFunction, encoding: cython.pchar) -> str:
         return syntax
     if data._arg_count == 1:
         return syntax % _escape_common(
-            cython.cast(object, tuple_getitem(data._args, 0)), encoding
+            cython.cast(object, tuple_getitem(data._args, 0))
         )
-    return data.syntax() % _escape_item_tuple(data._args, encoding, False)
+    return data.syntax() % _escape_item_tuple(data._args, False)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_sqlintvl(data: SQLInterval, encoding: cython.pchar) -> str:
+def _escape_sqlintvl(data: SQLInterval) -> str:
     """(cfunc) Escape SQLInterval 'data' to literal `<'str'>`.
 
     ## Example:
     >>> _escape_sqlintvl(sqlintvl.INTERVAL(1, "DAY"))
     >>> "INTERVAL 1 DAY"  # str
     """
-    return data.syntax() % _escape_common(data._expr, encoding)
+    return data.syntax() % _escape_common(data._expr)
 
 
 @cython.cfunc
@@ -636,7 +635,7 @@ def _escape_objstr(data: ObjStr) -> str:
 # . Sequence types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_list(data: list, encoding: cython.pchar) -> str:
+def _escape_list(data: list) -> str:
     """(cfunc) Escape list 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -649,13 +648,13 @@ def _escape_list(data: list, encoding: cython.pchar) -> str:
         [["val1", 1, 1.1], ["val2", 2, 2.2]])
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data])
+    res = ",".join([_escape_common(i) for i in data])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_tuple(data: tuple, encoding: cython.pchar) -> str:
+def _escape_tuple(data: tuple) -> str:
     """(cfunc) Escape tuple 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -668,13 +667,13 @@ def _escape_tuple(data: tuple, encoding: cython.pchar) -> str:
         (("val1", 1, 1.1), ("val2", 2, 2.2)))
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data])
+    res = ",".join([_escape_common(i) for i in data])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_set(data: set, encoding: cython.pchar) -> str:
+def _escape_set(data: set) -> str:
     """(cfunc) Escape set 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -687,13 +686,13 @@ def _escape_set(data: set, encoding: cython.pchar) -> str:
         {("val1", 1, 1.1), ("val2", 2, 2.2)})
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data])
+    res = ",".join([_escape_common(i) for i in data])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_frozenset(data: frozenset, encoding: cython.pchar) -> str:
+def _escape_frozenset(data: frozenset) -> str:
     """(cfunc) Escape frozenset 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -706,13 +705,13 @@ def _escape_frozenset(data: frozenset, encoding: cython.pchar) -> str:
         {("val1", 1, 1.1), ("val2", 2, 2.2)}))
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data])
+    res = ",".join([_escape_common(i) for i in data])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_sequence(data: Iterable, encoding: cython.pchar) -> str:
+def _escape_sequence(data: Iterable) -> str:
     """(cfunc) Escape sequence 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -725,7 +724,7 @@ def _escape_sequence(data: Iterable, encoding: cython.pchar) -> str:
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values())
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data])
+    res = ",".join([_escape_common(i) for i in data])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
@@ -744,7 +743,7 @@ def _escape_range(data: object) -> str:
 # . Mapping types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_dict(data: dict, encoding: cython.pchar) -> str:
+def _escape_dict(data: dict) -> str:
     """(cfunc) Escape dict 'data' to literal `<'str'>`.
 
     ## Example (flat):
@@ -757,7 +756,7 @@ def _escape_dict(data: dict, encoding: cython.pchar) -> str:
         {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]})
     >>> "('val1',1,1.1),('val2',2,2.2)"  # str
     """
-    res = ",".join([_escape_common(i, encoding) for i in data.values()])
+    res = ",".join([_escape_common(i) for i in data.values()])
     return res if str_read(res, 0) == "(" else "(" + res + ")"
 
 
@@ -857,7 +856,7 @@ def _escape_timedelta64_fr_us(us: cython.longlong) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
+def _escape_ndarray(data: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'data' to literal `<'str'>`.
 
     ## Example (1-dimension):
@@ -875,7 +874,7 @@ def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
     # Serialize ndarray
     # . ndarray[object]
     if dtype == NDARRAY_OBJECT:
-        return _escape_ndarray_object(data, encoding)
+        return _escape_ndarray_object(data)
     # . ndarray[int]
     if dtype == NDARRAY_INT:
         return _escape_ndarray_int(data)
@@ -899,14 +898,14 @@ def _escape_ndarray(data: np.ndarray, encoding: cython.pchar) -> str:
         return _escape_ndarray_bytes(data)
     # . ndarray[str]
     if dtype == NDARRAY_UNICODE:
-        return _escape_ndarray_unicode(data, encoding)
+        return _escape_ndarray_unicode(data)
     # . invalid dtype
     raise TypeError("Unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
+def _escape_ndarray_object(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
     ### This function is for ndarray dtype `"O" (object)` only.
@@ -931,7 +930,7 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         # . escape to literal
         # fmt: off
         l_i = [
-            _escape_common(arr_getitem_1d(arr, i), encoding)  # type: ignore
+            _escape_common(arr_getitem_1d(arr, i))  # type: ignore
             for i in range(s_i)
         ]
         # fmt: on
@@ -947,7 +946,7 @@ def _escape_ndarray_object(arr: np.ndarray, encoding: cython.pchar) -> str:
         i: cython.Py_ssize_t
         l_i = []
         for i in range(s_i):
-            l_j = [_escape_common(arr_getitem_2d(arr, i, j), encoding) for j in range(s_j)]  # type: ignore
+            l_j = [_escape_common(arr_getitem_2d(arr, i, j)) for j in range(s_j)]  # type: ignore
             l_i.append("(" + ",".join(l_j) + ")")
         return ",".join(l_i)
     # invalid
@@ -1242,7 +1241,7 @@ def _escape_ndarray_bytes(arr: np.ndarray) -> str:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
+def _escape_ndarray_unicode(arr: np.ndarray) -> str:
     """(cfunc) Escape numpy.ndarray 'arr' to literal `<'str'>`.
 
     ### This function is for ndarray dtype `"U" (unicode string)` only.
@@ -1267,7 +1266,7 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
         # . escape to literal
         # fmt: off
         l_i = [
-            _escape_str(arr_getitem_1d(arr, i), encoding)  # type: ignore
+            _escape_str(arr_getitem_1d(arr, i))  # type: ignore
             for i in range(s_i)
         ]
         # fmt: on
@@ -1283,7 +1282,7 @@ def _escape_ndarray_unicode(arr: np.ndarray, encoding: cython.pchar) -> str:
         # fmt: off
         l_i = [
             "(" + ",".join([
-                _escape_str(arr_getitem_2d(arr, i, j), encoding)  # type: ignore
+                _escape_str(arr_getitem_2d(arr, i, j))  # type: ignore
                 for j in range(s_j)])+ ")"
             for i in range(s_i)
         ]
@@ -1304,7 +1303,7 @@ def _raise_unsupported_array_dim_error(ndim: cython.int) -> cython.bint:
 # . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_series(data: Series, encoding: cython.pchar) -> str:
+def _escape_series(data: Series) -> str:
     """(cfunc) Escape pandas.Series 'data' to literal `<'str'>`.
 
     ## Example:
@@ -1315,12 +1314,12 @@ def _escape_series(data: Series, encoding: cython.pchar) -> str:
         arr: np.ndarray = data.values
     except Exception as err:
         raise TypeError("Expects <'pandas.Series'>, got %s." % type(data)) from err
-    return _escape_ndarray(arr, encoding)
+    return _escape_ndarray(arr)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
+def _escape_dataframe(data: DataFrame) -> str:
     """(cfunc) Escape pandas.DataFrame 'data' to literal `<'str'>`.
 
     ## Example:
@@ -1342,7 +1341,7 @@ def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
     # Escape DataFrame
     # fmt: off
     cols = [
-        _escape_item_ndarray(col.values, encoding, False) 
+        _escape_item_ndarray(col.values, False) 
         for _, col in data.items()
     ]
     # fmt: on
@@ -1356,7 +1355,7 @@ def _escape_dataframe(data: DataFrame, encoding: cython.pchar) -> str:
 # . Escape - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_common(data: object, encoding: cython.pchar) -> str:
+def _escape_common(data: object) -> str:
     """(cfunc) Escape common 'data' to literal `<'str'>`."""
     # Get data type
     dtype = type(data)
@@ -1365,7 +1364,7 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
     # Basic Types
     # . <'str'>
     if dtype is str:
-        return _escape_str(data, encoding)
+        return _escape_str(data)
     # . <'int'>
     if dtype is int:
         return _escape_int(data)
@@ -1406,26 +1405,26 @@ def _escape_common(data: object, encoding: cython.pchar) -> str:
     # Sequence Types
     # . <'tuple'>
     if dtype is tuple:
-        return _escape_tuple(data, encoding)
+        return _escape_tuple(data)
     # . <'list'>
     if dtype is list:
-        return _escape_list(data, encoding)
+        return _escape_list(data)
     # . <'set'>
     if dtype is set:
-        return _escape_set(data, encoding)
+        return _escape_set(data)
 
     # Mapping Types
     # . <'dict'>
     if dtype is dict:
-        return _escape_dict(data, encoding)
+        return _escape_dict(data)
 
     ##### Uncommon Types #####
-    return _escape_uncommon(data, encoding, dtype)
+    return _escape_uncommon(data, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
+def _escape_uncommon(data: object, dtype: type) -> str:
     """(cfunc) Escape uncommon 'data' to literal `<'str'>`."""
     ##### Uncommon Types #####
     # Basic Types
@@ -1483,31 +1482,31 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
     # String Types:
     # . <'numpy.str_'>
     if dtype is typeref.STR_:
-        return _escape_str(data, encoding)
+        return _escape_str(data)
 
     # Sequence Types
     # . <'frozenset'>
     if dtype is frozenset:
-        return _escape_frozenset(data, encoding)
+        return _escape_frozenset(data)
     # . <'range'>
     if dtype is range:
         return _escape_range(data)
     # . <'dict_keys'> & <'dict_values'>
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
-        return _escape_sequence(data, encoding)
+        return _escape_sequence(data)
 
     # Mapping Types
     # . <'dict_items'>
     if dtype is typeref.DICT_ITEMS:
-        return _escape_dict(dict(data), encoding)
+        return _escape_dict(dict(data))
 
     # NumPy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
-        return _escape_ndarray(data, encoding)
+        return _escape_ndarray(data)
     # . <'numpy.record'>
     if dtype is typeref.RECORD:
-        return _escape_sequence(data, encoding)
+        return _escape_sequence(data)
 
     # Pandas Types
     # . <'pandas.Series'> & <'pandas.DatetimeIndex'> & <'pandas.TimedeltaIndex'>
@@ -1516,20 +1515,20 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
         or dtype is typeref.DATETIMEINDEX
         or dtype is typeref.TIMEDELTAINDEX
     ):
-        return _escape_series(data, encoding)
+        return _escape_series(data)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:
-        return _escape_dataframe(data, encoding)
+        return _escape_dataframe(data)
 
     # Custom Types
     if dtype is BIT:
         return _escape_bit(data)
     if dtype is JSON:
-        return _escape_json(data, encoding)
+        return _escape_json(data)
     if isinstance(data, SQLFunction):
-        return _escape_sqlfunc(data, encoding)
+        return _escape_sqlfunc(data)
     if isinstance(data, SQLInterval):
-        return _escape_sqlintvl(data, encoding)
+        return _escape_sqlintvl(data)
     if dtype is RawText:
         return _escape_rawtext(data)
     if dtype is ObjStr:
@@ -1542,21 +1541,21 @@ def _escape_uncommon(data: object, encoding: cython.pchar, dtype: type) -> str:
             return _escape_datetime(data)
         # . <'cytimes.pddt'>
         if dtype is typeref.PDDT:
-            return _escape_series(data, encoding)
+            return _escape_series(data)
 
     ##### Subclass Types #####
-    return _escape_subclass(data, encoding, dtype)
+    return _escape_subclass(data, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
+def _escape_subclass(data: object, dtype: type) -> str:
     """(cfunc) Escape subclass 'data' to literal `<'str'>`."""
     ##### Subclass Types #####
     # Basic Types
     # . subclass of <'str'>
     if isinstance(data, str):
-        return _escape_str(str(data), encoding)
+        return _escape_str(str(data))
     # . subclass of <'int'>
     if isinstance(data, int):
         return _escape_int(int(data))
@@ -1584,21 +1583,21 @@ def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
     # Sequence Types
     # . subclass of <'tuple'>
     if isinstance(data, tuple):
-        return _escape_tuple(tuple(data), encoding)
+        return _escape_tuple(tuple(data))
     # . subclass of <'list'>
     if isinstance(data, list):
-        return _escape_list(list(data), encoding)
+        return _escape_list(list(data))
     # . subclass of <'set'>
     if isinstance(data, set):
-        return _escape_set(set(data), encoding)
+        return _escape_set(set(data))
     # . subclass of <'frozenset'>
     if isinstance(data, frozenset):
-        return _escape_frozenset(frozenset(data), encoding)
+        return _escape_frozenset(frozenset(data))
 
     # Mapping Types
     # . subclass of <'dict'>
     if isinstance(data, dict):
-        return _escape_dict(dict(data), encoding)
+        return _escape_dict(dict(data))
 
     # Invalid Data Type
     raise TypeError("Unsupported 'data' type %s." % dtype)
@@ -1608,11 +1607,7 @@ def _escape_subclass(data: object, encoding: cython.pchar, dtype: type) -> str:
 # . Sequence types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_list(
-    data: list,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_list(data: list, many: cython.bint) -> object:
     """(cfunc) Escape items of list 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1637,17 +1632,13 @@ def _escape_item_list(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data]
-    return list_to_tuple([_escape_common(i, encoding) for i in data])
+        return [_escape_item_common(i, False) for i in data]
+    return list_to_tuple([_escape_common(i) for i in data])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_tuple(
-    data: tuple,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_tuple(data: tuple, many: cython.bint) -> object:
     """(cfunc) Escape items of tuple 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1672,17 +1663,13 @@ def _escape_item_tuple(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data]
-    return list_to_tuple([_escape_common(i, encoding) for i in data])
+        return [_escape_item_common(i, False) for i in data]
+    return list_to_tuple([_escape_common(i) for i in data])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_set(
-    data: set,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_set(data: set, many: cython.bint) -> object:
     """(cfunc) Escape items of set 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1707,17 +1694,13 @@ def _escape_item_set(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data]
-    return list_to_tuple([_escape_common(i, encoding) for i in data])
+        return [_escape_item_common(i, False) for i in data]
+    return list_to_tuple([_escape_common(i) for i in data])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_frozenset(
-    data: frozenset,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_frozenset(data: frozenset, many: cython.bint) -> object:
     """(cfunc) Escape items of frozenset 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1742,17 +1725,13 @@ def _escape_item_frozenset(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data]
-    return list_to_tuple([_escape_common(i, encoding) for i in data])
+        return [_escape_item_common(i, False) for i in data]
+    return list_to_tuple([_escape_common(i) for i in data])
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_sequence(
-    data: Iterable,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_sequence(data: Iterable, many: cython.bint) -> object:
     """(cfunc) Escape items of sequence 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1777,8 +1756,8 @@ def _escape_item_sequence(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data]
-    return list_to_tuple([_escape_common(i, encoding) for i in data])
+        return [_escape_item_common(i, False) for i in data]
+    return list_to_tuple([_escape_common(i) for i in data])
 
 
 @cython.cfunc
@@ -1802,11 +1781,7 @@ def _escape_item_range(data: object, many: cython.bint) -> object:
 # . Mapping types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_dict(
-    data: dict,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_dict(data: dict, many: cython.bint) -> object:
     """(cfunc) Escape items of dict 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1831,18 +1806,14 @@ def _escape_item_dict(
     >>> [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # list[tuple[str]]
     """
     if many:
-        return [_escape_item_common(i, encoding, False) for i in data.values()]
-    return list_to_tuple([_escape_common(i, encoding) for i in data.values()])
+        return [_escape_item_common(i, False) for i in data.values()]
+    return list_to_tuple([_escape_common(i) for i in data.values()])
 
 
 # . NumPy types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray(
-    data: np.ndarray,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_ndarray(data: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'data' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1864,7 +1835,7 @@ def _escape_item_ndarray(
 
     # . ndarray[object]
     if dtype == NDARRAY_OBJECT:
-        return _escape_item_ndarray_object(data, encoding, many)
+        return _escape_item_ndarray_object(data, many)
     # . ndarray[int]
     if dtype == NDARRAY_INT:
         return _escape_item_ndarray_int(data, many)
@@ -1888,18 +1859,14 @@ def _escape_item_ndarray(
         return _escape_item_ndarray_bytes(data, many)
     # . ndarray[str]
     if dtype == NDARRAY_UNICODE:
-        return _escape_item_ndarray_unicode(data, encoding, many)
+        return _escape_item_ndarray_unicode(data, many)
     # . invalid dtype
     raise TypeError("Unsupported <'numpy.ndarray'> dtype [%s]." % data.dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_object(
-    arr: np.ndarray,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_ndarray_object(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -1929,14 +1896,11 @@ def _escape_item_ndarray_object(
         # . escape items to literals
         if many:
             return [
-                _escape_item_common(arr_getitem_1d(arr, i), encoding, False)  # type: ignore
+                _escape_item_common(arr_getitem_1d(arr, i), False)  # type: ignore
                 for i in range(s_i)
             ]
         return list_to_tuple(
-            [
-                _escape_common(arr_getitem_1d(arr, i), encoding)  # type: ignore
-                for i in range(s_i)
-            ]
+            [_escape_common(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
         )
     # 2-dimensional
     if ndim == 2:
@@ -1949,7 +1913,7 @@ def _escape_item_ndarray_object(
         # fmt: off
         return [
             list_to_tuple([
-                _escape_common(arr_getitem_2d(arr, i, j), encoding)  # type: ignore
+                _escape_common(arr_getitem_2d(arr, i, j))  # type: ignore
                 for j in range(s_j)])
             for i in range(s_i)
         ]
@@ -2282,11 +2246,7 @@ def _escape_item_ndarray_bytes(arr: np.ndarray, many: cython.bint) -> object:
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_ndarray_unicode(
-    arr: np.ndarray,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_ndarray_unicode(arr: np.ndarray, many: cython.bint) -> object:
     """(cfunc) Escape items of numpy.ndarray 'arr' to
     sequence(s) of literals `<'tuple/list'>`.
 
@@ -2314,7 +2274,7 @@ def _escape_item_ndarray_unicode(
         if s_i == 0:
             return [] if many else ()  # exit
         # . escape items to literals
-        l_i = [_escape_str(arr_getitem_1d(arr, i), encoding) for i in range(s_i)]  # type: ignore
+        l_i = [_escape_str(arr_getitem_1d(arr, i)) for i in range(s_i)]  # type: ignore
         return l_i if many else list_to_tuple(l_i)
     # 2-dimensional
     if ndim == 2:
@@ -2327,7 +2287,7 @@ def _escape_item_ndarray_unicode(
         l_i = []
         i: cython.Py_ssize_t
         for i in range(s_i):
-            l_j = [_escape_str(arr_getitem_2d(arr, i, j), encoding) for j in range(s_j)]  # type: ignore
+            l_j = [_escape_str(arr_getitem_2d(arr, i, j)) for j in range(s_j)]  # type: ignore
             l_i.append(list_to_tuple(l_j))
         return l_i
     # invalid
@@ -2337,11 +2297,7 @@ def _escape_item_ndarray_unicode(
 # . Pandas types - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_series(
-    data: Series,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_series(data: Series, many: cython.bint) -> object:
     """(cfunc) Escape items of pandas.Series 'data' to
     tuple of literals `<'tuple[str]'>`.
 
@@ -2353,12 +2309,12 @@ def _escape_item_series(
         arr: np.ndarray = data.values
     except Exception as err:
         raise TypeError("Expects <'pandas.Series'>, got %s." % type(data)) from err
-    return _escape_item_ndarray(arr, encoding, many)
+    return _escape_item_ndarray(arr, many)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
+def _escape_item_dataframe(data: DataFrame) -> list:
     """(cfunc) Escape items of pandas.DataFrame 'data' to
     sequences of literals `<'list[tuple[str]]'>`.
 
@@ -2385,7 +2341,7 @@ def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
     # Escape DataFrame
     # fmt: off
     cols = [
-        _escape_item_ndarray(col.values, encoding, False) 
+        _escape_item_ndarray(col.values, False) 
         for _, col in data.items()
     ]
     return [
@@ -2400,11 +2356,7 @@ def _escape_item_dataframe(data: DataFrame, encoding: cython.pchar) -> list:
 # . Escape - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_common(
-    data: object,
-    encoding: cython.pchar,
-    many: cython.bint,
-) -> object:
+def _escape_item_common(data: object, many: cython.bint) -> object:
     """(cfunc) Escape items of common 'data' to literal
     or sequence(s) of literals `<'str/tuple/list'>`."""
     # Get data type
@@ -2414,7 +2366,7 @@ def _escape_item_common(
     # Basic Types
     # . <'str'>
     if dtype is str:
-        return _escape_str(data, encoding)
+        return _escape_str(data)
     # . <'int'>
     if dtype is int:
         return _escape_int(data)
@@ -2455,31 +2407,26 @@ def _escape_item_common(
     # Sequence Types
     # . <'list'>
     if dtype is list:
-        return _escape_item_list(data, encoding, many)
+        return _escape_item_list(data, many)
     # . <'tuple'>
     if dtype is tuple:
-        return _escape_item_tuple(data, encoding, many)
+        return _escape_item_tuple(data, many)
     # . <'set'>
     if dtype is set:
-        return _escape_item_set(data, encoding, many)
+        return _escape_item_set(data, many)
 
     # Mapping Types
     # . <'dict'>
     if dtype is dict:
-        return _escape_item_dict(data, encoding, many)
+        return _escape_item_dict(data, many)
 
     ##### Uncommon Types #####
-    return _escape_item_uncommon(data, encoding, many, dtype)
+    return _escape_item_uncommon(data, many, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_uncommon(
-    data: object,
-    encoding: cython.pchar,
-    many: cython.bint,
-    dtype: type,
-) -> object:
+def _escape_item_uncommon(data: object, many: cython.bint, dtype: type) -> object:
     """(cfunc) Escape items of uncommon 'data' to literal
     or sequence(s) of literals `<'str/tuple/list'>`."""
     ##### Uncommon Types #####
@@ -2538,31 +2485,31 @@ def _escape_item_uncommon(
     # String Types:
     # . <'numpy.str_'>
     if dtype is typeref.STR_:
-        return _escape_str(data, encoding)
+        return _escape_str(data)
 
     # Sequence Types
     # . <'frozenset'>
     if dtype is frozenset:
-        return _escape_item_frozenset(data, encoding, many)
+        return _escape_item_frozenset(data, many)
     # . <'range'>
     if dtype is range:
         return _escape_item_range(data, many)
     # . <'dict_keys'> & <'dict_values'>
     if dtype is typeref.DICT_VALUES or dtype is typeref.DICT_KEYS:
-        return _escape_item_sequence(data, encoding, many)
+        return _escape_item_sequence(data, many)
 
     # Mapping Types
     # . <'dict_items'>
     if dtype is typeref.DICT_ITEMS:
-        return _escape_item_dict(dict(data), encoding, many)
+        return _escape_item_dict(dict(data), many)
 
     # NumPy Types
     # . <'numpy.ndarray'>
     if dtype is np.ndarray:
-        return _escape_item_ndarray(data, encoding, many)
+        return _escape_item_ndarray(data, many)
     # . <'numpy.record'>
     if dtype is typeref.RECORD:
-        return _escape_item_sequence(data, encoding, many)
+        return _escape_item_sequence(data, many)
 
     # Pandas Types
     # . <'pandas.Series'> & <'pandas.DatetimeIndex'> & <'pandas.TimedeltaIndex'>
@@ -2571,20 +2518,20 @@ def _escape_item_uncommon(
         or dtype is typeref.DATETIMEINDEX
         or dtype is typeref.TIMEDELTAINDEX
     ):
-        return _escape_item_series(data, encoding, many)
+        return _escape_item_series(data, many)
     # . <'pandas.DataFrame'>
     if dtype is typeref.DATAFRAME:
-        return _escape_item_dataframe(data, encoding)
+        return _escape_item_dataframe(data)
 
     # Custom Types
     if dtype is BIT:
         return _escape_bit(data)
     if dtype is JSON:
-        return _escape_json(data, encoding)
+        return _escape_json(data)
     if isinstance(data, SQLFunction):
-        return _escape_sqlfunc(data, encoding)
+        return _escape_sqlfunc(data)
     if isinstance(data, SQLInterval):
-        return _escape_sqlintvl(data, encoding)
+        return _escape_sqlintvl(data)
     if dtype is RawText:
         return _escape_rawtext(data)
     if dtype is ObjStr:
@@ -2597,27 +2544,22 @@ def _escape_item_uncommon(
             return _escape_datetime(data)
         # . <'cytimes.pddt'>
         if dtype is typeref.PDDT:
-            return _escape_item_series(data, encoding, many)
+            return _escape_item_series(data, many)
 
     ##### Subclass Types #####
-    return _escape_item_subclass(data, encoding, many, dtype)
+    return _escape_item_subclass(data, many, dtype)
 
 
 @cython.cfunc
 @cython.inline(True)
-def _escape_item_subclass(
-    data: object,
-    encoding: cython.pchar,
-    many: cython.bint,
-    dtype: type,
-) -> object:
+def _escape_item_subclass(data: object, many: cython.bint, dtype: type) -> object:
     """(cfunc) Escape items of subclass 'data' to literal
     or sequence(s) of literals `<'str/tuple/list'>`."""
     ##### Subclass Types #####
     # Basic Types
     # . subclass of <'str'>
     if isinstance(data, str):
-        return _escape_str(str(data), encoding)
+        return _escape_str(str(data))
     # . subclass of <'int'>
     if isinstance(data, int):
         return _escape_int(int(data))
@@ -2645,21 +2587,21 @@ def _escape_item_subclass(
     # Sequence Types
     # . subclass of <'list'>
     if isinstance(data, list):
-        return _escape_item_list(list(data), encoding, many)
+        return _escape_item_list(list(data), many)
     # . subclass of <'tuple'>
     if isinstance(data, tuple):
-        return _escape_item_tuple(tuple(data), encoding, many)
+        return _escape_item_tuple(tuple(data), many)
     # . subclass of <'set'>
     if isinstance(data, set):
-        return _escape_item_set(set(data), encoding, many)
+        return _escape_item_set(set(data), many)
     # . subclass of <'frozenset'>
     if isinstance(data, frozenset):
-        return _escape_item_frozenset(frozenset(data), encoding, many)
+        return _escape_item_frozenset(frozenset(data), many)
 
     # Mapping Types
     # . subclass of <'dict'>
     if isinstance(data, dict):
-        return _escape_item_dict(dict(data), encoding, many)
+        return _escape_item_dict(dict(data), many)
 
     # Invalid Data Type
     raise TypeError("Unsupported 'data' type %s." % dtype)
@@ -2669,7 +2611,6 @@ def _escape_item_subclass(
 @cython.ccall
 def escape(
     data: object,
-    encoding: cython.pchar,
     itemize: cython.bint = True,
     many: cython.bint = False,
 ) -> object:
@@ -2688,8 +2629,6 @@ def escape(
           pd.TimedeltaIndex, pd.Series, pd.DataFrame.
         - Library [cytimes](https://github.com/AresJef/cyTimes):
           pydt, pddt.
-
-    :param encoding `<'bytes'>`: The encoding for the data.
 
     :param itemize `<'bool'>`: Whether to escape each items of the 'data' individual. Defaults to `True`.
         - When 'itemize=True', the 'data' type determines how to escape.
@@ -2732,9 +2671,9 @@ def escape(
     """
     try:
         if itemize or many:
-            return _escape_item_common(data, encoding, many)
+            return _escape_item_common(data, many)
         else:
-            return _escape_common(data, encoding)
+            return _escape_common(data)
     except Exception as err:
         raise errors.EscapeError(
             "Failed to escape: %s\n%r\nError: %s" % (type(data), data, err)

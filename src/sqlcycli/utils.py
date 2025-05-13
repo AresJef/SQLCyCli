@@ -219,13 +219,13 @@ def validate_max_allowed_packet(
 
 @cython.cfunc
 @cython.inline(True)
-def validate_sql_mode(sql_mode: object, encoding: cython.pchar) -> str:
+def validate_sql_mode(sql_mode: object) -> str:
     """(cfunc) Validate if the 'sql_mode' argument is valid `<'str'>`."""
     if sql_mode is None:
         return None
     if isinstance(sql_mode, str):
         if str_len(sql_mode) > 0:
-            return escape(sql_mode, encoding, False, False)
+            return escape(sql_mode, False, False)
         return None
     raise errors.InvalidConnectionArgsError(
         "Invalid 'sql_mode' argument: %r.\n"

@@ -356,5 +356,5 @@ cdef bytes validate_arg_bytes(object arg, str arg_name, char* encoding, str defa
 cdef Charset validate_charset(object charset, object collation, str default_charset)
 cdef int validate_autocommit(object auto) except -2
 cdef int validate_max_allowed_packet(object max_allowed_packet, int default, int maximum)
-cdef str validate_sql_mode(object sql_mode, char* encoding)
+cdef str validate_sql_mode(object sql_mode)
 cdef object validate_ssl(object ssl)

@@ -663,7 +663,7 @@ class Pool:
         self._local_infile = local_infile
         self._max_allowed_packet = utils.validate_max_allowed_packet(
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
-        self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
+        self._sql_mode = utils.validate_sql_mode(sql_mode)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = validate_async_cursor(cursor)
         self._sync_cursor = validate_sync_cursor(cursor)

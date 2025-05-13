@@ -667,7 +667,7 @@ class Cursor:
         # Single query: no args
         if args is None:
             return await self._query_str(sql)
-        args = escape(args, self._encoding_c, itemize, many)
+        args = escape(args, itemize, many)
 
         # Single row query
         if not many and not itemize:
@@ -861,7 +861,7 @@ class Cursor:
         if args is None:
             _args: tuple = ()
         else:
-            items = escape(args, self._encoding_c, True, False)
+            items = escape(args, True, False)
             if type(items) is not tuple:
                 raise errors.InvalidCursorArgsError(
                     "Invalid 'args' for 'callproc()' method, "
@@ -916,7 +916,7 @@ class Cursor:
         # Query without args
         if args is None:
             return sql
-        args = escape(args, self._encoding_c, itemize, many)
+        args = escape(args, itemize, many)
 
         # Single row query
         if not many and not itemize:
@@ -2506,7 +2506,7 @@ class BaseConnection:
         string(s). The 'sql' should have '%s' placeholders equal to the
         item count in each row.
         """
-        return escape(args, self._encoding_c, itemize, many)
+        return escape(args, itemize, many)
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:
@@ -3976,7 +3976,7 @@ class Connection(BaseConnection):
         self._local_infile = bool(local_infile)
         self._max_allowed_packet = utils.validate_max_allowed_packet(
             max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
-        self._sql_mode = utils.validate_sql_mode(sql_mode, encoding)
+        self._sql_mode = utils.validate_sql_mode(sql_mode)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = None
         self._cursor = self._validate_cursor(cursor)
