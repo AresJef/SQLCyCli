@@ -1787,13 +1787,9 @@ class TransactionManager(CursorManager):
         self._cur = self._acquire()
         try:
             self._conn.begin()
-        except BaseException as err:
+        except:  # noqa
             self._close()
-            err.add_note(
-                "-> <'%s'> Failed to START TRANSACTION: %s"
-                % (self.__class__.__name__, err)
-            )
-            raise err
+            raise
         return self._cur
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -1801,26 +1797,18 @@ class TransactionManager(CursorManager):
         if exc_val is not None:
             self._conn.close()
             self._close()
-            exc_val.add_note(
-                "-> <'%s'> Failed to COMMIT TRANSACTION: %s"
-                % (self.__class__.__name__, exc_val)
-            )
             raise exc_val
 
         # Try commit the transaction
         try:
+            # exit: commit successfully
             self._conn.commit()
             self._close()
-            # exit: commit successfully
-        except BaseException as err:
+        except:  # noqa
             # fail to commit
             self._conn.close()
             self._close()
-            err.add_note(
-                "-> <'%s'> Failed to COMMIT TRANSACTION: %s"
-                % (self.__class__.__name__, err)
-            )
-            raise err
+            raise
 
 
 @cython.cclass
@@ -2345,16 +2333,17 @@ class BaseConnection:
         """Acquire a new cursor in `TRANSACTION` mode
         through context manager `<'TransactionManager'>`.
 
+        :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
+            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+
+        ## Explanation
         By acquiring cursor through this method, the following happens:
         - 1. Use the connection to `BEGIN` a transaction.
         - 2. Returns a cursor of the connection.
         - 3a. If catches ANY exceptions during the transaction, close the connection.
         - 3b. If the transaction executed successfully, execute `COMMIT` in the end.
 
-        :param cursor `<'type[Cursor]/None'>`: The cursor type (class) to use. Defaults to `None` (use connection default).
-            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
-
-        ## Example:
+        ## Example
         >>> with conn.transaction() as cur:
                 cur.execute("INSERT INTO table VALUES (1, 'name')")
                 # COMMIT automatically if no error
