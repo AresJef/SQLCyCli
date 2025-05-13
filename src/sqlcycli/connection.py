@@ -2345,8 +2345,11 @@ class BaseConnection:
 
         ## Example
         >>> with conn.transaction() as cur:
-                cur.execute("INSERT INTO table VALUES (1, 'name')")
-                # COMMIT automatically if no error
+                cur.execute("INSERT INTO tb (id, name) VALUES (1, 'name')")
+            # Equivalent to:
+            BEGIN;
+            INSERT INTO tb (id, name) VALUES (1, 'test');
+            COMMIT;
         """
         self._verify_connected()
         cur = self._validate_cursor(cursor)
