@@ -1,6 +1,6 @@
 import asyncio, time, warnings
 import pandas as pd
-import aiomysql, asyncmy, MySQLdb, pymysql, sqlcycli
+import aiomysql, asyncmy, pymysql, sqlcycli
 
 warnings.filterwarnings("ignore", category=Warning)
 
@@ -327,7 +327,6 @@ if __name__ == "__main__":
 
     stats = []
     for cls, args in (
-        (Benchmark_Sync, {"name": "mysqlclient", "conn_cls": MySQLdb.Connection}),
         (Benchmark_Sync, {"name": "SQLCyCli", "conn_cls": sqlcycli.Connection}),
         (Benchmark_Sync, {"name": "PyMySQL", "conn_cls": pymysql.Connection}),
         (Benchmark_Async, {"name": "SQLCyCli", "conn_cls": sqlcycli.aio.Connection}),
