@@ -32,7 +32,13 @@ from sqlcycli._optionfile import OptionFile
 from sqlcycli.aio import connection as async_conn
 from sqlcycli import connection as sync_conn, utils, errors
 
-__all__ = ["PoolConnection", "PoolSyncConnection", "PoolConnectionManager", "Pool"]
+__all__ = [
+    "PoolConnection",
+    "PoolSyncConnection",
+    "PoolConnectionManager",
+    "PoolTransactionManager",
+    "Pool",
+]
 
 
 # Utils ---------------------------------------------------------------------------------------
@@ -1295,7 +1301,7 @@ class Pool:
     @cython.ccall
     def release(self, conn: PoolConnection | PoolSyncConnection) -> object:
         """Release a connection back to the pool `<'Future'>`.
-        This method is `NOT` needed if the connection is acquired through the 
+        This method is `NOT` needed if the connection is acquired through the
         'acquire()' or 'transaction()' methods. The context manager will
         automatically release the connection back to the pool.
 
