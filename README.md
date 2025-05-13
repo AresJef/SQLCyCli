@@ -16,19 +16,6 @@ Install from `github`
 pip install git+https://github.com/AresJef/SQLCyCli.git
 ```
 
-For Linux systems, if you encounter the following error when installing the SQLCyCli dependency [mysqlclient](https://github.com/PyMySQL/mysqlclient):
-
-```
-Exception: Can not find valid pkg-config name.
-Specify MYSQLCLIENT_CFLAGS and MYSQLCLIENT_LDFLAGS env vars manually
-```
-
-Try the following to fix dependency issue (source: [Stack Overflow](https://stackoverflow.com/questions/76585758/mysqlclient-cannot-install-via-pip-cannot-find-pkg-config-name-in-ubuntu)):
-
-```bash
-sudo apt-get install pkg-config python3-dev default-libmysqlclient-dev build-essential
-```
-
 ## Requirements
 
 - Python 3.10 or higher.
@@ -48,8 +35,6 @@ The following result comes from [benchmark](./src/benchmark.py):
 
 - Device: MacbookPro M1Pro(2E8P) 32GB
 - Python: 3.12.4
-- MySQL: 8.3.0
-- mysqlclient: 2.2.4
 - PyMySQL: 1.1.1
 - aiomysql: 0.2.0
 - asyncmy: 0.2.9
@@ -57,23 +42,21 @@ The following result comes from [benchmark](./src/benchmark.py):
 ```
 # Unit: second | Lower is better
 name        type    rows    insert-per-row  insert-bulk select-per-row  select-all
-mysqlclient sync    50000   1.729575        0.435661    1.719481        0.117943
-SQLCyCli    sync    50000   2.165910        0.275736    2.215093        0.056679
-PyMySQL     sync    50000   2.553401        0.404618    4.212548        0.325706
-SQLCyCli    async   50000   3.347850        0.282364    4.153874        0.135656
-aiomysql    async   50000   3.478428        0.394711    5.101733        0.321200
-asyncmy     async   50000   3.665675        0.397671    5.483239        0.313418
+SQLCyCli    sync    50000   2.428453        0.367404    2.526141        0.078057
+PyMySQL     sync    50000   2.821481        0.480322    4.784844        0.335978
+SQLCyCli    async   50000   3.757844        0.340909    5.017284        0.157078
+aiomysql    async   50000   3.845818        0.419444    5.764339        0.333526
+asyncmy     async   50000   4.015180        0.484794    6.144809        0.337285
 ```
 
 ```
 # Unit: second | Lower is better
 name        type    rows    update-per-row  update-all  delete-per-row  delete-all
-mysqlclient sync    50000   1.735787        0.345561    1.531275        0.105109
-SQLCyCli    sync    50000   2.241458        0.343359    2.078324        0.104441
-PyMySQL     sync    50000   2.516349        0.344614    2.264735        0.104326
-SQLCyCli    async   50000   3.465996        0.343864    3.269337        0.103967
-aiomysql    async   50000   3.534125        0.344573    3.345815        0.104281
-asyncmy     async   50000   3.695764        0.352104    3.460674        0.104523
+SQLCyCli    sync    50000   2.597837        0.327441    2.251010        0.131872
+PyMySQL     sync    50000   3.044907        0.368951    2.789961        0.158141
+SQLCyCli    async   50000   4.226546        0.369085    3.994125        0.139679
+aiomysql    async   50000   3.792293        0.356109    3.589203        0.134762
+asyncmy     async   50000   4.160017        0.362896    3.928555        0.145456
 ```
 
 ## Usage
@@ -277,4 +260,3 @@ SQLCyCli is based on the following open-source repositories:
 - [numpy](https://github.com/numpy/numpy)
 - [orjson](https://github.com/ijl/orjson)
 - [pandas](https://github.com/pandas-dev/pandas)
-- [mysqlclient](https://github.com/PyMySQL/mysqlclient)
