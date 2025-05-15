@@ -10,11 +10,42 @@ from sqlcycli.charset cimport Charset
 
 # Constants
 cdef:
+    str DEFAULT_USER
+    str DEFUALT_CHARSET
+    int MAX_CONNECT_TIMEOUT
+    int DEFALUT_MAX_ALLOWED_PACKET
+    int MAXIMUM_MAX_ALLOWED_PACKET
+    unsigned int MAX_PACKET_LENGTH
+    #: Max statement size which :meth:`executemany` generates.
+    #: Max size of allowed statement is max_allowed_packet - packet_header_size.
+    #: Default value of max_allowed_packet is 1048576.
+    unsigned int MAX_STATEMENT_LENGTH
+    #: Regular expression for :meth:`Cursor.executemany`.
+    #: executemany only supports simple bulk insert.
+    #: You can use it to load large dataset.
+    object INSERT_VALUES_RE
+    #: Regular expression for server version.
+    object SERVER_VERSION_RE
+
+    # The following values are for the first byte
+    # value of MySQL length encoded integer.
     unsigned char NULL_COLUMN  # 251
     unsigned char UNSIGNED_CHAR_COLUMN  # 251
     unsigned char UNSIGNED_SHORT_COLUMN  # 252
     unsigned char UNSIGNED_INT24_COLUMN  # 253
     unsigned char UNSIGNED_INT64_COLUMN  # 254
+
+# Utils: Connection
+cdef bytes gen_connect_attrs(list attrs)
+cdef bytes DEFAULT_CONNECT_ATTRS
+cdef str validate_arg_str(object arg, str arg_name, str default)
+cdef object validate_arg_uint(object arg, str arg_name, unsigned int min_val, unsigned int max_val)
+cdef bytes validate_arg_bytes(object arg, str arg_name, char* encoding, str default)
+cdef Charset validate_charset(object charset, object collation, str default_charset)
+cdef int validate_autocommit(object auto) except -2
+cdef int validate_max_allowed_packet(object max_allowed_packet, int default, int maximum)
+cdef str validate_sql_mode(object sql_mode)
+cdef object validate_ssl(object ssl)
 
 # Utils: string
 cdef inline bytes encode_str(object obj, char* encoding):
@@ -348,13 +379,4 @@ cdef inline long long unpack_int64(char* data, Py_ssize_t pos):
     """
     return <long long> unpack_uint64(data, pos)
 
-# Utils: Connection
-cdef bytes gen_connect_attrs(list attrs)
-cdef str validate_arg_str(object arg, str arg_name, str default)
-cdef object validate_arg_uint(object arg, str arg_name, unsigned int min_val, unsigned int max_val)
-cdef bytes validate_arg_bytes(object arg, str arg_name, char* encoding, str default)
-cdef Charset validate_charset(object charset, object collation, str default_charset)
-cdef int validate_autocommit(object auto) except -2
-cdef int validate_max_allowed_packet(object max_allowed_packet, int default, int maximum)
-cdef str validate_sql_mode(object sql_mode)
-cdef object validate_ssl(object ssl)
+

@@ -11,12 +11,44 @@ from cython.cimports.sqlcycli._ssl import is_ssl, is_ssl_ctx  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset, _charsets  # type: ignore
 
 # Python imports
+import re
 from sqlcycli.charset import Charset
 from sqlcycli.transcode import escape
 from sqlcycli._ssl import is_ssl, is_ssl_ctx
 from sqlcycli import errors
 
 # Constants -----------------------------------------------------------------------------------
+try:
+    import getpass
+
+    DEFAULT_USER: str = getpass.getuser()
+    del getpass
+except (ImportError, KeyError):
+    #: KeyError occurs when there's no entry
+    #: in OS database for a current user.
+    DEFAULT_USER: str = None
+DEFUALT_CHARSET: str = "utf8mb4"
+MAX_CONNECT_TIMEOUT: cython.int = 31_536_000  # 1 year
+DEFALUT_MAX_ALLOWED_PACKET: cython.int = 16_777_216  # 16MB
+MAXIMUM_MAX_ALLOWED_PACKET: cython.int = 1_073_741_824  # 1GB
+MAX_PACKET_LENGTH: cython.uint = 2**24 - 1
+#: Max statement size which :meth:`executemany` generates.
+#: Max size of allowed statement is max_allowed_packet - packet_header_size.
+#: Default value of max_allowed_packet is 1048576.
+MAX_STATEMENT_LENGTH: cython.uint = 1024000
+#: Regular expression for :meth:`Cursor.executemany`.
+#: executemany only supports simple bulk insert.
+#: You can use it to load large dataset.
+RE_INSERT_VALUES: re.Pattern = re.compile(
+    r"\s*((?:INSERT|REPLACE)\b.+\bVALUES?\s*)"  # prefix: INSERT INTO ... VALUES
+    + r"(\(\s*(?:%s|%\(.+\)s)\s*(?:,\s*(?:%s|%\(.+\)s)\s*)*\))"  # placeholders: (%s, %s, ...)
+    + r"(\s*(?:AS\b\s.+)?\s*(?:ON DUPLICATE\b.+)?);?\s*\Z",  # suffix: AS ... ON DUPLICATE ...
+    re.IGNORECASE | re.DOTALL,
+)
+INSERT_VALUES_RE: re.Pattern = RE_INSERT_VALUES
+#: Regular expression for server version.
+SERVER_VERSION_RE: re.Pattern = re.compile(r".*?(\d+)\.(\d+)\.(\d+).*?")
+
 # The following values are for the first byte
 # value of MySQL length encoded integer.
 NULL_COLUMN: cython.uchar = 251
@@ -37,6 +69,11 @@ def gen_connect_attrs(attrs: list[str]) -> bytes:
         arr.append(gen_length_encoded_integer(bytes_len(attr)))  # type: ignore
         arr.append(attr)
     return b"".join(arr)
+
+
+DEFAULT_CONNECT_ATTRS: bytes = gen_connect_attrs(
+    ["_client_name", "sqlcycli", "_client_version", "0.0.0", "_pid"]
+)
 
 
 @cython.cfunc

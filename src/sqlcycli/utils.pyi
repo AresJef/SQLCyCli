@@ -1,12 +1,55 @@
 import cython
+from re import Pattern
 from sqlcycli.charset import Charset
 
 # Constants
+DEFAULT_USER: str
+DEFUALT_CHARSET: str
+MAX_CONNECT_TIMEOUT: int
+DEFALUT_MAX_ALLOWED_PACKET: int
+MAXIMUM_MAX_ALLOWED_PACKET: int
+DEFAULT_CONNECT_ATTRS: bytes
+MAX_PACKET_LENGTH: int
+MAX_STATEMENT_LENGTH: int
+SERVER_VERSION_RE: Pattern
+RE_INSERT_VALUES: Pattern
+"""regex pattern: python-constants"""
+INSERT_VALUES_RE: Pattern
+"""regex pattern: c-constants"""
 NULL_COLUMN: cython.uchar
 UNSIGNED_CHAR_COLUMN: cython.uchar
 UNSIGNED_SHORT_COLUMN: cython.uchar
 UNSIGNED_INT24_COLUMN: cython.uchar
 UNSIGNED_INT64_COLUMN: cython.uchar
+
+# Utils: Connection
+def gen_connect_attrs(attrs: list[str]) -> bytes: ...
+def validate_arg_str(arg: str | None, arg_name: str, default: str) -> str | None: ...
+def validate_arg_uint(
+    arg: int | None,
+    arg_name: str,
+    min_val: int,
+    max_val: int,
+) -> int | None: ...
+def validate_arg_bytes(
+    arg: bytes | str | None,
+    arg_name: str,
+    encoding: cython.pchar,
+    default: str,
+) -> bytes | None: ...
+def validate_charset(
+    charset: str | None,
+    collation: str | None,
+    default_charset: str,
+) -> Charset: ...
+def validate_autocommit(auto: bool | None) -> int: ...
+def validate_max_allowed_packet(
+    max_allowed_packet: int | str | None,
+    default: int,
+    max_val: int,
+) -> int: ...
+def validate_sql_mode(sql_mode: str | None) -> str | None: ...
+def validate_ssl(ssl: object | None) -> object | None: ...
 
 # Utils: string
 def encode_str(obj: str, encoding: cython.pchar) -> bytes:
@@ -185,32 +228,3 @@ def unpack_int64(data: cython.pchar, pos: int) -> int:
     """(cfunc) Unpack (read) `SIGNED` 64-bit integer from 'data'
     at the given 'pos' in little-endian order `<'int'>`.
     """
-
-# Utils: Connection
-def gen_connect_attrs(attrs: list[str]) -> bytes: ...
-def validate_arg_str(arg: str | None, arg_name: str, default: str) -> str | None: ...
-def validate_arg_uint(
-    arg: int | None,
-    arg_name: str,
-    min_val: int,
-    max_val: int,
-) -> int | None: ...
-def validate_arg_bytes(
-    arg: bytes | str | None,
-    arg_name: str,
-    encoding: cython.pchar,
-    default: str,
-) -> bytes | None: ...
-def validate_charset(
-    charset: str | None,
-    collation: str | None,
-    default_charset: str,
-) -> Charset: ...
-def validate_autocommit(auto: bool | None) -> int: ...
-def validate_max_allowed_packet(
-    max_allowed_packet: int | str | None,
-    default: int,
-    max_val: int,
-) -> int: ...
-def validate_sql_mode(sql_mode: str | None) -> str | None: ...
-def validate_ssl(ssl: object | None) -> object | None: ...
