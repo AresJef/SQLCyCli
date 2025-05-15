@@ -127,4 +127,7 @@ cdef class Pool:
     cpdef bint closed(self) except -1
     cdef inline bint _close_sync_conn(self) except -1
     cdef inline bint _verify_open(self) except -1
+    # Query
+    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
+
   

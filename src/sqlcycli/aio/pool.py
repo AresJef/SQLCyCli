@@ -14,6 +14,7 @@ from cython.cimports.cpython.set import PySet_Discard as set_discard  # type: ig
 from cython.cimports.sqlcycli._ssl import SSL  # type: ignore
 from cython.cimports.sqlcycli.charset import Charset  # type: ignore
 from cython.cimports.sqlcycli._auth import AuthPlugin  # type: ignore
+from cython.cimports.sqlcycli.transcode import escape  # type: ignore
 from cython.cimports.sqlcycli._optionfile import OptionFile  # type: ignore
 from cython.cimports.sqlcycli.aio import connection as async_conn  # type: ignore
 from cython.cimports.sqlcycli import connection as sync_conn, utils  # type: ignore
@@ -28,6 +29,7 @@ from pandas import DataFrame
 from sqlcycli._ssl import SSL
 from sqlcycli.charset import Charset
 from sqlcycli._auth import AuthPlugin
+from sqlcycli.transcode import escape
 from sqlcycli._optionfile import OptionFile
 from sqlcycli.aio import connection as async_conn
 from sqlcycli import connection as sync_conn, utils, errors
@@ -1924,6 +1926,71 @@ class Pool:
         if self._closing or self.closed():
             raise errors.PoolClosedError(0, "Pool is closed.")
         return True
+
+    # Query -----------------------------------------------------------------------------------
+    @cython.ccall
+    def escape_args(
+        self,
+        args: Any,
+        many: cython.bint = False,
+        itemize: cython.bint = True,
+    ) -> object:
+        """Escape 'args' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
+
+        :param args `<'object'>`: The object to escape, supports:
+            - Python native:
+              int, float, bool, str, None, datetime, date, time,
+              timedelta, struct_time, bytes, bytearray, memoryview,
+              Decimal, dict, list, tuple, set, frozenset, range.
+            - Library [numpy](https://github.com/numpy/numpy):
+              np.int, np.uint, np.float, np.bool, np.bytes,
+              np.str, np.datetime64, np.timedelta64, np.ndarray.
+            - Library [pandas](https://github.com/pandas-dev/pandas):
+              pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+              pd.TimedeltaIndex, pd.Series, pd.DataFrame.
+            - Library [cytimes](https://github.com/AresJef/cyTimes):
+              pydt, pddt.
+
+        :param many `<'bool'>`: Wheter to escape 'args' as multi-rows. Defaults to `False`.
+            * When 'many=True', the argument 'itemize' is ignored.
+            * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
+              escapes to `<'list[str/tuple[str]]'>`. Each element represents
+              one row of the 'args'.
+            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+              `<'list[str]'>`. Each element represents one row of the 'args'.
+            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+              to `<'list[tuple[str]]'>`. Each tuple represents one row
+              of the 'args' .
+            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+              to one literal string `<'str'>`.
+
+        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
+            - When 'itemize=True', the 'args' type determines how to escape.
+                * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
+                  escapes to `<'tuple[str]'>`.
+                * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+                  `<'tuple[str]'>`.
+                * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+                  to `<'list[tuple[str]]'>`. Each tuple represents one row
+                  of the 'args' .
+                * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+                  to one literal string `<'str'>`.
+            - When 'itemize=False', regardless of the 'args' type, all
+              escapes to one single literal string `<'str'>`.
+
+        :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
+
+        ## Returns
+        - If returns a `<'str'>`, it represents a single literal string.
+          The 'sql' should only have one '%s' placeholder.
+        - If returns a `<'tuple'>`, it represents a single row of literal
+          strings. The 'sql' should have '%s' placeholders equal to the
+          tuple length.
+        - If returns a `<'list'>`, it represents multiple rows of literal
+          string(s). The 'sql' should have '%s' placeholders equal to the
+          item count in each row.
+        """
+        return escape(args, many, itemize)
 
     # Special Methods -------------------------------------------------------------------------
     def __repr__(self) -> str:
