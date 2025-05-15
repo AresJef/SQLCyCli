@@ -213,7 +213,7 @@ class TestTranscode(TestCase):
 
         for val, cmp in ((True, "1"), (False, "0")):
             self.assertEqual(escape(val, True, True), cmp)
-            self.assertEqual(escape(val, True, False), cmp)
+            self.assertEqual(escape(val, False, True), cmp)
             self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -230,7 +230,7 @@ class TestTranscode(TestCase):
             for v in values:
                 cmp = str(val)
                 self.assertEqual(escape(v, True, True), cmp)
-                self.assertEqual(escape(v, True, False), cmp)
+                self.assertEqual(escape(v, False, True), cmp)
                 self.assertEqual(escape(v, False, False), cmp)
 
         # unsigned integer
@@ -241,7 +241,7 @@ class TestTranscode(TestCase):
             for v in values:
                 cmp = str(val)
                 self.assertEqual(escape(v, True, True), cmp)
-                self.assertEqual(escape(v, True, False), cmp)
+                self.assertEqual(escape(v, False, True), cmp)
                 self.assertEqual(escape(v, False, False), cmp)
 
         self.log_ended(test)
@@ -257,7 +257,7 @@ class TestTranscode(TestCase):
             for v in values:
                 cmp = str(val)
                 self.assertEqual(escape(v, True, True), cmp)
-                self.assertEqual(escape(v, True, False), cmp)
+                self.assertEqual(escape(v, False, True), cmp)
                 self.assertEqual(escape(v, False, False), cmp)
 
         self.log_ended(test)
@@ -273,7 +273,7 @@ class TestTranscode(TestCase):
         for dtype in (str, np.str_):
             val = dtype(val)
             self.assertEqual(escape(val, True, True), cmp)
-            self.assertEqual(escape(val, True, False), cmp)
+            self.assertEqual(escape(val, False, True), cmp)
             self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -285,7 +285,7 @@ class TestTranscode(TestCase):
         self.log_start(test)
 
         self.assertEqual(escape(None, True, True), "NULL")
-        self.assertEqual(escape(None, True, False), "NULL")
+        self.assertEqual(escape(None, False, True), "NULL")
         self.assertEqual(escape(None, False, False), "NULL")
 
         self.log_ended(test)
@@ -308,7 +308,7 @@ class TestTranscode(TestCase):
             (np.datetime64(v2), c2),
         ):
             self.assertEqual(escape(val, True, True), cmp)
-            self.assertEqual(escape(val, True, False), cmp)
+            self.assertEqual(escape(val, False, True), cmp)
             self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -322,7 +322,7 @@ class TestTranscode(TestCase):
         val = datetime.date(2021, 1, 1)
         cmp = "'2021-01-01'"
         self.assertEqual(escape(val, True, True), cmp)
-        self.assertEqual(escape(val, True, False), cmp)
+        self.assertEqual(escape(val, False, True), cmp)
         self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -338,7 +338,7 @@ class TestTranscode(TestCase):
             (datetime.time(12, 0, 0, 100), "'12:00:00.000100'"),
         ):
             self.assertEqual(escape(val, True, True), cmp)
-            self.assertEqual(escape(val, True, False), cmp)
+            self.assertEqual(escape(val, False, True), cmp)
             self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -372,7 +372,7 @@ class TestTranscode(TestCase):
             (np.timedelta64(v4), c4),
         ):
             self.assertEqual(escape(val, True, True), cmp)
-            self.assertEqual(escape(val, True, False), cmp)
+            self.assertEqual(escape(val, False, True), cmp)
             self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -387,7 +387,7 @@ class TestTranscode(TestCase):
         cmp = "_binary'foo\\nbar'"
         for v in (val, bytearray(val), memoryview(val)):
             self.assertEqual(escape(v, True, True), cmp)
-            self.assertEqual(escape(v, True, False), cmp)
+            self.assertEqual(escape(v, False, True), cmp)
             self.assertEqual(escape(v, False, False), cmp)
 
         self.log_ended(test)
@@ -401,7 +401,7 @@ class TestTranscode(TestCase):
         val = decimal.Decimal("1.2345")
         cmp = "1.2345"
         self.assertEqual(escape(val, True, True), cmp)
-        self.assertEqual(escape(val, True, False), cmp)
+        self.assertEqual(escape(val, False, True), cmp)
         self.assertEqual(escape(val, False, False), cmp)
 
         self.log_ended(test)
@@ -415,12 +415,12 @@ class TestTranscode(TestCase):
 
         # . flat
         data = {"key1": "val1", "key2": 1, "key3": 1.1}
+        v1c1 = "('val1',1,1.1)"  # literal
+        v1c2 = ("'val1'", "1", "1.1")  # itemize
+        v1c3 = ["'val1'", "1", "1.1"]  # many
         for v1 in [data, data.items(), OrderedDict(data)]:
-            v1c1 = "('val1',1,1.1)"  # literal
-            v1c2 = ("'val1'", "1", "1.1")  # itemize
-            v1c3 = ["'val1'", "1", "1.1"]  # many
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
 
         # . nested
@@ -429,23 +429,23 @@ class TestTranscode(TestCase):
         v2c2 = ("('val1',1,1.1)", "('val2',2,2.2)")  # itemize
         v2c3 = [("'val1'", "1", "1.1"), ("'val2'", "2", "2.2")]  # many
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c3)
         # . nested items()
         vi = v2.items()
         self.assertEqual(escape(vi, False, False), v2c1)
-        self.assertEqual(escape(vi, True, False), v2c2)
+        self.assertEqual(escape(vi, False, True), v2c2)
         self.assertEqual(escape(vi, True, True), v2c3)
         # . nested OrderedDict
         vo = OrderedDict(v2)
         self.assertEqual(escape(vo, False, False), v2c1)
-        self.assertEqual(escape(vo, True, False), v2c2)
+        self.assertEqual(escape(vo, False, True), v2c2)
         self.assertEqual(escape(vo, True, True), v2c3)
 
         # . empty
         v3 = {}
         self.assertEqual(escape(v3, False, False), "()")
-        self.assertEqual(escape(v3, True, False), ())
+        self.assertEqual(escape(v3, False, True), ())
         self.assertEqual(escape(v3, True, True), [])
 
         self.log_ended(test)
@@ -466,7 +466,7 @@ class TestTranscode(TestCase):
         for dtype in (list, tuple):
             val = dtype(v1)
             self.assertEqual(escape(val, False, False), v1c1)
-            self.assertEqual(escape(val, True, False), v1c2)
+            self.assertEqual(escape(val, False, True), v1c2)
             self.assertEqual(escape(val, True, True), v1c3)
         # . nested
         v2 = [["val1", 1, 1.1], ["val2", 2, 2.2]]
@@ -476,13 +476,13 @@ class TestTranscode(TestCase):
         for dtype in (list, tuple):
             val = dtype(v2)
             self.assertEqual(escape(val, False, False), v2c1)
-            self.assertEqual(escape(val, True, False), v2c2)
+            self.assertEqual(escape(val, False, True), v2c2)
             self.assertEqual(escape(val, True, True), v2c3)
         # . empty
         for dtype in (list, tuple):
             v3 = dtype([])
             self.assertEqual(escape(v3, False, False), "()")
-            self.assertEqual(escape(v3, True, False), ())
+            self.assertEqual(escape(v3, False, True), ())
             self.assertEqual(escape(v3, True, True), [])
 
         # Set & Frozenset
@@ -494,7 +494,7 @@ class TestTranscode(TestCase):
             cmp2 = tuple(str(i) for i in val)
             cmp3 = [str(i) for i in val]
             self.assertEqual(escape(val, False, False), cmp1)
-            self.assertEqual(escape(val, True, False), cmp2)
+            self.assertEqual(escape(val, False, True), cmp2)
             self.assertEqual(escape(val, True, True), cmp3)
         # . nested
         v2 = [(1, 2, 3), (4, 5, 6)]
@@ -504,30 +504,30 @@ class TestTranscode(TestCase):
             cmp2 = tuple("(" + ",".join(str(i) for i in v) + ")" for v in val)
             cmp3 = [tuple(str(i) for i in v) for v in val]
             self.assertEqual(escape(val, False, False), cmp1)
-            self.assertEqual(escape(val, True, False), cmp2)
+            self.assertEqual(escape(val, False, True), cmp2)
             self.assertEqual(escape(val, True, True), cmp3)
         # . empty
         for dtype in (set, frozenset):
             v3 = dtype([])
             self.assertEqual(escape(v3, False, False), "()")
-            self.assertEqual(escape(v3, True, False), ())
+            self.assertEqual(escape(v3, False, True), ())
             self.assertEqual(escape(v3, True, True), [])
 
         # Sequence (dict_values)
         # . flat
         v1 = {"key1": "val1", "key2": 1, "key3": 1.1}.values()
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . nested
         v2 = {"key1": ["val1", 1, 1.1], "key2": ["val2", 2, 2.2]}.values()
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c3)
         # . empty
         v3 = {}.values()
         self.assertEqual(escape(v3, False, False), "()")
-        self.assertEqual(escape(v3, True, False), ())
+        self.assertEqual(escape(v3, False, True), ())
         self.assertEqual(escape(v3, True, True), [])
 
         self.log_ended(test)
@@ -545,29 +545,29 @@ class TestTranscode(TestCase):
         v1c2 = ("1", "1.23", "'abc'")
         v1c3 = ["1", "1.23", "'abc'"]
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . pd.Series
         v1 = pd.Series(v1)
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype="O"), pd.Series([], dtype="O")]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         v2 = np.array([[1, 1.23, "abc"], [2, 4.56, "def"]], dtype="O")
         v2c1 = "(1,1.23,'abc'),(2,4.56,'def')"
         v2c2 = [("1", "1.23", "'abc'"), ("2", "4.56", "'def'")]
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype="O")
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Float: 'f' ----------------------------------------------------------------
@@ -579,12 +579,12 @@ class TestTranscode(TestCase):
         for dtype in (float, np.float32, np.float64):
             v1 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
             # . pd.Series
             v1 = pd.Series(v1)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
         # . catch inf error
         value = (-1.1, 0.0, np.inf)  # raise error for inf
@@ -593,20 +593,20 @@ class TestTranscode(TestCase):
             with self.assertRaises(errors.EscapeError):
                 escape(v1, False, False)
             with self.assertRaises(errors.EscapeError):
-                escape(v1, True, False)
+                escape(v1, False, True)
             with self.assertRaises(errors.EscapeError):
                 escape(v1, True, True)
             v1 = pd.Series(v1)  # pd.Series
             with self.assertRaises(errors.EscapeError):
                 escape(v1, False, False)
             with self.assertRaises(errors.EscapeError):
-                escape(v1, True, False)
+                escape(v1, False, True)
             with self.assertRaises(errors.EscapeError):
                 escape(v1, True, True)
         # . empty
         for value in [np.array([], dtype=np.float64), pd.Series([], dtype=np.float64)]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         value = [(-1.1, 0.0), (1.1, 2.2)]
@@ -615,7 +615,7 @@ class TestTranscode(TestCase):
         for dtype in (float, np.float32, np.float64):
             v2 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v2, False, False), v2c1)
-            self.assertEqual(escape(v2, True, False), v2c2)
+            self.assertEqual(escape(v2, False, True), v2c2)
             self.assertEqual(escape(v2, True, True), v2c2)
         # . catch inf error
         value = [(-1.1, 0.0), (1.1, np.inf)]  # raise error for inf
@@ -624,13 +624,13 @@ class TestTranscode(TestCase):
             with self.assertRaises(errors.EscapeError):
                 escape(v2, False, False)
             with self.assertRaises(errors.EscapeError):
-                escape(v2, True, False)
+                escape(v2, False, True)
             with self.assertRaises(errors.EscapeError):
                 escape(v2, True, True)
         # . empty
         value = np.array([[], []], dtype=np.float64)
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Signed integer: 'i' -------------------------------------------------------
@@ -642,17 +642,17 @@ class TestTranscode(TestCase):
         for dtype in (int, np.int8, np.int16, np.int32, np.int64):
             v1 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
             # . pd.Series
             v1 = pd.Series(v1)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype=np.int64), pd.Series([], dtype=np.int64)]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         value = [(-1, 0), (1, 2)]
@@ -661,12 +661,12 @@ class TestTranscode(TestCase):
         for dtype in (int, np.int8, np.int16, np.int32, np.int64):
             v2 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v2, False, False), v2c1)
-            self.assertEqual(escape(v2, True, False), v2c2)
+            self.assertEqual(escape(v2, False, True), v2c2)
             self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype=np.int64)
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Unsigned Integer: 'u' -----------------------------------------------------
@@ -678,17 +678,17 @@ class TestTranscode(TestCase):
         for dtype in (np.uint8, np.uint16, np.uint32, np.uint64):
             v1 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
             # pd.Series
             v1 = pd.Series(v1)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype=np.uint64), pd.Series([], dtype=np.uint64)]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         value = [(0, 5), (10, 15)]
@@ -697,12 +697,12 @@ class TestTranscode(TestCase):
         for dtype in (np.uint8, np.uint16, np.uint32, np.uint64):
             v2 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v2, False, False), v2c1)
-            self.assertEqual(escape(v2, True, False), v2c2)
+            self.assertEqual(escape(v2, False, True), v2c2)
             self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype=np.uint64)
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Bool: 'b' -----------------------------------------------------------------
@@ -714,17 +714,17 @@ class TestTranscode(TestCase):
         for dtype in (bool, np.bool_):
             v1 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
             # pd.Series
             v1 = pd.Series(v1)
             self.assertEqual(escape(v1, False, False), v1c1)
-            self.assertEqual(escape(v1, True, False), v1c2)
+            self.assertEqual(escape(v1, False, True), v1c2)
             self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype=np.bool_), pd.Series([], dtype=np.bool_)]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         value = [(True, False), (False, True)]
@@ -733,12 +733,12 @@ class TestTranscode(TestCase):
         for dtype in (bool, np.bool_):
             v2 = np.array(value, dtype=dtype)
             self.assertEqual(escape(v2, False, False), v2c1)
-            self.assertEqual(escape(v2, True, False), v2c2)
+            self.assertEqual(escape(v2, False, True), v2c2)
             self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype=np.bool_)
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Datetime64: 'M' -----------------------------------------------------------
@@ -750,12 +750,12 @@ class TestTranscode(TestCase):
         v1c3 = ["'1970-01-01 00:00:01'", "'1970-01-01 00:00:02'", "'1970-01-01 00:00:03'"]
         # fmt: on
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # pd.Series
         v1 = pd.Series(v1)
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [
@@ -763,7 +763,7 @@ class TestTranscode(TestCase):
             pd.Series([], dtype="datetime64[ns]"),
         ]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         v2 = np.array([[1, 2], [3, 4]], dtype="datetime64[s]")
@@ -773,12 +773,12 @@ class TestTranscode(TestCase):
             ("'1970-01-01 00:00:03'", "'1970-01-01 00:00:04'"),
         ]
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype="datetime64[ns]")
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # pd.DatetimeIndex: 'M' -----------------------------------------------------
@@ -786,12 +786,12 @@ class TestTranscode(TestCase):
             ["1970-01-01 00:00:01", "1970-01-01 00:00:02", "1970-01-01 00:00:03"]
         )
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         v1 = pd.DatetimeIndex([])
         self.assertEqual(escape(v1, False, False), "()")
-        self.assertEqual(escape(v1, True, False), ())
+        self.assertEqual(escape(v1, False, True), ())
         self.assertEqual(escape(v1, True, True), [])
 
         # Timedelta64: 'm' ----------------------------------------------------------
@@ -801,12 +801,12 @@ class TestTranscode(TestCase):
         v1c2 = ("'-00:00:01'", "'00:00:00'", "'00:00:01'")
         v1c3 = ["'-00:00:01'", "'00:00:00'", "'00:00:01'"]
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # pd.Series
         v1 = pd.Series(v1)
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [
@@ -814,30 +814,30 @@ class TestTranscode(TestCase):
             pd.Series([], dtype="timedelta64[ns]"),
         ]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         v2 = np.array([[-1, 0], [1, 2]], dtype="timedelta64[s]")
         v2c1 = "('-00:00:01','00:00:00'),('00:00:01','00:00:02')"
         v2c2 = [("'-00:00:01'", "'00:00:00'"), ("'00:00:01'", "'00:00:02'")]
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype="timedelta64[ns]")
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # pd.TimedeltaIndex: 'm' ----------------------------------------------------
         v1 = pd.TimedeltaIndex(["-00:00:01", "00:00:00", "00:00:01"])
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
 
         v1 = pd.TimedeltaIndex([])
         self.assertEqual(escape(v1, False, False), "()")
-        self.assertEqual(escape(v1, True, False), ())
+        self.assertEqual(escape(v1, False, True), ())
         self.assertEqual(escape(v1, True, True), [])
 
         # Bytes string: 'S' ---------------------------------------------------------
@@ -847,29 +847,29 @@ class TestTranscode(TestCase):
         v1c2 = ("_binary'1'", "_binary'2'", "_binary'3'")
         v1c3 = ["_binary'1'", "_binary'2'", "_binary'3'"]
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # pd.Series
         v1 = pd.Series(v1)
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype="S"), pd.Series([], dtype="S")]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         v2 = np.array([[1, 2], [3, 4]], dtype="S")
         v2c1 = "(_binary'1',_binary'2'),(_binary'3',_binary'4')"
         v2c2 = [("_binary'1'", "_binary'2'"), ("_binary'3'", "_binary'4'")]
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype="S")
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         # Unicode string: 'U' -------------------------------------------------------
@@ -879,29 +879,29 @@ class TestTranscode(TestCase):
         v1c2 = ("'1'", "'2'", "'3'")
         v1c3 = ["'1'", "'2'", "'3'"]
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # pd.Series
         v1 = pd.Series(v1)
         self.assertEqual(escape(v1, False, False), v1c1)
-        self.assertEqual(escape(v1, True, False), v1c2)
+        self.assertEqual(escape(v1, False, True), v1c2)
         self.assertEqual(escape(v1, True, True), v1c3)
         # . empty
         for value in [np.array([], dtype="U"), pd.Series([], dtype="U")]:
             self.assertEqual(escape(value, False, False), "()")
-            self.assertEqual(escape(value, True, False), ())
+            self.assertEqual(escape(value, False, True), ())
             self.assertEqual(escape(value, True, True), [])
         # . 2-dimensional
         v2 = np.array([["1", "2"], ["3", "4"]], dtype="U")
         v2c1 = "('1','2'),('3','4')"
         v2c2 = [("'1'", "'2'"), ("'3'", "'4'")]
         self.assertEqual(escape(v2, False, False), v2c1)
-        self.assertEqual(escape(v2, True, False), v2c2)
+        self.assertEqual(escape(v2, False, True), v2c2)
         self.assertEqual(escape(v2, True, True), v2c2)
         # . empty
         value = np.array([[], []], dtype="U")
         self.assertEqual(escape(value, False, False), "()")
-        self.assertEqual(escape(value, True, False), [])
+        self.assertEqual(escape(value, False, True), [])
         self.assertEqual(escape(value, True, True), [])
 
         self.log_ended(test)
@@ -916,7 +916,7 @@ class TestTranscode(TestCase):
         cmp1 = "(1,1.1,'a'),(2,2.2,'b'),(3,3.3,'c')"
         cmp2 = [("1", "1.1", "'a'"), ("2", "2.2", "'b'"), ("3", "3.3", "'c'")]
         self.assertEqual(escape(val, False, False), cmp1)
-        self.assertEqual(escape(val, True, False), cmp2)
+        self.assertEqual(escape(val, False, True), cmp2)
         self.assertEqual(escape(val, True, True), cmp2)
         # . empty
         val = pd.DataFrame()
@@ -989,7 +989,7 @@ class TestTranscode(TestCase):
         val = datetime.datetime(2021, 1, 1, 12, 0, 0)
         cmp = "'2021-01-01 12:00:00'"
         self.assertEqual(escape(cytimes.Pydt.parse(val), False, False), cmp)
-        self.assertEqual(escape(cytimes.Pydt.parse(val), True, False), cmp)
+        self.assertEqual(escape(cytimes.Pydt.parse(val), False, True), cmp)
         self.assertEqual(escape(cytimes.Pydt.parse(val), True, True), cmp)
 
         # pddt
@@ -998,7 +998,7 @@ class TestTranscode(TestCase):
         cmp2 = ("'2021-01-01 12:00:00'", "'2021-01-01 12:00:01'")
         cmp3 = ["'2021-01-01 12:00:00'", "'2021-01-01 12:00:01'"]
         self.assertEqual(escape(cytimes.Pddt(val), False, False), cmp1)
-        self.assertEqual(escape(cytimes.Pddt(val), True, False), cmp2)
+        self.assertEqual(escape(cytimes.Pddt(val), False, True), cmp2)
         self.assertEqual(escape(cytimes.Pddt(val), True, True), cmp3)
 
         self.log_ended(test)
