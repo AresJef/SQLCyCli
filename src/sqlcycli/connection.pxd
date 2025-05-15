@@ -3,19 +3,6 @@ from sqlcycli.charset cimport Charset
 from sqlcycli._auth cimport AuthPlugin
 from sqlcycli.protocol cimport MysqlPacket, FieldDescriptorPacket
 
-# Constant
-cdef:
-    str DEFAULT_USER
-    str DEFUALT_CHARSET
-    int MAX_CONNECT_TIMEOUT
-    int DEFALUT_MAX_ALLOWED_PACKET
-    int MAXIMUM_MAX_ALLOWED_PACKET
-    bytes DEFAULT_CONNECT_ATTRS
-    unsigned int MAX_PACKET_LENGTH
-    unsigned int MAX_STATEMENT_LENGTH
-    object INSERT_VALUES_RE
-    object SERVER_VERSION_RE
-
 # Result
 cdef class MysqlResult:
     cdef:

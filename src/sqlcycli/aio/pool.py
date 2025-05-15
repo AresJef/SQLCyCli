@@ -718,17 +718,17 @@ class Pool:
 
         # fmt: off
         # . charset
-        self._charset = utils.validate_charset(charset, collation, sync_conn.DEFUALT_CHARSET)
+        self._charset = utils.validate_charset(charset, collation, utils.DEFUALT_CHARSET)
         encoding: cython.pchar = self._charset._encoding_c
         # . basic
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
-        self._user = utils.validate_arg_bytes(user, "user", encoding, sync_conn.DEFAULT_USER)
+        self._user = utils.validate_arg_bytes(user, "user", encoding, utils.DEFAULT_USER)
         self._password = utils.validate_arg_bytes(password, "password", b"latin1", "")
         self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
-            connect_timeout, "connect_timeout", 1, sync_conn.MAX_CONNECT_TIMEOUT)
+            connect_timeout, "connect_timeout", 1, utils.MAX_CONNECT_TIMEOUT)
         self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
         self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
         self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
@@ -741,7 +741,7 @@ class Pool:
         self._autocommit_mode = utils.validate_autocommit(autocommit)
         self._local_infile = local_infile
         self._max_allowed_packet = utils.validate_max_allowed_packet(
-            max_allowed_packet, sync_conn.DEFALUT_MAX_ALLOWED_PACKET, sync_conn.MAXIMUM_MAX_ALLOWED_PACKET)
+            max_allowed_packet, utils.DEFALUT_MAX_ALLOWED_PACKET, utils.MAXIMUM_MAX_ALLOWED_PACKET)
         self._sql_mode = utils.validate_sql_mode(sql_mode)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = validate_async_cursor(cursor)

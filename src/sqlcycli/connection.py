@@ -53,44 +53,6 @@ __all__ = [
 ]
 
 
-# Constant ------------------------------------------------------------------------------------
-try:
-    import getpass
-
-    DEFAULT_USER: str = getpass.getuser()
-    del getpass
-except (ImportError, KeyError):
-    #: KeyError occurs when there's no entry
-    #: in OS database for a current user.
-    DEFAULT_USER: str = None
-DEFUALT_CHARSET: str = "utf8mb4"
-MAX_CONNECT_TIMEOUT: cython.int = 31_536_000  # 1 year
-DEFALUT_MAX_ALLOWED_PACKET: cython.int = 16_777_216  # 16MB
-MAXIMUM_MAX_ALLOWED_PACKET: cython.int = 1_073_741_824  # 1GB
-# fmt: off
-DEFAULT_CONNECT_ATTRS: bytes = utils.gen_connect_attrs(
-    ["_client_name", "sqlcycli", "_client_version", "0.0.0", "_pid"] )
-# fmt: on
-MAX_PACKET_LENGTH: cython.uint = 2**24 - 1
-#: Max statement size which :meth:`executemany` generates.
-#: Max size of allowed statement is max_allowed_packet - packet_header_size.
-#: Default value of max_allowed_packet is 1048576.
-MAX_STATEMENT_LENGTH: cython.uint = 1024000
-
-#: Regular expression for :meth:`Cursor.executemany`.
-#: executemany only supports simple bulk insert.
-#: You can use it to load large dataset.
-INSERT_VALUES_RE: re.Pattern = re.compile(
-    r"\s*((?:INSERT|REPLACE)\b.+\bVALUES?\s*)"  # prefix: INSERT INTO ... VALUES
-    + r"(\(\s*(?:%s|%\(.+\)s)\s*(?:,\s*(?:%s|%\(.+\)s)\s*)*\))"  # values: (%s, %s, ...)
-    + r"(\s*(?:AS\s.*?)?\s*(?:ON DUPLICATE.*)?);?\s*\Z",  # suffix: AS ... ON DUPLICATE ...
-    re.IGNORECASE | re.DOTALL,
-)
-
-#: Regular expression for server version.
-SERVER_VERSION_RE: re.Pattern = re.compile(r".*?(\d+)\.(\d+)\.(\d+).*?")
-
-
 # Result --------------------------------------------------------------------------------------
 @cython.cclass
 class MysqlResult:
@@ -726,7 +688,7 @@ class Cursor:
 
         # Bulk INSERT/REPLACE `NOT` matched
         rows: cython.ulonglong = 0
-        m = INSERT_VALUES_RE.match(sql)
+        m = utils.INSERT_VALUES_RE.match(sql)
         if m is None:
             # . execute row by row
             for arg in args:
@@ -738,27 +700,27 @@ class Cursor:
         self._verify_connected()
         conn: BaseConnection = self._conn
         # . split query
-        gps: tuple = m.groups()
-        values: str
-        pfix, values, sfix = gps
-        # . query prefix INSERT INTO ... VALUES
+        plhs: str
+        regex_gps: tuple = m.groups()
+        pfix, plhs, sfix = regex_gps
+        # . query prefix: INSERT INTO ... VALUES
         prefix: bytes = conn.encode_sql(self._format(pfix, ()))
-        # . query values: (%s, %s, ...)
-        values = values.rstrip()
+        # . query placeholders: (%s, %s, ...)
+        plhs = plhs.rstrip()
         # . query suffix: AS ... ON DUPLICATE ...
         suffix: bytes = b"" if sfix is None else conn.encode_sql(sfix)
         # . prepare statement
         args_iter = iter(args)
-        vals: bytes = conn.encode_sql(self._format(values, next(args_iter)))
+        vals: bytes = conn.encode_sql(self._format(plhs, next(args_iter)))
         stmt: list[bytes] = [prefix, vals]
         fix_len: cython.uint = bytes_len(prefix) + bytes_len(suffix)
         val_len: cython.uint = bytes_len(vals)
         sql_len: cython.uint = fix_len + val_len
         for arg in args_iter:
-            vals = conn.encode_sql(self._format(values, arg))
+            vals = conn.encode_sql(self._format(plhs, arg))
             val_len = bytes_len(vals)
             sql_len += 1 + val_len
-            if sql_len <= MAX_STATEMENT_LENGTH:
+            if sql_len <= utils.MAX_STATEMENT_LENGTH:
                 stmt.append(b",")
                 stmt.append(vals)
             else:
@@ -2035,11 +1997,11 @@ class BaseConnection:
     def _setup_connect_attrs(self, program_name: str | None) -> cython.bint:
         """(cfunc) Setup the 'connect_attrs'."""
         if program_name is None:
-            attrs: bytes = DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+            attrs: bytes = utils.DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
                 [str(_getpid)]
             )
         else:
-            attrs: bytes = DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
+            attrs: bytes = utils.DEFAULT_CONNECT_ATTRS + utils.gen_connect_attrs(
                 [str(_getpid), "program_name", program_name]
             )
         self._connect_attrs = utils.gen_length_encoded_integer(bytes_len(attrs)) + attrs
@@ -2584,7 +2546,7 @@ class BaseConnection:
         :param charset `<'str'>`: The charset.
         :param collation `<'str/None'>`: The collation. Defaults to `None`.
         """
-        ch: Charset = utils.validate_charset(charset, collation, DEFUALT_CHARSET)
+        ch: Charset = utils.validate_charset(charset, collation, utils.DEFUALT_CHARSET)
         if ch._name != self._charset or ch._collation != self._collation:
             self._setup_charset(ch)
             sql = "SET NAMES %s COLLATE %s" % (self._charset, self._collation)
@@ -2979,7 +2941,7 @@ class BaseConnection:
             if self._server_info is None:
                 return None
             # Parser version
-            m = SERVER_VERSION_RE.match(self._server_info)
+            m = utils.SERVER_VERSION_RE.match(self._server_info)
             if m is None:
                 raise errors.DatabaseError(
                     "Failed to parse server version from '%s'." % self._server_info
@@ -3362,7 +3324,7 @@ class BaseConnection:
 
         # . init data
         header: bytes = utils.pack_IIB23s(
-            self._client_flag, MAX_PACKET_LENGTH, self._charset_id
+            self._client_flag, utils.MAX_PACKET_LENGTH, self._charset_id
         )
         data: list[bytes] = [header]
 
@@ -3696,7 +3658,7 @@ class BaseConnection:
         # which is the command.
         sql_size: cython.ulonglong = bytes_len(sql)
         pkt_size: cython.uint = min(
-            sql_size + 1, MAX_PACKET_LENGTH
+            sql_size + 1, utils.MAX_PACKET_LENGTH
         )  # +1 is for command
         data = utils.pack_IB(pkt_size, command) + sql[0 : pkt_size - 1]
         self._write_bytes(data)
@@ -3705,7 +3667,7 @@ class BaseConnection:
         # Write remaining data
         pos: cython.ulonglong = pkt_size - 1
         while pos < sql_size:
-            pkt_size = min(sql_size - pos, MAX_PACKET_LENGTH)
+            pkt_size = min(sql_size - pos, utils.MAX_PACKET_LENGTH)
             self._write_packet(sql[pos : pos + pkt_size])
             pos += pkt_size
 
@@ -3875,7 +3837,7 @@ class BaseConnection:
             recv_data: bytes = self._read_bytes(bytes_to_read)
             buffer.append(recv_data)
             # https://dev.mysql.com/doc/internals/en/sending-more-than-16mbyte.html
-            if bytes_to_read < MAX_PACKET_LENGTH:
+            if bytes_to_read < utils.MAX_PACKET_LENGTH:
                 break
 
         # Return buffer
@@ -4048,17 +4010,17 @@ class Connection(BaseConnection):
 
         # fmt: off
         # . charset
-        self._setup_charset(utils.validate_charset(charset, collation, DEFUALT_CHARSET))
+        self._setup_charset(utils.validate_charset(charset, collation, utils.DEFUALT_CHARSET))
         encoding: cython.pchar = self._encoding_c
         # . basic
         self._host = utils.validate_arg_str(host, "host", "localhost")
         self._port = utils.validate_arg_uint(port, "port", 1, 65_535)
-        self._user = utils.validate_arg_bytes(user, "user", encoding, DEFAULT_USER)
+        self._user = utils.validate_arg_bytes(user, "user", encoding, utils.DEFAULT_USER)
         self._password = utils.validate_arg_bytes(password, "password", b"latin1", "")
         self._database = utils.validate_arg_bytes(database, "database", encoding, None)
         # . timeouts
         self._connect_timeout = utils.validate_arg_uint(
-            connect_timeout, "connect_timeout", 1, MAX_CONNECT_TIMEOUT)
+            connect_timeout, "connect_timeout", 1, utils.MAX_CONNECT_TIMEOUT)
         self._read_timeout = utils.validate_arg_uint(read_timeout, "read_timeout", 1, UINT_MAX)
         self._write_timeout = utils.validate_arg_uint(write_timeout, "write_timeout", 1, UINT_MAX)
         self._wait_timeout = utils.validate_arg_uint(wait_timeout, "wait_timeout", 1, UINT_MAX)
@@ -4071,7 +4033,7 @@ class Connection(BaseConnection):
         self._autocommit_mode = utils.validate_autocommit(autocommit)
         self._local_infile = bool(local_infile)
         self._max_allowed_packet = utils.validate_max_allowed_packet(
-            max_allowed_packet, DEFALUT_MAX_ALLOWED_PACKET, MAXIMUM_MAX_ALLOWED_PACKET)
+            max_allowed_packet, utils.DEFALUT_MAX_ALLOWED_PACKET, utils.MAXIMUM_MAX_ALLOWED_PACKET)
         self._sql_mode = utils.validate_sql_mode(sql_mode)
         self._init_command = utils.validate_arg_str(init_command, "init_command", None)
         self._cursor = None

@@ -1,7 +1,6 @@
 from os import PathLike
-from asyncio import AbstractEventLoop
+from typing import Any, Literal
 from typing_extensions import Self
-from typing import Any, Literal, Generator
 import pandas as pd
 from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
