@@ -289,6 +289,7 @@ def validate_ssl(ssl: object) -> object:
 ########## The REST utility functions are in the utils.pxd file ##########
 ########## The following functions are for testing purpose only ##########
 def _test_utils() -> None:
+    _test_format_sql()
     _test_encode_decode_utf8()
     _test_encode_decode_ascii()
     _test_encode_decode_latin1()
@@ -305,6 +306,16 @@ def _test_utils() -> None:
     _test_pack_unpack_int64()
     _test_pack_unpack_uint64()
     _test_validate_max_allowed_packet()
+
+
+def _test_format_sql() -> None:
+    try:
+        format_sql("%s %s", "hello")  # type: ignore
+    except errors.InvalidSQLArgsErorr:
+        pass
+
+    assert format_sql("%s %s", ("hello", "world")) == "hello world"  # type: ignore
+    print("format sql function".ljust(80))
 
 
 def _test_encode_decode_utf8() -> None:

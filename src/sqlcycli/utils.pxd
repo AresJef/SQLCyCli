@@ -7,6 +7,7 @@ from cpython.bytes cimport PyBytes_AsString as bytes_to_chars
 from cpython.unicode cimport PyUnicode_AsEncodedString, PyUnicode_Decode
 from cpython.unicode cimport PyUnicode_DecodeUTF8, PyUnicode_DecodeASCII, PyUnicode_DecodeLatin1
 from sqlcycli.charset cimport Charset
+import errors
 
 # Constants
 cdef:
@@ -46,6 +47,23 @@ cdef int validate_autocommit(object auto) except -2
 cdef int validate_max_allowed_packet(object max_allowed_packet, int default, int maximum)
 cdef str validate_sql_mode(object sql_mode)
 cdef object validate_ssl(object ssl)
+
+# Utils: Query
+cdef inline str format_sql(str sql, object args):
+    """Format the sql with the arguments `<'str'>`.
+
+    :param sql `<'str'>`: The sql to format.
+    :param args `<'str/tuple'>`: The arguments to bound to the SQL.
+    :raises `<'InvalidSQLArgsErorr'>`: If any error occurs.
+    """
+    try:
+        return sql % args
+    except Exception as err:
+        raise errors.InvalidSQLArgsErorr(
+            "\nFailed to format SQL:\n%s\n"
+            "With %s arguments:\n%r\n"
+            "Error: %s" % (sql, type(args), args, err)
+        ) from err
 
 # Utils: string
 cdef inline bytes encode_str(object obj, char* encoding):

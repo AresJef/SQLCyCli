@@ -49,7 +49,6 @@ cdef class Cursor:
     cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
     cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
-    cdef inline str _format(self, str sql, object args)
     # Read
     cdef inline dict _convert_row_to_dict(self, tuple row, tuple cols, unsigned long long field_count)
     cpdef tuple columns(self)

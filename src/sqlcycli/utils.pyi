@@ -51,6 +51,15 @@ def validate_max_allowed_packet(
 def validate_sql_mode(sql_mode: str | None) -> str | None: ...
 def validate_ssl(ssl: object | None) -> object | None: ...
 
+# Utils: Query
+def format_sql(sql: str, args: str | tuple) -> str:
+    """(cfunc) Format the sql with the arguments `<'str'>`.
+
+    :param sql `<'str'>`: The sql to format.
+    :param args `<'str/tuple'>`: The arguments to bound to the SQL.
+    :raises `<'InvalidSQLArgsErorr'>`: If any error occurs.
+    """
+
 # Utils: string
 def encode_str(obj: str, encoding: cython.pchar) -> bytes:
     """(cfunc) Encode string to bytes using the 'encoding' with

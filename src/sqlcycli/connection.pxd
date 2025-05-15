@@ -60,7 +60,6 @@ cdef class Cursor:
     cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
     cdef inline unsigned long long _query_str(self, str sql)
     cdef inline unsigned long long _query_bytes(self, bytes sql)
-    cdef inline str _format(self, str sql, object args)
     # Read
     cdef inline tuple _fetchone_tuple(self)
     cdef inline dict _fetchone_dict(self)

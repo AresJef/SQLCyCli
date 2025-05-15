@@ -673,12 +673,12 @@ class Cursor:
         if not many and not itemize:
             # When 'many=False' & 'itemize=False', the escaped
             # 'args' can only be a single literal <'str'>.
-            return self._query_str(self._format(sql, args))
+            return self._query_str(utils.format_sql(sql, args))
         if type(args) is not list:
             # If the escaped 'args' is not a list, it must be
             # either a <'str'> or <'tuple[str]'>, which should
             # also bind to the 'sql' directly.
-            return self._query_str(self._format(sql, args))
+            return self._query_str(utils.format_sql(sql, args))
 
         # Multi-rows query
         # The escaped 'args' now on can only be a <'list'>.
@@ -692,7 +692,7 @@ class Cursor:
         if m is None:
             # . execute row by row
             for arg in args:
-                rows += self._query_str(self._format(sql, arg))
+                rows += self._query_str(utils.format_sql(sql, arg))
             self._affected_rows = rows
             return rows
 
@@ -704,20 +704,20 @@ class Cursor:
         regex_gps: tuple = m.groups()
         pfix, plhs, sfix = regex_gps
         # . query prefix: INSERT INTO ... VALUES
-        prefix: bytes = conn.encode_sql(self._format(pfix, ()))
+        prefix: bytes = conn.encode_sql(utils.format_sql(pfix, ()))
         # . query placeholders: (%s, %s, ...)
         plhs = plhs.rstrip()
         # . query suffix: AS ... ON DUPLICATE ...
         suffix: bytes = b"" if sfix is None else conn.encode_sql(sfix)
         # . prepare statement
         args_iter = iter(args)
-        vals: bytes = conn.encode_sql(self._format(plhs, next(args_iter)))
+        vals: bytes = conn.encode_sql(utils.format_sql(plhs, next(args_iter)))
         stmt: list[bytes] = [prefix, vals]
         fix_len: cython.uint = bytes_len(prefix) + bytes_len(suffix)
         val_len: cython.uint = bytes_len(vals)
         sql_len: cython.uint = fix_len + val_len
         for arg in args_iter:
-            vals = conn.encode_sql(self._format(plhs, arg))
+            vals = conn.encode_sql(utils.format_sql(plhs, arg))
             val_len = bytes_len(vals)
             sql_len += 1 + val_len
             if sql_len <= utils.MAX_STATEMENT_LENGTH:
@@ -876,7 +876,7 @@ class Cursor:
         if count > 0:
             fmt: str = f"@_{procname}_%d=%s"
             sql: str = "SET" + ",".join(
-                [self._format(fmt, (idx, arg)) for idx, arg in enumerate(_args)]
+                [utils.format_sql(fmt, (idx, arg)) for idx, arg in enumerate(_args)]
             )
             self._query_str(sql)
             self.nextset()
@@ -885,7 +885,7 @@ class Cursor:
         # fmt: off
         sql: str = "CALL %s(%s)" % (
             procname,
-            ",".join([self._format("@_%s_%d", (procname, i)) for i in range(count)]),
+            ",".join([utils.format_sql("@_%s_%d", (procname, i)) for i in range(count)]),
         )
         # fmt: on
         self._query_str(sql)
@@ -924,12 +924,12 @@ class Cursor:
         if not many and not itemize:
             # When 'many=False' & 'itemize=False', the escaped
             # 'args' can only be a single literal <'str'>.
-            return self._format(sql, args)
+            return utils.format_sql(sql, args)
         if type(args) is not list:
             # If the escaped 'args' is not a list, it must be
             # either a <'str'> or <'tuple[str]'>, which should
             # also bind to the 'sql' directly.
-            return self._format(sql, args)
+            return utils.format_sql(sql, args)
 
         # Multi-row query
         # The escaped 'args' now on can only be a <'list[str/tuple]'>.
@@ -937,7 +937,7 @@ class Cursor:
         if len(args) == 0:
             return sql
         else:
-            return self._format(sql, args[0])
+            return utils.format_sql(sql, args[0])
 
     @cython.cfunc
     @cython.inline(True)
@@ -958,24 +958,6 @@ class Cursor:
         self._read_result()
         self._executed_sql = sql
         return rows
-
-    @cython.cfunc
-    @cython.inline(True)
-    def _format(self, sql: str, args: str | tuple) -> str:
-        """(cfunc) Format the query with the arguments `<'str'>`.
-
-        :param sql `<'str'>`: The query to format.
-        :param args `<'str/tuple'>`: Arguments to bound to the SQL.
-        :raises `<'InvalidSQLArgsErorr'>`: If any error occurs.
-        """
-        try:
-            return sql % args
-        except Exception as err:
-            raise errors.InvalidSQLArgsErorr(
-                "\nFailed to format SQL:\n%s\n"
-                "With %s arguments:\n%r\n"
-                "Error: %s" % (sql, type(args), args, err)
-            ) from err
 
     # Read ------------------------------------------------------------------------------------
     # . fetchone
