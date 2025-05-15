@@ -3593,76 +3593,195 @@ class TestCursor(TestCase):
         test = "EXECUTE MANY"
         self.log_start(test)
 
+        from sqlcycli.utils import RE_INSERT_VALUES as RE
+
         with self.setupForCursor() as conn:
-            # Due to complie, INSERT_VALUES_RE can't not be imported directly.
-            # The following regex is the exact same one used by the library.
-            INSERT_VALUES_RE: re.Pattern = re.compile(
-                r"\s*((?:INSERT|REPLACE)\b.+\bVALUES?\s*)"  # prefix: INSERT INTO ... VALUES
-                + r"(\(\s*(?:%s|%\(.+\)s)\s*(?:,\s*(?:%s|%\(.+\)s)\s*)*\))"  # values: (%s, %s, ...)
-                + r"(\s*(?:AS\s.*?)?\s*(?:ON DUPLICATE.*)?);?\s*\Z",  # suffix: AS ... ON DUPLICATE ...
-                re.IGNORECASE | re.DOTALL,
-            )
-
             ##################################################################
-            m = INSERT_VALUES_RE.match("INSERT INTO TEST (ID, NAME) VALUES (%s, %s)")
+            # . VALUE ()
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUE (%s, %s)")
             self.assertIsNotNone(m, "error parse %s")
-            self.assertEqual(
-                m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
-            )
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUE ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUE (%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUE ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            # . VALUES ()
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            # . VALUE()
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUE(%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUE")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUE(%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUE")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            # . VALUES()
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES(%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUES(%s, %s)")
+            self.assertIsNotNone(m, "error parse %s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "")
 
             ##################################################################
-            m = INSERT_VALUES_RE.match(
-                "INSERT INTO TEST (ID, NAME) VALUES (%(id)s, %(name)s)"
-            )
+            # . %(name)s
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%(id)s, %(name)s)")
             self.assertIsNotNone(m, "error parse %(name)s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%(id)s, %(name)s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%(id)s, %(name)s)")
+            self.assertIsNotNone(m, "error parse %(name)s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%(id)s, %(name)s)")
+            self.assertEqual(m.group(3), "")
+
+            ##################################################################
+            # . %(id_name)s
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s)")
+            self.assertIsNotNone(m, "error parse %(id_name)s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%(id_name)s, %(name)s)")
+            self.assertEqual(m.group(3), "")
+
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%(id_name)s, %(name)s)"
+            )
+            self.assertIsNotNone(m, "error parse %(id_name)s")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%(id_name)s, %(name)s)")
+            self.assertEqual(m.group(3), "")
+
+            ##################################################################
+            # . AS row
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%s, %s) AS row")
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " AS row")
+
+            m = RE.match("INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nAS row")
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "\nAS row")
+
+            # . AS row(a, b)
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%s, %s) AS row(a, b)")
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " AS row(a, b)")
+
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nAS row(a, b)"
+            )
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "\nAS row(a, b)")
+
+            # . AS row (a, b)
+            m = RE.match("INSERT INTO TEST (ID, NAME) VALUES (%s, %s) AS row (a, b)")
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " AS row (a, b)")
+
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nAS row (a, b)"
+            )
+            self.assertIsNotNone(m, "error parse 'row alias'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "\nAS row (a, b)")
+
+            ##################################################################
+            # . ON DUPLICATE KEY UPDATE
+            m = RE.match(
+                "INSERT INTO TEST (ID, NAME) VALUES (%s, %s) ON DUPLICATE KEY UPDATE"
+            )
+            self.assertIsNotNone(m, "error parse 'on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " ON DUPLICATE KEY UPDATE")
+
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nON DUPLICATE KEY UPDATE"
+            )
+            self.assertIsNotNone(m, "error parse 'on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), "\nON DUPLICATE KEY UPDATE")
+
+            # . ON DUPLICATE KEY UPDATE name = VALUES(name)
+            m = RE.match(
+                "INSERT INTO TEST (ID, NAME) VALUES (%s, %s) ON DUPLICATE KEY UPDATE name = VALUES(name)"
+            )
+            self.assertIsNotNone(m, "error parse 'on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " ON DUPLICATE KEY UPDATE name = VALUES(name)")
+
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nON DUPLICATE KEY UPDATE\n\tname = VALUES(name)"
+            )
+            self.assertIsNotNone(m, "error parse 'on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
             self.assertEqual(
-                m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
+                m.group(3), "\nON DUPLICATE KEY UPDATE\n\tname = VALUES(name)"
             )
 
             ##################################################################
-            m = INSERT_VALUES_RE.match(
-                "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s)"
+            # . AS row & ON DUPLICATE KEY UPDATE
+            m = RE.match(
+                "INSERT INTO TEST (ID, NAME) VALUES (%s, %s) AS row ON DUPLICATE KEY UPDATE ID=row.ID"
             )
-            self.assertIsNotNone(m, "error parse %(id_name)s")
-            self.assertEqual(
-                m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
-            )
+            self.assertIsNotNone(m, "error parse 'row alias & on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST (ID, NAME) VALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
+            self.assertEqual(m.group(3), " AS row ON DUPLICATE KEY UPDATE ID=row.ID")
 
-            ##################################################################
-            m = INSERT_VALUES_RE.match(
-                "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) AS v"
+            m = RE.match(
+                "INSERT INTO TEST\n\t(ID, NAME)\nVALUES (%s, %s)\nAS row\nON DUPLICATE KEY UPDATE\n\tID=row.ID"
             )
-            self.assertIsNotNone(m, "error parse %(id_name)s")
+            self.assertIsNotNone(m, "error parse 'row alias & on duplicate key update'")
+            self.assertEqual(m.group(1), "INSERT INTO TEST\n\t(ID, NAME)\nVALUES ")
+            self.assertEqual(m.group(2), "(%s, %s)")
             self.assertEqual(
-                m.group(3),
-                " AS v",
-                "group 3 not AS v, bug in RE_INSERT_VALUES?",
-            )
-
-            ##################################################################
-            m = INSERT_VALUES_RE.match(
-                "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) ON duplicate update"
-            )
-            self.assertIsNotNone(m, "error parse %(id_name)s")
-            self.assertEqual(
-                m.group(3),
-                " ON duplicate update",
-                "group 3 not ON duplicate update, bug in RE_INSERT_VALUES?",
-            )
-
-            ##################################################################
-            m = INSERT_VALUES_RE.match(
-                "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) AS v ON duplicate update"
-            )
-            self.assertIsNotNone(m, "error parse %(id_name)s")
-            self.assertEqual(
-                m.group(3),
-                " AS v ON duplicate update",
-                "group 3 not AS v ON duplicate update, bug in RE_INSERT_VALUES?",
+                m.group(3), "\nAS row\nON DUPLICATE KEY UPDATE\n\tID=row.ID"
             )
 
             # https://github.com/PyMySQL/PyMySQL/pull/597
-            m = INSERT_VALUES_RE.match("INSERT INTO bloup(foo, bar)VALUES(%s, %s)")
+            m = RE.match("INSERT INTO bloup(foo, bar)VALUES(%s, %s)")
             assert m is not None
 
             # cursor._executed must bee "insert into test (data)
@@ -3690,7 +3809,7 @@ class TestCursor(TestCase):
                 sql = (
                     f"INSERT INTO {self.db}.percent_test (`A%%`, `B%%`) VALUES (%s, %s)"
                 )
-                self.assertIsNotNone(INSERT_VALUES_RE.match(sql))
+                self.assertIsNotNone(RE.match(sql))
                 cur.executemany(sql, [(3, 4), (5, 6)])
                 self.assertTrue(
                     cur.executed_sql.endswith("(3, 4),(5, 6)"),

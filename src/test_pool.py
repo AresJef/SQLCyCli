@@ -3242,80 +3242,13 @@ class TestCursor(TestCase):
         test = "EXECUTE MANY"
         self.log_start(test)
 
+        from sqlcycli.utils import RE_INSERT_VALUES as RE
+
         async with await self.get_pool() as pool:
             async with pool.acquire() as conn:
                 await self.setupForCursor(conn)
-                # Due to complie, INSERT_VALUES_RE can't not be imported directly.
-                # The following regex is the exact same one used by the library.
-                INSERT_VALUES_RE: re.Pattern = re.compile(
-                    r"\s*((?:INSERT|REPLACE)\b.+\bVALUES?\s*)"  # prefix: INSERT INTO ... VALUES
-                    + r"(\(\s*(?:%s|%\(.+\)s)\s*(?:,\s*(?:%s|%\(.+\)s)\s*)*\))"  # values: (%s, %s, ...)
-                    + r"(\s*(?:AS\s.*?)?\s*(?:ON DUPLICATE.*)?);?\s*\Z",  # suffix: AS ... ON DUPLICATE ...
-                    re.IGNORECASE | re.DOTALL,
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%s, %s)"
-                )
-                self.assertIsNotNone(m, "error parse %s")
-                self.assertEqual(
-                    m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%(id)s, %(name)s)"
-                )
-                self.assertIsNotNone(m, "error parse %(name)s")
-                self.assertEqual(
-                    m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s)"
-                )
-                self.assertIsNotNone(m, "error parse %(id_name)s")
-                self.assertEqual(
-                    m.group(3), "", "group 3 not blank, bug in RE_INSERT_VALUES?"
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) AS v"
-                )
-                self.assertIsNotNone(m, "error parse %(id_name)s")
-                self.assertEqual(
-                    m.group(3),
-                    " AS v",
-                    "group 3 not AS v, bug in RE_INSERT_VALUES?",
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) ON duplicate update"
-                )
-                self.assertIsNotNone(m, "error parse %(id_name)s")
-                self.assertEqual(
-                    m.group(3),
-                    " ON duplicate update",
-                    "group 3 not ON duplicate update, bug in RE_INSERT_VALUES?",
-                )
-
-                ##################################################################
-                m = INSERT_VALUES_RE.match(
-                    "INSERT INTO TEST (ID, NAME) VALUES (%(id_name)s, %(name)s) AS v ON duplicate update"
-                )
-                self.assertIsNotNone(m, "error parse %(id_name)s")
-                self.assertEqual(
-                    m.group(3),
-                    " AS v ON duplicate update",
-                    "group 3 not AS v ON duplicate update, bug in RE_INSERT_VALUES?",
-                )
-
                 # https://github.com/PyMySQL/PyMySQL/pull/597
-                m = INSERT_VALUES_RE.match("INSERT INTO bloup(foo, bar)VALUES(%s, %s)")
+                m = RE.match("INSERT INTO bloup(foo, bar)VALUES(%s, %s)")
                 assert m is not None
 
                 # cursor._executed must bee "insert into test (data)
@@ -3341,7 +3274,7 @@ class TestCursor(TestCase):
                             `B%` INTEGER)"""
                     )
                     sql = f"INSERT INTO {self.db}.percent_test (`A%%`, `B%%`) VALUES (%s, %s)"
-                    self.assertIsNotNone(INSERT_VALUES_RE.match(sql))
+                    self.assertIsNotNone(RE.match(sql))
                     await cur.executemany(sql, [(3, 4), (5, 6)])
                     self.assertTrue(
                         cur.executed_sql.endswith("(3, 4),(5, 6)"),
