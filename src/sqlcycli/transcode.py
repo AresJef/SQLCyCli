@@ -2611,8 +2611,8 @@ def _escape_item_subclass(data: object, many: cython.bint, dtype: type) -> objec
 @cython.ccall
 def escape(
     data: object,
-    itemize: cython.bint = True,
     many: cython.bint = False,
+    itemize: cython.bint = True,
 ) -> object:
     """Escape 'data' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
@@ -2630,19 +2630,6 @@ def escape(
         - Library [cytimes](https://github.com/AresJef/cyTimes):
           pydt, pddt.
 
-    :param itemize `<'bool'>`: Whether to escape each items of the 'data' individual. Defaults to `True`.
-        - When 'itemize=True', the 'data' type determines how to escape.
-            * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
-              escapes to `<'tuple[str]'>`.
-            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-              `<'tuple[str]'>`.
-            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-              to `<'list[tuple[str]]'>`. Each tuple represents one row
-              of the 'data' .
-            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-              to one literal string `<'str'>`.
-        - When 'itemize=False', regardless of the 'data' type, all
-          escapes to one single literal string `<'str'>`.
 
     :param many `<'bool'>`: Wheter to escape 'data' as multi-rows. Defaults to `False`.
         * When 'many=True', the argument 'itemize' is ignored.
@@ -2656,6 +2643,20 @@ def escape(
           of the 'data' .
         * 4. Single object (such as `int`, `float`, `str`, etc) escapes
           to one literal string `<'str'>`.
+
+    :param itemize `<'bool'>`: Whether to escape each items of the 'data' individual. Defaults to `True`.
+        - When 'itemize=True', the 'data' type determines how to escape.
+            * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
+              escapes to `<'tuple[str]'>`.
+            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+              `<'tuple[str]'>`.
+            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+              to `<'list[tuple[str]]'>`. Each tuple represents one row
+              of the 'data' .
+            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+              to one literal string `<'str'>`.
+        - When 'itemize=False', regardless of the 'data' type, all
+          escapes to one single literal string `<'str'>`.
 
     :raises `<'EscapeError'>`: If any error occurs during escaping.
 

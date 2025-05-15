@@ -718,7 +718,7 @@ cdef class JSON(_CustomType):
     pass
 
 # Escape
-cpdef object escape(object value, bint itemize=?, bint many=?)
+cpdef object escape(object value, bint many=?, bint itemize=?)
 
 # Decode
 cpdef object decode(

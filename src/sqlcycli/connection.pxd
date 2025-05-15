@@ -54,10 +54,10 @@ cdef class Cursor:
     # Init
     cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
-    cpdef unsigned long long execute(self, str sql, object args=?, bint itemize=?, bint many=?)
+    cpdef unsigned long long execute(self, str sql, object args=?, bint many=?, bint itemize=?)
     cpdef unsigned long long executemany(self, str sql, object args=?)
     cpdef object callproc(self, str procname, object args)
-    cpdef str mogrify(self, str sql, object args=?, bint itemize=?, bint many=?)
+    cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
     cdef inline unsigned long long _query_str(self, str sql)
     cdef inline unsigned long long _query_bytes(self, bytes sql)
     cdef inline str _format(self, str sql, object args)
@@ -205,7 +205,7 @@ cdef class BaseConnection:
     cpdef bint release_savepoint(self, str identifier) except -1
     cpdef tuple show_warnings(self)
     cpdef bint select_database(self, str db) except -1
-    cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
+    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
     cpdef bytes encode_sql(self, str sql)
     # . client
     cpdef bint set_charset(self, str charset, object collation=?) except -1

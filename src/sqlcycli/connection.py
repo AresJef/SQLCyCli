@@ -572,8 +572,8 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        itemize: cython.bint = True,
         many: cython.bint = False,
+        itemize: cython.bint = True,
     ) -> cython.ulonglong:
         """Prepare and execute a query, returns the affected/selected rows `<'int'>`.
 
@@ -592,6 +592,11 @@ class Cursor:
             - Library [cytimes](https://github.com/AresJef/cyTimes):
               pydt, pddt.
             * Note: For single 'NULL' value, use (None,) or [None].
+
+        :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
+            - When 'many=True', the argument 'itemize' is ignored. This function
+              behaves the SAME as the 'executemany()' method. For more information
+              and related examples, see 'cur.executemany()'.
 
         :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
             - When 'itemize=True', the 'args' type determines how to escape.
@@ -612,12 +617,7 @@ class Cursor:
               all escapes to one single literal string `<'str'>`. The 'sql' should
               have one '%s' placeholder.
 
-        :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
-            - When 'many=True', the argument 'itemize' is ignored. This function
-              behaves the SAME as the 'executemany()' method. For more information
-              and related examples, see 'cur.executemany()'.
-
-        ## Example (sequence & mapping [flat] | itemize=True):
+        ## Example (itemize=True):
         >>> cur.execute(
                 "INSERT INTO table (name, age, height) VALUES (%s, %s, %s)",
                 ["John", 25, 170]  # defalut: itemize=True & many=False,
@@ -627,7 +627,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age, height) VALUES ('John', 25, 170);"
 
-        ## Example (sequence & mapping [nested] | itemize=True):
+        ## Example (nested & itemize=True):
         >>> cur.execute(
                 "SELECT * FROM table WHERE name=%s AND age IN %s",
                 ["John", (25, 26)]  # defalut: itemize=True & many=False,
@@ -637,7 +637,7 @@ class Cursor:
             # executed as:
             "SELECT * FROM table WHERE name='John' AND age IN (25,26);"
 
-        ## Example (sequence & mapping [flat] | itemize=False):
+        ## Example (itemize=False):
         >>> cur.execute(
                 "INSERT INTO table (name, age, height) VALUES %s",
                 ["John", 25, 170], itemize=False  # defalut: many=False
@@ -647,7 +647,7 @@ class Cursor:
             # executed as:
             "INSERT INTO table (name, age, height) VALUES ('John',25,170);"
 
-        ## Example (sequence & mapping [nested] | itemize=False):
+        ## Example (nested & itemize=False):
         >>> cur.execute(
                 "INSERT INTO table (name, age, height) VALUES %s",
                 [["John", 25, 170], ["Doe", 26, 180]], itemize=False  # defalut: many=False
@@ -667,7 +667,7 @@ class Cursor:
         # Query without args
         if args is None:
             return self._query_str(sql)
-        args = escape(args, itemize, many)
+        args = escape(args, many, itemize)
 
         # Single row query
         if not many and not itemize:
@@ -863,7 +863,7 @@ class Cursor:
         if args is None:
             _args: tuple = ()
         else:
-            items = escape(args, True, False)
+            items = escape(args, False, True)
             if type(items) is not tuple:
                 raise errors.InvalidCursorArgsError(
                     "Invalid 'args' for 'callproc()' method, "
@@ -896,16 +896,16 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        itemize: cython.bint = True,
         many: cython.bint = False,
+        itemize: cython.bint = True,
     ) -> str:
         """Bound the 'args' to the 'sql' and returns the `exact*` string that
         will be sent to the database by calling the execute*() method `<'str'>`.
 
         :param sql `<'str'>`: The query SQL to mogrify.
         :param args `<'Any'>`: Arguments to bound to the SQL. Defaults to `None`.
-        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
         :param many `<'bool'>`: Whether to execute multi-row 'args'. Defaults to `False`.
+        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
 
         ## Explanation
         - When 'many=False' & 'itemize=True' (default), this method behaves
@@ -918,7 +918,7 @@ class Cursor:
         # Query without args
         if args is None:
             return sql
-        args = escape(args, itemize, many)
+        args = escape(args, many, itemize)
 
         # Single row query
         if not many and not itemize:
@@ -972,8 +972,8 @@ class Cursor:
             return sql % args
         except Exception as err:
             raise errors.InvalidSQLArgsErorr(
-                "Failed to format SQL:\n'%s'\n"
-                "With arguments: %s\n%r\n"
+                "\nFailed to format SQL:\n%s\n"
+                "With %s arguments:\n%r\n"
                 "Error: %s" % (sql, type(args), args, err)
             ) from err
 
@@ -2465,8 +2465,8 @@ class BaseConnection:
     def escape_args(
         self,
         args: Any,
-        itemize: cython.bint = True,
         many: cython.bint = False,
+        itemize: cython.bint = True,
     ) -> object:
         """Escape 'args' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
 
@@ -2484,6 +2484,19 @@ class BaseConnection:
             - Library [cytimes](https://github.com/AresJef/cyTimes):
               pydt, pddt.
 
+        :param many `<'bool'>`: Wheter to escape 'args' as multi-rows. Defaults to `False`.
+            * When 'many=True', the argument 'itemize' is ignored.
+            * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
+              escapes to `<'list[str/tuple[str]]'>`. Each element represents
+              one row of the 'args'.
+            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
+              `<'list[str]'>`. Each element represents one row of the 'args'.
+            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
+              to `<'list[tuple[str]]'>`. Each tuple represents one row
+              of the 'args' .
+            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
+              to one literal string `<'str'>`.
+
         :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
             - When 'itemize=True', the 'args' type determines how to escape.
                 * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
@@ -2498,19 +2511,6 @@ class BaseConnection:
             - When 'itemize=False', regardless of the 'args' type, all
               escapes to one single literal string `<'str'>`.
 
-        :param many `<'bool'>`: Wheter to escape 'args' as multi-rows. Defaults to `False`.
-            * When 'many=True', the argument 'itemize' is ignored.
-            * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
-              escapes to `<'list[str/tuple[str]]'>`. Each element represents
-              one row of the 'args'.
-            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-              `<'list[str]'>`. Each element represents one row of the 'args'.
-            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-              to `<'list[tuple[str]]'>`. Each tuple represents one row
-              of the 'args' .
-            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-              to one literal string `<'str'>`.
-
         :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
 
         ## Returns
@@ -2523,7 +2523,7 @@ class BaseConnection:
           string(s). The 'sql' should have '%s' placeholders equal to the
           item count in each row.
         """
-        return escape(args, itemize, many)
+        return escape(args, many, itemize)
 
     @cython.ccall
     def encode_sql(self, sql: str) -> bytes:

@@ -48,7 +48,7 @@ cdef class Cursor:
     # Setup
     cdef inline bint _setup(self, BaseConnection conn, bint unbuffered) except -1
     # Write
-    cpdef str mogrify(self, str sql, object args=?, bint itemize=?, bint many=?)
+    cpdef str mogrify(self, str sql, object args=?, bint many=?, bint itemize=?)
     cdef inline str _format(self, str sql, object args)
     # Read
     cdef inline dict _convert_row_to_dict(self, tuple row, tuple cols, unsigned long long field_count)
@@ -172,7 +172,7 @@ cdef class BaseConnection:
     cpdef TransactionManager transaction(self, object cursor=?)
     cdef inline type _validate_cursor(self, object cursor)
     # Query
-    cpdef object escape_args(self, object args, bint itemize=?, bint many=?)
+    cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
     cpdef bytes encode_sql(self, str sql)
     # . client
     cpdef bint get_autocommit(self) except -1
