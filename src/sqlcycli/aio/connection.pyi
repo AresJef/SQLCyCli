@@ -63,8 +63,8 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        itemize: bool = True,
         many: bool = False,
+        itemize: bool = True,
     ) -> int: ...
     async def executemany(self, sql: str, args: Any = None) -> int: ...
     async def callproc(self, procname: str, args: tuple | list) -> tuple | list: ...
@@ -72,8 +72,8 @@ class Cursor:
         self,
         sql: str,
         args: Any = None,
-        itemize: bool = True,
         many: bool = False,
+        itemize: bool = True,
     ) -> str: ...
     # Read
     async def fetchone(self) -> tuple | None: ...
@@ -226,8 +226,8 @@ class BaseConnection:
     def escape_args(
         self,
         args: Any,
-        itemize: bool = True,
         many: bool = False,
+        itemize: bool = True,
     ) -> str | tuple[str | tuple[str]] | list[str | tuple[str]]: ...
     def encode_sql(self, sql: str) -> bytes: ...
     # . client
