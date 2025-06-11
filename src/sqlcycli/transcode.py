@@ -2640,7 +2640,7 @@ def escape(
           `<'list[str]'>`. Each element represents one row of the 'data'.
         * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
           to `<'list[tuple[str]]'>`. Each tuple represents one row
-          of the 'data' .
+          of the 'data'.
         * 4. Single object (such as `int`, `float`, `str`, etc) escapes
           to one literal string `<'str'>`.
 

@@ -16,7 +16,7 @@ from sqlcycli.connection import (
     Connection,
 )
 from sqlcycli import aio
-from sqlcycli.aio.pool import Pool, PoolConnection
+from sqlcycli.aio.pool import Pool, PoolConnection, PoolSyncConnection
 from sqlcycli._connect import connect, create_pool
 
 
@@ -45,6 +45,7 @@ __all__ = [
     "aio",
     "Pool",
     "PoolConnection",
+    "PoolSyncConnection",
     # Type
     "BIT",
     "JSON",
