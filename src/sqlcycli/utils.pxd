@@ -7,7 +7,7 @@ from cpython.bytes cimport PyBytes_AsString as bytes_to_chars
 from cpython.unicode cimport PyUnicode_AsEncodedString, PyUnicode_Decode
 from cpython.unicode cimport PyUnicode_DecodeUTF8, PyUnicode_DecodeASCII, PyUnicode_DecodeLatin1
 from sqlcycli.charset cimport Charset
-import errors
+from sqlcycli import errors
 
 # Constants
 cdef:
