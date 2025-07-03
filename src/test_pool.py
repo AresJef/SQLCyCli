@@ -539,7 +539,7 @@ class TestPool(TestCase):
                 await pool.release(conn)
 
             async def do_wait_closed(pool: Pool) -> None:
-                await pool.wait_for_closed()
+                await pool.wait_for_closure()
 
             pool.close()
             await asyncio.gather(
@@ -607,7 +607,7 @@ class TestPool(TestCase):
 
         async with await self.get_pool(min_size=1, max_size=1) as pool:
             with self.assertRaises(errors.PoolNotClosedError):
-                await pool.wait_for_closed()
+                await pool.wait_for_closure()
         self.log_ended(test)
 
     async def test_release_terminated_pool(self):
