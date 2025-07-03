@@ -2614,61 +2614,45 @@ def escape(
     many: cython.bint = False,
     itemize: cython.bint = True,
 ) -> object:
-    """Escape 'data' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
+    """Prepare and escape arguments for SQL binding `<'str/tuple/list[str/tuple]'>`.
 
-    :param data `<'object'>`: The object to escape, supports:
-        - Python native:
-          int, float, bool, str, None, datetime, date, time,
-          timedelta, struct_time, bytes, bytearray, memoryview,
-          Decimal, dict, list, tuple, set, frozenset, range.
-        - Library [numpy](https://github.com/numpy/numpy):
-          np.int, np.uint, np.float, np.bool, np.bytes,
-          np.str, np.datetime64, np.timedelta64, np.ndarray.
-        - Library [pandas](https://github.com/pandas-dev/pandas):
-          pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
-          pd.TimedeltaIndex, pd.Series, pd.DataFrame.
-        - Library [cytimes](https://github.com/AresJef/cyTimes):
-          pydt, pddt.
+    :param args `<'Any'>`: Arguments to escape, supports:
 
+        - **Python built-ins**:
+            int, float, bool, str, None, datetime, date, time,
+            timedelta, struct_time, bytes, bytearray, memoryview,
+            Decimal, dict, list, tuple, set, frozenset, range
+        - **Library [numpy](https://github.com/numpy/numpy)**:
+            np.int, np.uint, np.float, np.bool, np.bytes,
+            np.str, np.datetime64, np.timedelta64, np.ndarray
+        - **Library [pandas](https://github.com/pandas-dev/pandas)**:
+            pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+            pd.TimedeltaIndex, pd.Series, pd.DataFrame
+        - **Library [cytimes](https://github.com/AresJef/cyTimes)**:
+            cytimes.Pydt, cytimes.Pddt
 
-    :param many `<'bool'>`: Wheter to escape 'data' as multi-rows. Defaults to `False`.
-        * When 'many=True', the argument 'itemize' is ignored.
-        * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
-          escapes to `<'list[str/tuple[str]]'>`. Each element represents
-          one row of the 'data'.
-        * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-          `<'list[str]'>`. Each element represents one row of the 'data'.
-        * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-          to `<'list[tuple[str]]'>`. Each tuple represents one row
-          of the 'data'.
-        * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-          to one literal string `<'str'>`.
+    :param many `<'bool'>`: Whether the 'args' is multi-row data. Defaults to `False`.
+    - `many=False`: The 'itemize' parameter determines how to escape the 'args'.
+    - `many=True`: The 'itemize' parameter is ignored, and the 'args' data type determines how escape is done.
+        - 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes to `<'list[str]'>`.
+        - 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to `<'list[str]'>`.
+        - 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes to `<'list[tuple[str]]'>`.
+        - 4. Single object (such as `int`, `float`, `str`, etc) escapes to one literal string `<'str'>`.
 
-    :param itemize `<'bool'>`: Whether to escape each items of the 'data' individual. Defaults to `True`.
-        - When 'itemize=True', the 'data' type determines how to escape.
-            * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
-              escapes to `<'tuple[str]'>`.
-            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-              `<'tuple[str]'>`.
-            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-              to `<'list[tuple[str]]'>`. Each tuple represents one row
-              of the 'data' .
-            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-              to one literal string `<'str'>`.
-        - When 'itemize=False', regardless of the 'data' type, all
-          escapes to one single literal string `<'str'>`.
+    :param itemize `<'bool'>`: Whether to escape items of the 'args' individually. Defaults to `True`.
+    - `itemize=False`: Always escapes to one single literal string `<'str'>`, regardless of the 'args' type.
+    - `itemize=True`: The 'args' data type determines how escape is done.
+        - 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes to `<'tuple[str]'>`.
+        - 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to `<'tuple[str]'>`.
+        - 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes to `<'list[tuple[str]]'>`.
+        - 4. Single object (such as `int`, `float`, `str`, etc) escapes to one literal string `<'str'>`.
 
-    :raises `<'EscapeError'>`: If any error occurs during escaping.
+    :returns `<'str/tuple/list'>`:
+    - If returns `<'str'>`, it represents a single literal string.
+    - If returns `<'tuple'>`, it represents a single row of literal strings.
+    - If returns `<'list'>`, it represents multiple rows of literal strings.
 
-    ## Returns
-    - If returns a `<'str'>`, it represents a single literal string.
-      The 'sql' should only have one '%s' placeholder.
-    - If returns a `<'tuple'>`, it represents a single row of literal
-      strings. The 'sql' should have '%s' placeholders equal to the
-      tuple length.
-    - If returns a `<'list'>`, it represents multiple rows of literal
-      strings. The 'sql' should have '%s' placeholders equal to the
-      item count in each row.
+    :raises `<'EscapeTypeError'>`: If escape fails due to unsupported type.
     """
     try:
         if itemize or many:
@@ -2975,16 +2959,17 @@ def decode(
     decode_bit: cython.bint,
     decode_json: cython.bint,
 ) -> object:
-    """Decode MySQL column value in Python `<'object'>`.
+    """Decode a raw MySQL column value into the corresponding Python object `<'object'>`.
 
-    :param value `<'bytes'>`: The value of the column item to decode.
+    :param value `<'bytes'>`: The raw bytes received from the server for a single column value.
     :param field_type `<'int'>`: The field type of the column. Please refer to 'constants.FIELD_TYPE'
     :param encoding `<'bytes'>`: The encoding of the column.
-    :param is_binary `<'bool'>`: Whether the column is binary data.
-    :param use_decimal `<'bool'>`: Whether to use <'Decimal'> to represent DECIMAL column, `False` use <'float'>.
-    :param decode_bit `<'bool'>`: Whether to decode BIT column to integer, `False` keep as original <'bytes'>.
-    :param decode_json `<'bool'>`: Whether to deserialize JSON column, `False` keep as original JSON <'str'>.
-    :raises `<'DecodeError'>`: When encountering unknown 'field_type'.
+    :param is_binary `<'bool'>`: Whether the column is represents binary data.
+    :param use_decimal `<'bool'>`: DECIMAL columns are decoded as `decimal.Decimal` if `True`, else as `float`.
+    :param decode_bit `<'bool'>`: BIT columns are decoded as `int` if `True`, else kept as the original `bytes`.
+    :param decode_json `<'bool'>`: JSON columns are deserialized if `True`, else kept as the original JSON string.
+    :returns `<'object'>`: The decoded python object.
+    :raises `<'DecodeError'>`: If decode fails due to unsupported `field_type`.
     """
     # Char / Binary
     if field_type in (
