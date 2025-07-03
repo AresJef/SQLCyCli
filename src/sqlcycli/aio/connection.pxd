@@ -77,7 +77,7 @@ cdef class SSDictCursor(DictCursor):
 cdef class SSDfCursor(DfCursor):
     pass
 
-# Connection
+# Cursor Manager
 cdef class CursorManager:
     cdef:
         BaseConnection _conn
@@ -88,6 +88,7 @@ cdef class CursorManager:
 cdef class TransactionManager(CursorManager):
     pass
     
+# Connection
 cdef class BaseConnection:
     cdef:
         # Basic
@@ -196,3 +197,6 @@ cdef class BaseConnection:
     cdef inline bint _write_packet(self, bytes payload) except -1
     cdef inline bint _write_bytes(self, bytes data) except -1
     cdef inline bint _set_use_time(self) except -1
+
+cdef class Connection(BaseConnection):
+    pass

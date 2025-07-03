@@ -64,9 +64,9 @@ cdef class Cursor:
     cdef inline tuple _fetchone_tuple(self)
     cdef inline dict _fetchone_dict(self)
     cdef inline object _fetchone_df(self)
-    cdef inline tuple _fetchmany_tuple(self, unsigned long long size)
-    cdef inline tuple _fetchmany_dict(self, unsigned long long size)
-    cdef inline object _fetchmany_df(self, unsigned long long size)
+    cdef inline tuple _fetchmany_tuple(self, unsigned long long rows)
+    cdef inline tuple _fetchmany_dict(self, unsigned long long rows)
+    cdef inline object _fetchmany_df(self, unsigned long long rows)
     cdef inline tuple _fetchall_tuple(self)
     cdef inline tuple _fetchall_dict(self)
     cdef inline object _fetchall_df(self)
@@ -100,7 +100,7 @@ cdef class SSDictCursor(DictCursor):
 cdef class SSDfCursor(DfCursor):
     pass
 
-# Connection
+# Cursor Manager
 cdef class CursorManager:
     cdef:
         BaseConnection _conn
@@ -113,6 +113,7 @@ cdef class CursorManager:
 cdef class TransactionManager(CursorManager):
     pass
 
+# Connection
 cdef class BaseConnection:
     cdef:
         # Basic
@@ -248,8 +249,8 @@ cdef class BaseConnection:
     cdef inline bint _setup_server_information(self) except -1
     cdef inline bint _request_authentication(self) except -1
     cdef inline MysqlPacket _process_authentication(self, MysqlPacket auth_pkt)
-    cdef inline MysqlPacket _process_auth_caching_sha2(self, MysqlPacket pkt)
-    cdef inline MysqlPacket _process_auth_sha256(self, MysqlPacket pkt)
+    cdef inline MysqlPacket _process_auth_caching_sha2(self, MysqlPacket auth_pkt)
+    cdef inline MysqlPacket _process_auth_sha256(self, MysqlPacket auth_pkt)
     cdef inline MysqlPacket _process_auth_send_data(self, bytes data)
     cdef inline bint _verify_connected(self) except -1
     # Write
@@ -265,3 +266,6 @@ cdef class BaseConnection:
     cdef inline FieldDescriptorPacket _read_field_descriptor_packet(self)
     cdef inline bytes _read_packet_buffer(self)
     cdef inline bytes _read_bytes(self, unsigned int size)
+
+cdef class Connection(BaseConnection):
+    pass
