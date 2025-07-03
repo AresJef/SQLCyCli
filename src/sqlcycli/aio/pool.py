@@ -43,12 +43,10 @@ __all__ = [
 ]
 
 
-# Utils ---------------------------------------------------------------------------------------
+# Cursor --------------------------------------------------------------------------------------
 @cython.ccall
 def validate_sync_cursor(cursor: object) -> type:
-    """Validate and map the given 'cursor' to the corresponding
-    `sync` cursor type `<'type[Cursor]/None'>`.
-    """
+    """Validate and map a cursor identifier to its [sync] cursor class. `<'type[Cursor]/None'>`."""
     if cursor is None:
         return None
     if type(cursor) is type:
@@ -80,9 +78,7 @@ def validate_sync_cursor(cursor: object) -> type:
 
 @cython.ccall
 def validate_async_cursor(cursor: object) -> type:
-    """Validate and map the given 'cursor' to the corresponding
-    `async` cursor type `<'type[Cursor]/None'>`.
-    """
+    """Validate and map a cursor identifier to its [async] cursor class. `<'type[Cursor]/None'>`."""
     if cursor is None:
         return None
     if type(cursor) is type:
@@ -115,13 +111,12 @@ def validate_async_cursor(cursor: object) -> type:
 # Pool Connection -----------------------------------------------------------------------------
 @cython.cclass
 class PoolConnection(async_conn.BaseConnection):
-    """Represents the `async` connection to the server managed by a `Pool`.
+    """Represents the [async] socket connection to the server managed by a pool.
 
-    This class serves as the connection object managed by a pool only.
-    It does not perform argument validations during initialization.
-    Such validations are delegated to the class `<'aio.Pool'>`.
-
-    ### Please do `NOT` create an instance of this class directly.
+    - This class serves as the connection managed by a pool only.
+      It does not perform argument validations during initialization.
+      Such validations are delegated to the `<'aio.Pool'>` class.
+    - Please do `NOT` instanciate this class directly.
     """
 
     # . pool
@@ -162,15 +157,16 @@ class PoolConnection(async_conn.BaseConnection):
         decode_json: cython.bint,
         loop: AbstractEventLoop,
     ):
-        """The `async` connection to the server managed by a `Pool`.
+        """The [async] socket connection to the server managed by a pool.
 
-        This class serves as the connection object managed by a pool only.
-        It does not perform argument validations during initialization.
-        Such validations are delegated to the class `<'aio.Pool'>`.
-
-        ### Please do `NOT` create an instance of this class directly.
+        - This class serves as the connection managed by a pool only.
+          It does not perform argument validations during initialization.
+          Such validations are delegated to the `<'aio.Pool'>` class.
+        - Please do `NOT` instanciate this class directly.
 
         :param pool_id `<'int'>`: The unique identifier of the pool.
+
+        - For details about other parameters, please refer to `sqlcycli.aio.connection.BaseConnection`.
         """
         # . pool
         self._pool_id = pool_id
@@ -217,32 +213,26 @@ class PoolConnection(async_conn.BaseConnection):
         self._loop = loop
 
     # Property --------------------------------------------------------------------------------
-    # . pool
     @property
     def close_scheduled(self) -> bool:
-        """Whether the connection is scheduled to be closed
-        when 'release()' back to the pool `<'bool'>`."""
+        """Check if the connection is scheduled for closure when released by the pool `<'bool'>`."""
         return self._close_scheduled
 
-    # Pool ------------------------------------------------------------------------------------
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def schedule_close(self) -> cython.bint:
-        """After calling the method, this connection is scheduled
-        to be closed when 'release()' back to the pool.
-        """
+        """Schedule the connection for closure (instead of reuse) when released by the pool."""
         self._close_scheduled = True
 
 
 @cython.cclass
 class PoolSyncConnection(sync_conn.BaseConnection):
-    """Represents the `sync` connection to the server managed by a `Pool`.
+    """Represents the [sync] socket connection to the server managed by a pool.
 
-    This class serves as the connection object managed by a pool only.
-    It does not perform argument validations during initialization.
-    Such validations are delegated to the class `<'aio.Pool'>`.
-
-    ### Please do `NOT` create an instance of this class directly.
+    - This class serves as the connection managed by a pool only.
+      It does not perform argument validations during initialization.
+      Such validations are delegated to the `<'aio.Pool'>` class.
+    - Please do `NOT` instanciate this class directly.
     """
 
     # . pool
@@ -282,15 +272,16 @@ class PoolSyncConnection(sync_conn.BaseConnection):
         decode_bit: cython.bint,
         decode_json: cython.bint,
     ):
-        """The `sync` connection to the server managed by a `Pool`.
+        """The [sync] socket connection to the server managed by a pool.
 
-        This class serves as the connection object managed by a pool only.
-        It does not perform argument validations during initialization.
-        Such validations are delegated to the class `<'aio.Pool'>`.
-
-        ### Please do `NOT` create an instance of this class directly.
+        - This class serves as the connection managed by a pool only.
+          It does not perform argument validations during initialization.
+          Such validations are delegated to the `<'aio.Pool'>` class.
+        - Please do `NOT` instanciate this class directly.
 
         :param pool_id `<'int'>`: The unique identifier of the pool.
+
+        - For details about other parameters, please refer to `sqlcycli.connection.BaseConnection`.
         """
         # . pool
         self._pool_id = pool_id
@@ -335,36 +326,34 @@ class PoolSyncConnection(sync_conn.BaseConnection):
         self._decode_json = decode_json
 
     # Property --------------------------------------------------------------------------------
-    # . pool
     @property
     def close_scheduled(self) -> bool:
-        """Whether the connection is scheduled to be closed
-        when 'release()' back to the pool `<'bool'>`."""
+        """Check if the connection is scheduled for closure when released by the pool `<'bool'>`."""
         return self._close_scheduled
 
-    # Pool ------------------------------------------------------------------------------------
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def schedule_close(self) -> cython.bint:
-        """After calling the method, this connection is scheduled
-        to be closed when 'release()' back to the pool.
-        """
+        """Schedule the connection for closure (instead of reuse) when released by the pool."""
         self._close_scheduled = True
 
 
-# Pool ----------------------------------------------------------------------------------------
+# Pool Connection Manager ---------------------------------------------------------------------
 @cython.cclass
 class PoolConnectionManager:
-    """The Context Manager for a PoolConnection."""
+    """The context manager for acquiring and releasing
+    a free [sync/async] connection from the pool.
+    """
 
     _pool: Pool
     _sync_conn: PoolSyncConnection
     _async_conn: PoolConnection
 
     def __init__(self, pool: Pool) -> None:
-        """The Context Manager for a PoolConnection.
+        """The context manager for acquiring and releasing
+        a free [sync/async] connection from the pool.
 
-        :param pool `<'Pool'>`: The pool to manage the connection.
+        :param pool `<'Pool'>`: The pool managing the connections.
         """
         self._pool = pool
         self._sync_conn = None
@@ -374,7 +363,10 @@ class PoolConnectionManager:
     @cython.cfunc
     @cython.inline(True)
     def _acquire_sync_conn(self) -> PoolSyncConnection:
-        """(internal) Acquire a `sync` connection from the pool `<'PoolSyncConnection'>`."""
+        """(internal) Acquire a [sync] connection from the pool `<'PoolSyncConnection'>`.
+
+        :returns `<'PoolSyncConnection'>`: An active [sync] connection managed by the pool.
+        """
         try:
             conn = self._pool._acquire_sync_conn()
         except:  # noqa
@@ -391,7 +383,11 @@ class PoolConnectionManager:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _release_sync_conn(self, close: cython.bint) -> cython.bint:
-        """(internal) Release the `sync` connection back to the pool."""
+        """(internal) Release the [sync] connection back to the pool.
+
+        :param close `<'bool'>`: Whether to schedule the connection
+            for closure instead of reuse.
+        """
         conn: PoolSyncConnection = self._sync_conn
         if conn is not None:
             if close:
@@ -409,7 +405,10 @@ class PoolConnectionManager:
 
     # Async --------------------------------------------------------------------------------------
     async def _acquire_async_conn(self) -> PoolConnection:
-        """(internal) Acquire `async`` connection from the pool `<'PoolConnection'>`."""
+        """(internal) Acquire an [async] connection from the pool `<'PoolSyncConnection'>`.
+
+        :returns `<'PoolSyncConnection'>`: An active [async] connection managed by the pool.
+        """
         try:
             conn = await self._pool._acquire_async_conn()
         except:  # noqa
@@ -423,9 +422,10 @@ class PoolConnectionManager:
         return conn
 
     async def _release_async_conn(self, close: cython.bint) -> None:
-        """(internal) Release the `async` connection back to the pool.
+        """(internal) Release the [async] connection back to the pool.
 
-        :param close `<'bool'>`: Whether to close the connection at Pool release.
+        :param close `<'bool'>`: Whether to schedule the connection
+            for closure instead of reuse.
         """
         conn: PoolConnection = self._async_conn
         if conn is not None:
@@ -454,12 +454,31 @@ class PoolConnectionManager:
 
 @cython.cclass
 class PoolTransactionManager(PoolConnectionManager):
-    """The Context Manager for a PoolConnection in transaction mode."""
+    """The context manager for acquiring and releasing a free
+    [sync/async] connection from the pool in TRANSACTION mode.
+
+    ## On enter
+    - 1. Acquire a connection from the pool.
+    - 2. Calls `BEGIN` on the connection
+
+    ## On exit
+    - If no exception occurs: calls `COMMIT` and releases the connection back to the pool for reuse.
+    - If an exception occurs: Schedules the connection for closure and releases it back to the pool.
+    """
 
     def __init__(self, pool: Pool):
-        """The Context Manager for a PoolConnection.
+        """The context manager for acquiring and releasing a free
+        [sync/async] connection from the pool in TRANSACTION mode.
 
-        :param pool `<'Pool'>`: The pool to manage the connection.
+        ## On enter
+        - 1. Acquire a connection from the pool.
+        - 2. Calls `BEGIN` on the connection
+
+        ## On exit
+        - If no exception occurs: calls `COMMIT` and releases the connection back to the pool for reuse.
+        - If an exception occurs: Schedules the connection for closure and releases it back to the pool.
+
+        :param pool `<'Pool'>`: The pool managing the connections.
         """
         self._pool = pool
         self._sync_conn = None
@@ -518,9 +537,12 @@ class PoolTransactionManager(PoolConnectionManager):
             raise
 
 
+# Pool ----------------------------------------------------------------------------------------
 @cython.cclass
 class Pool:
-    """Represents the pool that manages and maintains connections to the server."""
+    """Represents the pool that manages and maintains both the
+    synchronize and asynchronize connections to the server.
+    """
 
     # Sync Connection
     _sync_conn: PoolSyncConnection
@@ -626,14 +648,14 @@ class Pool:
         decode_bit: cython.bint = False,
         decode_json: cython.bint = False,
     ):
-        """The pool that manages and maintains connections to the server.
+        """The pool that manages and maintains both the synchronize and asynchronize connections to the server.
 
-        :param min_size `<'int'>`: The minimum number of active `async` connections to maintain. Defaults to `0`.
-        :param max_size `<'int'>`: The maximum number of active `async` connections to maintain. Defaults to `10`.
-        :param recycle `<'int/None'>`: The recycle time in seconds. Defaults to `None`.
-            - If set to positive integer, the pool will automatically close
-              and remove any connections idling more than the 'recycle' time.
-            - If 'recycle=None' (Default), recycling is disabled.
+        :param min_size `<'int'>`: The minimum number of [async] connections to maintain. Defaults to `0`.
+        :param max_size `<'int'>`: The maximum number of [async] connections to maintain. Defaults to `10`.
+        :param recycle `<'int/None'>`: The connection recycle time in seconds. Defaults to `None`.
+            When set to a positive integer, the pool will automatically close
+            and remove any connections idling more than the `recycle` time.
+            Any other values disables the recycling feature.
 
         :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
         :param port `<'int'>`: The port of the server. Defaults to `3306`.
@@ -656,8 +678,9 @@ class Pool:
         :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
         :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
         :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
-        :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+        :param cursor `<'type[Cursor]/None'>`: The default cursor class (type) to use. Defaults to `<'Cursor'>`.
+            Determines the data type of the fetched result set.
+            Also accepts: 1. `tuple` => `Cursor`; 2. `dict` => `DictCursor`; 3. `DataFrame` => `DfCursor`;
 
         :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
         :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
@@ -667,16 +690,16 @@ class Pool:
               to <'OptionFile'>, with option group defaults to 'client'.
 
         :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
-            - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
+            - Supports both `sqlcycli.SSL` or pre-configured `ssl.SSLContext` object.
 
         :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
             - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
             - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
         :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
-        :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-        :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
-        :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
+        :param use_decimal `<'bool'>`: DECIMAL columns are decoded as `decimal.Decimal` if `True`, else as `float`. Defaults to `False`.
+        :param decode_bit `<'bool'>`: BIT columns are decoded as `int` if `True`, else kept as the original `bytes`. Defaults to `False`.
+        :param decode_json `<'bool'>`: JSON columns are deserialized if `True`, else kept as the original JSON string. Defaults to `False`.
         """
         # Sync Connection
         self._sync_conn = None
@@ -783,13 +806,13 @@ class Pool:
         self,
         min_size: cython.int,
         max_size: cython.int,
-        recycle: object,
+        recycle: int | None,
     ) -> cython.bint:
         """(internal) Setup the pool.
 
-        :param min_size `<'int'>`: The minimum number of active `async` connections to maintain.
-        :param max_size `<'int'>`: The maximum number of active `async` connections to maintain.
-        :param recycle `<'int/None'>`: The recycle time in seconds.
+        :param min_size `<'int'>`: The minimum number of [async] connections to maintain.
+        :param max_size `<'int'>`: The maximum number of [async] connections to maintain.
+        :param recycle `<'int/None'>`: The connection recycle time in seconds.
         """
         # . counting
         self._acqr = 0
@@ -797,12 +820,12 @@ class Pool:
         # . internal
         if min_size < 0:
             raise errors.InvalidPoolArgsError(
-                "Invalid minimum pool size '%s', must be greater than 0." % min_size
+                "Invalid minimum pool size '%d', must be a postive integer." % min_size
             )
         self._min_size = min_size
         if max_size < max(1, min_size):
             raise errors.InvalidPoolArgsError(
-                "Invalid maximum pool size %s', must be greater than %d."
+                "Invalid maximum pool size '%d', must be greater than %d."
                 % (max_size, max(1, min_size))
             )
         self._max_size = max_size
@@ -865,17 +888,17 @@ class Pool:
 
     @property
     def charset(self) -> str:
-        """The 'CHARSET' of the connections `<'str'>`."""
+        """The CHARACTER SET of the connections `<'str'>`."""
         return self._charset._name
 
     @property
     def collation(self) -> str:
-        """The 'COLLATION' of the connections `<'str'>`."""
+        """The COLLATION of the connections `<'str'>`."""
         return self._charset._collation
 
     @property
     def encoding(self) -> str:
-        """The 'encoding' of the connections `<'str'>`."""
+        """The encoding of the connections `<'str'>`."""
         return utils.decode_bytes_ascii(self._charset._encoding)
 
     @property
@@ -895,10 +918,14 @@ class Pool:
 
     @property
     def autocommit(self) -> bool | None:
-        """The default 'autocommit' mode of the pool. All acquired
-        connections will comply to this setting `<'bool/None'>`.
+        """The default autocommit mode of the pool `<'bool/None'>`.
 
-        `None` means pool is not connected and use server default.
+        - All connections acquired from the pool will comply to this setting.
+
+        :returns `<'bool/None'>`:
+        - `True`: if the connections operate in autocommit (non-transactional) mode.
+        - `False`: if the connections operate in manual commit (transactional) mode.
+        - `None`: means pool is not connected yet and use the server default.
         """
         if not self.closed():
             return self._autocommit
@@ -913,7 +940,7 @@ class Pool:
 
     @property
     def max_allowed_packet(self) -> int:
-        """The max size of packet sent to server in bytes `<'int'>`."""
+        """The maximum size of packet sent to server in bytes `<'int'>`."""
         return self._max_allowed_packet
 
     @property
@@ -923,22 +950,22 @@ class Pool:
 
     @property
     def init_command(self) -> str | None:
-        """The 'init_command' to be executed after connecting `<'str/None'>`."""
+        """The initial SQL statement to run when connections are established `<'str/None'>`."""
         return self._init_command
 
     @property
     def client_flag(self) -> int:
-        """The initial SQL statement to run when connections are established `<'str/None'>`."""
+        """The latest client flag of the connections `<'int'>`."""
         return self._client_flag
 
     @property
     def ssl(self) -> object | None:
-        """The 'ssl.SSLContext' for the connections `<'SSLContext/None'>`."""
+        """The `ssl.SSLContext` of the connections `<'SSLContext/None'>`."""
         return self._ssl_ctx
 
     @property
     def auth_plugin(self) -> AuthPlugin | None:
-        """The authentication plugins handlers `<'AuthPlugin/None'>`."""
+        """The authentication plugin handlers `<'AuthPlugin/None'>`."""
         return self._auth_plugin
 
     # . server
@@ -957,15 +984,13 @@ class Pool:
     @property
     def server_version(self) -> tuple[int] | None:
         """The server version `<'tuple[int]/None'>`.
-        >>> (8, 0, 23)  # example
-        """
+        >>> (8, 0, 23)  # example"""
         return self._server_version
 
     @property
     def server_version_major(self) -> int | None:
-        """The server major version `<'int/None'>`.
-        >>> 8  # example
-        """
+        """The major server version `<'int/None'>`.
+        >>> 8  # example"""
         if self._server_version_major == -1:
             return None
         return self._server_version_major
@@ -983,66 +1008,67 @@ class Pool:
     # . decode
     @property
     def use_decimal(self) -> bool:
-        """The default decode behavior of the pool: whether to
-        use <'DECIMAL'> to represent DECIMAL column data `<'bool'>`.
+        """Determine whether DECIMAL columns are decoded as `decimal.Decimal` `<'bool'>`.
 
-        If `False`, use <'float'> instead. All acquired
-        connections will comply to this settings.
+        DECIMAL columns are decoded as `decimal.Decimal` if `True`, else as `float`.
+
+        - All connections acquired from the pool will comply to this setting.
         """
         return self._use_decimal
 
     @property
     def decode_bit(self) -> bool:
-        """The default decode behavior of the pool: whether
-        to decode BIT column data to integer `<'bool'>`.
+        """Determine whether BIT columns are decoded as integers `<'bool'>`.
 
-        If `False`, keep as the original bytes. All acq
-        uired connections will comply to this settings.
+        BIT columns are decoded as `int` if `True`, else kept as the original `bytes`.
+
+        - All connections acquired from the pool will comply to this setting.
         """
         return self._decode_bit
 
     @property
     def decode_json(self) -> bool:
-        """The default decode behavior of the pool: whether
-        to deserialize JSON column data `<'bool'>`.
+        """Determine whether JSON columns are deserialized `<'bool'>`.
 
-        If `False`, keep as the original JSON string. All
-        acquired connections will comply to this settings.
+        JSON columns are deserialized if `True`, else kept as the original JSON string.
+
+        - All connections acquired from the pool will comply to this setting.
         """
         return self._decode_json
 
     # . pool
     @property
     def free(self) -> int:
-        """The number of free `async` connections in the pool `<'int'>`."""
+        """Number of free [async] connections in the pool `<'int'>`."""
         return self._free
 
     @property
     def used(self) -> int:
-        """The number of `async` connections that are in use `<'int'>`."""
+        """Number of in-use [async] connections in the pool `<'int'>`."""
         return self._get_used()
 
     @property
     def total(self) -> int:
-        """The total number of `async` connections in the pool `<'int'>`."""
+        """Total number of [async] connections in the pool `<'int'>`."""
         return self._get_total()
 
     @property
     def min_size(self) -> int:
-        """The minimum number of active `async` connections to maintain `<'int'>`."""
+        """Minimum number of [async] connections the pool will maintain `<'int'>`."""
         return self._min_size
 
     @property
     def max_size(self) -> int:
-        """The maximum number of active `async` connections to maintain `<'int'>`."""
+        """Maximum number of [async] connections the pool will maintain `<'int'>`."""
         return self._max_size
 
     @property
     def recycle(self) -> int | None:
-        """The recycle time in seconds `<int/None>`.
+        """The conneciton recycle time in seconds `<int/None>`.
 
-        Any connections idling more than the 'recycle' time
-        will be closed and removed from the pool.
+        Any connections idling more than the `recycle` time
+        will be closed and removed from the pool. Value of
+        `None` means the recycling feature is disabled.
         """
         return None if self._recycle == -1 else self._recycle
 
@@ -1050,9 +1076,9 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_min_size(self, size: cython.uint) -> cython.bint:
-        """Change the minimum number of active `async` connections to maintain by the pool.
+        """Change the minimum number of [async] connections the pool maintains.
 
-        :param size `<'int'>`: New minium pool size.
+        :param size `<'int'>`: The new minimum pool size.
         """
         if size > self._max_size:
             raise errors.InvalidPoolArgsError(
@@ -1064,12 +1090,13 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_recycle(self, recycle: int | None) -> cython.bint:
-        """Change the recycle time.
+        """Change the connection recycle time.
 
-        :param recycle `<'int/None'>`: New recycle time in seconds.
-            - If set to any positive integer, the pool will automatically close
-              and remove any connections idling more than the 'recycle' time.
-            - Set to `None` to disable recycling.
+        :param recycle `<'int/None'>`: New connection recycle time in seconds.
+
+            When set to a positive integer, the pool will automatically close
+            and remove any connections idling more than the `recycle` time.
+            Any other values disables the recycling feature.
         """
         if recycle is None:
             self._recycle = -1
@@ -1087,12 +1114,13 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_autocommit(self, value: cython.bint) -> cython.bint:
-        """Set the default 'autocommit' mode of the pool. All acquired
-        connections will comply to this setting.
+        """Set the default autocommit mode of the pool.
+
+        - All connections acquired from the pool will comply to this setting.
 
         :param value `<'bool'>`: Enable/Disable autocommit.
-            - `True` to operate in autocommit (non-transactional) mode.
-            - `False` to operate in manual commit (transactional) mode.
+        - `True` to operate in autocommit (non-transactional) mode.
+        - `False` to operate in manual commit (transactional) mode.
         """
         self._autocommit_mode = int(value)
         if not self.closed():
@@ -1102,11 +1130,12 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_use_decimal(self, value: cython.bint) -> cython.bint:
-        """Set the default decode behavior of the pool: whether to
-        use `<'DECIMAL'> to represent DECIMAL column data. All
-        acquired connections will comply to this setting.
+        """Set the decoding behavior for DECIMAL columns.
 
-        :param value `<'bool'>`: True to use <'DECIMAL>', else <'float'>.
+        - All connections acquired from the pool will comply to this setting.
+
+        :param value `<'bool'>`: DECIMAL columns are decoded as
+            `decimal.Decimal` if `True`, else as `float`.
         """
         self._use_decimal = value
         return True
@@ -1114,11 +1143,12 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_decode_bit(self, value: cython.bint) -> cython.bint:
-        """Set the default decode behavior of the pool: whether to
-        decode BIT column data to integer. All acquired connections
-        will comply to this settings.
+        """Set the decoding behavior for BIT columns.
 
-        :param value `<'bool'>`: True to decode BIT column, else keep as original bytes.
+        - All connections acquired from the pool will comply to this setting.
+
+        :param value `<'bool'>`: BIT columns are decoded as `int`
+            if `True`, else kept as the original `bytes`.
         """
         self._decode_bit = value
         return True
@@ -1126,11 +1156,12 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def set_decode_json(self, value: cython.bint) -> cython.bint:
-        """Set the default decode behavior of the pool: whether to
-        deserialize JSON column data. All acquired connections will
-        comply to this settings.
+        """Set the decoding behavior for JSON columns.
 
-        :param value `<'bool'>`: True to deserialize JSON column, else keep as original JSON string.
+        - All connections acquired from the pool will comply to this setting.
+
+        :param value `<'bool'>`: JSON columns are deserialized if
+            `True`, else kept as the original JSON string.
         """
         self._decode_json = value
         return True
@@ -1139,7 +1170,11 @@ class Pool:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _add_free_conn(self, conn: PoolConnection) -> cython.bint:
-        """(internal) Add back a free `async` connection, and update counting."""
+        """(internal) Add a free [async] connection back to
+        the pool, and update the counting.
+
+        :param conn `<'PoolConnection'>`: The [async] connection instance.
+        """
         self._free_conns.append(conn)
         self._free += 1
         return True
@@ -1147,7 +1182,12 @@ class Pool:
     @cython.cfunc
     @cython.inline(True)
     def _get_free_conn(self) -> PoolConnection:
-        """(internal) Get a free `async` connection, and update counting `<'PoolConnection/None'>`."""
+        """(internal) Get a free [async] connection from the pool,
+        and update the counting `<'PoolConnection/None'>`.
+
+        :returns `<'PoolConnection'>`: The [async] connection instance,
+            or `None` when no more free connection is available.
+        """
         try:
             conn: PoolConnection = self._free_conns.popleft()
             if self._free > 0:
@@ -1161,14 +1201,14 @@ class Pool:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _get_free(self) -> cython.uint:
-        """(internal) Get the number of free `async` connections in the pool `<'int'>`."""
+        """(internal) Get the number of free [async] connections in the pool `<'int'>`."""
         return self._free
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _get_used(self) -> cython.uint:
-        """(internal) Get the number of `async` connections that are in use `<'int'>`."""
+        """(internal) Get the number of in-use [async] connections in the pool `<'int'>`."""
         if self._used_conns is None:
             return 0
         return set_len(self._used_conns)
@@ -1177,13 +1217,13 @@ class Pool:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _get_total(self) -> cython.uint:
-        """(internal) Get the total number of `async` connections in the pool `<'int'>`."""
+        """(internal) Get the total number of [async] connections in the pool `<'int'>`."""
         return self._acqr + self._free + self._get_used()
 
     @cython.cfunc
     @cython.inline(True)
     def _get_loop(self) -> object:
-        """(internal) Get async event loop `<'AbstractEventLoop'>`'"""
+        """(internal) Get the async event loop `<'AbstractEventLoop'>`'"""
         if self._loop is None:
             self._loop = _get_event_loop()
         return self._loop
@@ -1194,17 +1234,13 @@ class Pool:
         """Acquire a free connection from the pool through context manager `<'PoolConnectionManager'>`.
 
         ## Notice
-        - To maintain consistency, connection 'autocommit', 'used_decimal',
-          'decode_bit' and 'decode_json' will be reset to pool settings
-          when acquired.
-        - If user changes 'charset', 'read_timeout', 'write_timeout',
-          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
-          and 'exeuction_timeout' through connection built-in 'set_*()'
-          methods, these settings will also be reset to pool defaults
-          at release.
-        - For connection consistency, other changes made on the connection
-          [SESSION] (especially through SQL queries), please manually call
-          'conn.schedule_close()' method before releasing back to the pool.
+        - **On Acquisition**: The following session settings are reset to the pool's defaults:
+          `autocommit`, `used_decimal`, `decode_bit`, `decode_json`.
+        - **At Release**: Any changes made vis `set_*()` methods (e.g. `set_charset()`,
+          `set_read_timeout()`, etc.) will be reverted back to the pool defaults.
+        - **Consistency**: Any other session-level changes (e.g. via SQL statements) will
+          break the pool connection consistency. Please call `Connection.schedule_close()`
+          before exiting the context.
 
         ## Example (sync):
         >>> with pool.acquire() as conn:
@@ -1215,51 +1251,35 @@ class Pool:
         >>> async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("SELECT * FROM table")
-
-        ## Example (direct async - NOT recommended):
-        >>> conn = await pool.acquire()
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT * FROM table")
-            await pool.release(conn)  # manual release
         """
         return PoolConnectionManager(self)
 
     @cython.ccall
     def transaction(self) -> PoolTransactionManager:
-        """Acquire a free connection from the pool in `TRANSACTION` mode
+        """Acquire a free connection from the pool in TRANSACTION mode
         through context manager `<'PoolTransactionManager'>`.
 
-        ## Explanation
-        By acquiring connection through this method, the following happens:
-        - 1. Acquire a free connection from the Pool.
-        - 2. Use the connection to `BEGIN` a transaction.
-        - 3. Returns the connection.
-        - 4a. If catches ANY exceptions during the transaction, close and release the connection by the Pool.
-        - 4b. If the transaction executed successfully, execute `COMMIT` and release the connection back to the Pool.
+        ## On enter
+        - 1. Acquire a free connection from the pool.
+        - 2. Calls `BEGIN` on the connection
+
+        ## On exit
+        - If no exception occurs: calls `COMMIT` and releases the connection back to the pool for reuse.
+        - If an exception occurs: Schedules the connection for closure and releases it back to the pool.
 
         ## Notice
-        - Do `NOT` use 'conn.transaction()' to restart a TRANSACTION,
-          only use the 'conn.cursor()' method to acquire the cursor.
-        - To maintain consistency, connection 'autocommit', 'used_decimal',
-          'decode_bit' and 'decode_json' will be reset to pool settings
-          when acquired.
-        - If user changes 'charset', 'read_timeout', 'write_timeout',
-          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
-          and 'exeuction_timeout' through connection built-in 'set_*()'
-          methods, these settings will also be reset to pool defaults
-          at release.
-        - For connection consistency, other changes made on the connection
-          [SESSION] (especially through SQL queries), please manually call
-          'conn.schedule_close()' method before releasing back to the pool.
+        - **On Acquisition**: The following session settings are reset to the pool's defaults:
+          `autocommit`, `used_decimal`, `decode_bit`, `decode_json`.
+        - **At Release**: Any changes made vis `set_*()` methods (e.g. `set_charset()`,
+          `set_read_timeout()`, etc.) will be reverted back to the pool defaults.
+        - **Consistency**: Any other session-level changes (e.g. via SQL statements) will
+          break the pool connection consistency. Please call `Connection.schedule_close()`
+          before exiting the context.
 
         ## Example (sync):
         >>> with pool.transaction() as conn:
                 with conn.cursor() as cur:
                     cur.execute("INSERT INTO tb (id, name) VALUES (1, 'test')")
-            # Equivalent to:
-            BEGIN;
-            INSERT INTO tb (id, name) VALUES (1, 'test');
-            COMMIT;
 
         ## Example (async):
         >>> async with pool.transaction() as conn:
@@ -1273,12 +1293,13 @@ class Pool:
         return PoolTransactionManager(self)
 
     async def fill(self, num: cython.int = 1) -> None:
-        """Fill the pool with specific number of new `async` connections.
+        """Fill the pool with new [async] connections.
 
-        :param num `<'int'>`: The number of new `async` connections to fill. Defaults to `1`.
-            - If the number plus the existing `async` connections exceeds the
-              maximum pool size, the pool will only fill to the 'max_size' limit.
-            - If 'num=-1', the pool will fill to the 'min_size'.
+        :param num `<'int'>`: Number of new [async] connections to create. Defaults to `1`.
+
+            - If 'num' plus the total [async] connections in the pool exceeds the
+              maximum pool size, only fills up to the `Pool.max_size` limit.
+            - If 'num=-1', fills up to the `Pool.min_size` limit.
         """
         if num == 0 or num < -1 or self._closing:
             return None
@@ -1302,27 +1323,27 @@ class Pool:
 
     @cython.ccall
     def release(self, conn: PoolConnection | PoolSyncConnection) -> object:
-        """Release a connection back to the pool `<'Future'>`.
-        This method is `NOT` needed if the connection is acquired through the
-        'acquire()' or 'transaction()' methods. The context manager will
-        automatically release the connection back to the pool.
+        """Release a connection back to the pool `<'Task[None]'>`.
 
-        :param conn `<'PoolConnection/PoolSyncConnection'>`: The pool connection to release.
-        :raises `<'PoolReleaseError'>`: If the connection does not belong to this pool.
+        - Use this method `ONLY` when you directly acquired a connection without the context manager.
+        - Connections obtained via context manager are released automatically on exits.
 
-        ## Notice
-        - For `async` connection, please await for the result: `await pool.release(conn)`.
-        - To maintain consistency, connection 'autocommit', 'used_decimal',
-          'decode_bit' and 'decode_json' will be reset to pool settings
-          when acquired.
-        - If user changes 'charset', 'read_timeout', 'write_timeout',
-          'wait_timeout', 'interactive_timeout', 'lock_wait_timeout'
-          and 'exeuction_timeout' through connection built-in 'set_*()'
-          methods, these settings will also be reset to pool defaults
-          at release.
-        - For connection consistency, other changes made on the connection
-          [SESSION] (especially through SQL queries), please manually call
-          'conn.schedule_close()' method before releasing back to the pool.
+        :param conn `<'PoolConnection/PoolSyncConnection'>`: The pool [sync/async] connection to release.
+
+        :returns `<'Task[None]'>`: An `asyncio.Task` that resolves once the connection is released.
+
+            - For a [sync] connection, the returned `Task` can be ignored,
+              as the connection is released immediately.
+            - For an [async] connection, the returned `Task` must be awaited
+              to ensure the connection is properly handled.
+
+        :raises `<'PoolReleaseError'>`: If the connection does not belong to the pool.
+
+        ## Example (sync):
+        >>> pool.release(sync_conn)  # immediate release
+
+        ## Example (async):
+        >>> await pool.release(async_conn)  # 'await' for release
         """
         # Async connection
         loop: AbstractEventLoop = self._get_loop()
@@ -1347,9 +1368,11 @@ class Pool:
     @cython.cfunc
     @cython.inline(True)
     def _acquire_sync_conn(self) -> PoolSyncConnection:
-        """(internal) Acquired `sync` connection `<'PoolSyncConnection/None'>`.
+        """(internal) Acquire the [sync] connection maintained by the pool `<'PoolSyncConnection/None'>`.
 
-        ### This method returns `None` only when the pool is closing.
+        :returns `<'PoolSyncConnection/None'>`: Returns the existing active [sync]
+            connection if available and within the recycle policy; otherwise,
+            establishes a new one. If the pool is closing, returns `None`.
         """
         # Pool is closing
         if self._closing:
@@ -1434,19 +1457,19 @@ class Pool:
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _release_sync_conn(self, conn: PoolSyncConnection) -> cython.bint:
-        """(internal) Release the `sync` connection back to the pool.
+        """(internal) Release the [sync] connection back to the pool.
 
-        ### If the connection belongs to the pool, this method does not raise any error.
+        :param conn `<'PoolSyncConnection'>`: The [sync] connection to release.
+        :raises `<'PoolReleaseError'>`: If the connection does not belong to the pool.
         """
         # Validate pool identity
-        if conn._pool_id != self._id:
+        if conn is not self._sync_conn:
             raise errors.PoolReleaseError(
                 "Cannot release connection that does not belong to the pool."
             )
 
         # Scheduled close / in transaction / closing
         if conn._close_scheduled or conn.get_transaction_status() or self._closing:
-            conn.close()
             return self._close_sync_conn()
 
         # Reset connection
@@ -1456,62 +1479,65 @@ class Pool:
                 conn.set_charset(self._charset._name, self._charset._collation)
                 conn._charset_changed = False
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . read timeout
         if conn._read_timeout_changed:
             try:
                 conn.set_read_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . write timeout
         if conn._write_timeout_changed:
             try:
                 conn.set_write_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . wait timeout
         if conn._wait_timeout_changed:
             try:
                 conn.set_wait_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . interactive timeout
         if conn._interactive_timeout_changed:
             try:
                 conn.set_interactive_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . lock wait timeout
         if conn._lock_wait_timeout_changed:
             try:
                 conn.set_lock_wait_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
         # . execution timeout
         if conn._execution_timeout_changed:
             try:
                 conn.set_execution_timeout(None)
             except Exception:
-                conn.close()
                 return self._close_sync_conn()
 
-        # Reclaim connection (normally should not happen)
-        if self._sync_conn is None:
-            self._sync_conn = conn
+        # Finished
+        return True
 
+    @cython.cfunc
+    @cython.inline(True)
+    @cython.exceptval(-1, check=False)
+    def _close_sync_conn(self) -> cython.bint:
+        """(internal) Close the [sync] connection maintained by the pool."""
+        if self._sync_conn is not None:
+            self._sync_conn.close()
+            self._sync_conn = None
         return True
 
     # (Async) Acquire / Release ---------------------------------------------------------------
     async def _acquire_async_conn(self) -> PoolConnection | None:
-        """(internal) Acquire a `async` connection from the pool `<'PoolConnection/None'>`.
+        """(internal) Acquire an [async] free connection maintained by the pool `<'PoolConnection/None'>`.
 
-        ### This method returns `None` only when the pool is closing.
+        :returns `<'PoolConnection/None'>`: Returns a free [async] connection
+            if available; otherwise, fills the pool with new connections
+            and waits for a free connection to become available.
+            If the pool is closing, returns `None`.
         """
         async with self._condition:
             while True:
@@ -1519,33 +1545,29 @@ class Pool:
                 await self._fill_async_min()
 
                 # Acquire free connection
-                conn = await self._acquire_async_free()
+                conn = await self._acquire_async_conn_free()
                 if conn is not None:
                     return conn
 
                 # Acquire new connection
-                conn = await self._acquire_async_new()
+                await self._fill_async_new()
+                conn = await self._acquire_async_conn_free()
                 if conn is not None:
                     return conn
 
                 # Pool is closing
                 if self._closing:
                     # eixt: pool is closing, return None
-                    return await self.wait_for_closed()
+                    return await self.wait_for_closure()
 
                 # Wait for notification
                 await self._condition.wait()
 
-    async def _acquire_async_free(self) -> PoolConnection | None:
-        """(internal) Acquire an existing free `async` connection from the pool `<'PoolConnection/None'>`.
+    async def _acquire_async_conn_free(self) -> PoolConnection | None:
+        """(internal) Acquire an existing free [async] connection from the pool `<'PoolConnection/None'>`.
 
-        This method only tries to acquire existing free connections
-        in FIFO (First-In-First-Out) order. Recycling and socket
-        'eof' checks are performed here, and invalid connections
-        are closed and removed. Also, 'autocommit', 'used_decimal',
-        'decode_bit' and 'decode_json' will be reset to pool settings.
-
-        ### This method returns `None` if no free connection available.
+        :returns `<'PoolConnection/None'>`: The existing free [async] connection
+            in FIFO order, or `None` if free connection is not available.
         """
         while self._free > 0 and not self._closing:
             conn = self._get_free_conn()
@@ -1585,20 +1607,8 @@ class Pool:
         # No free available
         return None
 
-    async def _acquire_async_new(self) -> PoolConnection | None:
-        """(internal) Create and acquire a new `async` connection from the pool `<'PoolConnection/None'>`.
-
-        This method creates a new connection (if max limit not reached)
-        and adds it to the pool. The connection is then acquired and
-        returned to the caller.
-
-        ### This method returns `None` if pool max limit is reached.
-        """
-        await self._fill_async_new()
-        return await self._acquire_async_free()
-
     async def _fill_async_min(self) -> None:
-        """(internal) Fill the pool with new `async` connections up to 'min_size'."""
+        """(internal) Fill the pool with new [async] connections up to `Pool.min_size` limit."""
         if self._min_size == 0 or self._closing:
             return None
 
@@ -1610,7 +1620,7 @@ class Pool:
             self._condition.notify()
 
     async def _fill_async_new(self) -> None:
-        """(internal) Fill the pool with one new `async` connection."""
+        """(internal) Fill the pool with one extra new connection (limited by `Pool.max_size`)."""
         # Limit by pool size or is closing
         if self._get_total() >= self._max_size or self._closing:
             return None
@@ -1674,9 +1684,10 @@ class Pool:
             self._acqr -= 1
 
     async def _release_async_conn(self, conn: PoolConnection) -> None:
-        """(internal) Release an `async` connection back to the pool.
+        """(internal) Release an [async] connection back to the pool.
 
-        ### If the connection belongs to the pool, this method does not raise any error.
+        :param conn `<'PoolConnection'>`: The [async] connection to release.
+        :raises `<'PoolReleaseError'>`: If the connection does not belong to the pool.
         """
 
         async def notify() -> None:
@@ -1754,42 +1765,43 @@ class Pool:
                 await conn.close()
                 return await notify()
 
-        # Back to pool
+        # Add back to pool
         self._add_free_conn(conn)
         return await notify()
 
     # Close -----------------------------------------------------------------------------------
     @cython.ccall
     def close(self) -> object:
-        """Close the pool, and returns 'Pool.wait_for_closed()' `<'Future'>`.
+        """Initiate the shutdown of the connection pool `<'Task[None]'>`.
 
-        - Set pool 'closing' flag to `True`, so no free/new connections
-          can be acquired, and all in-use connections will be closed at
-          release.
-        - Returns the 'Future' object wraps the 'Pool.wait_for_closed()'
-          coroutine, which will close all free connections and `WAIT`
-          for the return and release of all the in-use connections'.
-        - If user only acquires `sync` connection and the pool is empty,
-          the 'Future' object can be ignored.
-        - If user acquires any `async` connections, please await of the 'Future'
-          object or manual await 'Pool.wait_for_closed()' method.
+        This method will:
+        - 1. Prevent any further connection acquisitions.
+        - 2. Immediately closes and removes the free [sync] connection.
+        - 3. Creates an `asyncio.Task` that closes and removes all [async] connections in the pool.
 
-        ### This method does not raise any error.
+        :returns `<'Task[None]'>`: An `asyncio.Task` that resolves once:
 
-        ## Example (await closure):
+            - All free [async] connections are closed and removed.
+            - Waited for all in-use [async] connections to be returned, closed and removed.
+
+        ## Notice
+        - In purely synchronous environment, the returned `Task` can be ignored,
+          as the [sync] connection is always closed and remvoed immediately.
+        - In asynchronous environment, please `await` for the returned `Task`
+          to ensure a proper shutdown.
+        - This method does not raise any error.
+
+        ## Example (sync):
+        >>> with pool.acquire() as conn:
+                # some SQL queries
+                ...
+            pool.close()  # immediate closure
+
+        ## Example (async):
         >>> async with pool.acquire() as conn:
                 # some SQL queries
                 ...
-            await pool.close()  # closing & await for closure
-
-        ## Example (manual closure):
-        >>> async with pool.acquire() as conn:
-                # some SQL queries
-                ...
-            pool.close()  # set 'closing' flag
-            # some more task
-            ...
-            await pool.wait_for_closed()  # manual closure
+            await pool.close()  # 'await' for closure
         """
         loop: AbstractEventLoop = self._get_loop()
 
@@ -1805,26 +1817,44 @@ class Pool:
         # Set closing flag
         self._closing = True
 
-        # Wait for closed (Future)
-        return loop.create_task(self.wait_for_closed())
+        # Check for [async] connections status
+        if self._get_total() == 0:  # all closed
+            # Set closed flag
+            self._closed = True
+            fut = loop.create_future()
+            fut.set_result(None)
+            return fut  # exit
 
-    async def wait_for_closed(self) -> None:
-        """Wait for the pool to be closed.
+        # Create the 'wait_for_closure' Task
+        return loop.create_task(self.wait_for_closure())
 
-        - Close all free connections.
-        - Wait for all in-use connections to return and be released (closed).
+    async def wait_for_closure(self) -> None:
+        """Wait until the connection pool has fully closed all its connections.
 
-        ### This method should only be called after 'Pool.close()'.
+        This coroutine will:
+        - 1. Close and remove any remaining [async] free connections.
+        - 2. Wait for all in-use [async] connections to be returned, closed and removed.
 
-        :raises `<'PoolNotClosedError'>`: If called before 'Pool.close()'. Otherwise, this method does not raise any error.
+        :raises `<'PoolNotClosedError'>`: Raises error if called before `Pool.close()`.
+            Otherwise, this method does not raise any error.
+
+        ## Notice
+        - Only call this method after `Pool.close()` has been invoked.
+
+        ## Example (async):
+        >>> async with pool.acquire() as conn:
+                # some SQL queries
+                ...
+            pool.close()  # initiate closure
+            await pool.wait_for_closure()  # 'await' for closure
         """
         # Pool already closed
         if self.closed():
             return None
         if not self._closing:
             raise errors.PoolNotClosedError(
-                "'Pool.wait_for_closed()' should only be "
-                "called after 'Pool.close()'."
+                "`Pool.wait_for_closure()` should only be "
+                "called after `Pool.close()` is invoked."
             )
 
         async with self._condition:
@@ -1846,9 +1876,10 @@ class Pool:
             self._condition.notify()
 
     async def clear(self) -> None:
-        """Clear (close) existing free connections in the pool.
+        """Clear all the free [async] connections in the pool.
 
-        ### This method does not affect in-use connections.
+        This method closes and removes all the idling free [async] 
+        connections in the pool, without affecting in-use ones.
         """
         self._close_sync_conn()
         async with self._condition:
@@ -1862,12 +1893,16 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def terminate(self) -> cython.bint:
-        """Terminate the pool immediately.
+        """Immediately shutdown the connection pool and force-close all connections.
 
-        - Set 'closing' flag to `True, so no free/new connections can be acquired.
-        - Close all existing free and in-use connections immediately.
+        This method will:
+        - 1. Prevent any further connection acquisitions.
+        - 2. Force-close and remove all free [sync & async] connnections.
+        - 3. Force-close and remove all in-use [async] connnections.
 
-        ### This method does not raise any error.
+        ## Notice
+        - Use this method only when an immediate, unconditional shutdown is needed.
+        - This method does not raise any error.
         """
         # Pool already closed
         if self.closed():
@@ -1901,27 +1936,16 @@ class Pool:
     @cython.ccall
     @cython.exceptval(-1, check=False)
     def closed(self) -> cython.bint:
-        """Represents the pool state: whether is closed `<'bool'>`."""
+        """Check if the pool is closed `<'bool'>`."""
         return self._closed and self._sync_conn is None
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _close_sync_conn(self) -> cython.bint:
-        """(internal) Close sync connection."""
-        conn: PoolSyncConnection = self._sync_conn
-        if conn is not None:
-            conn.close()
-            self._sync_conn = None
-        return True
-
-    @cython.cfunc
-    @cython.inline(True)
-    @cython.exceptval(-1, check=False)
     def _verify_open(self) -> cython.bint:
-        """(internal) Verify the pool is not closed.
+        """(internal) Verify the pool is open and accepts connection acquisitions.
 
-        :raises `<'PoolClosedError'>`: If pool is already closed.
+        :raises `<'PoolClosedError'>`: If pool has been closed.
         """
         if self._closing or self.closed():
             raise errors.PoolClosedError(0, "Pool is closed.")
@@ -1935,67 +1959,52 @@ class Pool:
         many: cython.bint = False,
         itemize: cython.bint = True,
     ) -> object:
-        """Escape 'args' to formatable object(s) `<'str/tuple/list[str/tuple]'>`.
+        """Prepare and escape arguments for SQL binding `<'str/tuple/list[str/tuple]'>`.
 
-        :param args `<'object'>`: The object to escape, supports:
-            - Python native:
-              int, float, bool, str, None, datetime, date, time,
-              timedelta, struct_time, bytes, bytearray, memoryview,
-              Decimal, dict, list, tuple, set, frozenset, range.
-            - Library [numpy](https://github.com/numpy/numpy):
-              np.int, np.uint, np.float, np.bool, np.bytes,
-              np.str, np.datetime64, np.timedelta64, np.ndarray.
-            - Library [pandas](https://github.com/pandas-dev/pandas):
-              pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
-              pd.TimedeltaIndex, pd.Series, pd.DataFrame.
-            - Library [cytimes](https://github.com/AresJef/cyTimes):
-              pydt, pddt.
+        :param args `<'Any'>`: Arguments to escape, supports:
 
-        :param many `<'bool'>`: Wheter to escape 'args' as multi-rows. Defaults to `False`.
-            * When 'many=True', the argument 'itemize' is ignored.
-            * 1. sequence and mapping (e.g. `list`, `tuple`, `dict`, etc)
-              escapes to `<'list[str/tuple[str]]'>`. Each element represents
-              one row of the 'args'.
-            * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-              `<'list[str]'>`. Each element represents one row of the 'args'.
-            * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-              to `<'list[tuple[str]]'>`. Each tuple represents one row
-              of the 'args' .
-            * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-              to one literal string `<'str'>`.
+            - **Python built-ins**:
+                int, float, bool, str, None, datetime, date, time,
+                timedelta, struct_time, bytes, bytearray, memoryview,
+                Decimal, dict, list, tuple, set, frozenset, range
+            - **Library [numpy](https://github.com/numpy/numpy)**:
+                np.int, np.uint, np.float, np.bool, np.bytes,
+                np.str, np.datetime64, np.timedelta64, np.ndarray
+            - **Library [pandas](https://github.com/pandas-dev/pandas)**:
+                pd.Timestamp, pd.Timedelta, pd.DatetimeIndex,
+                pd.TimedeltaIndex, pd.Series, pd.DataFrame
+            - **Library [cytimes](https://github.com/AresJef/cyTimes)**:
+                cytimes.Pydt, cytimes.Pddt
 
-        :param itemize `<'bool'>`: Whether to escape each items of the 'args' individual. Defaults to `True`.
-            - When 'itemize=True', the 'args' type determines how to escape.
-                * 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc)
-                  escapes to `<'tuple[str]'>`.
-                * 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to
-                  `<'tuple[str]'>`.
-                * 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes
-                  to `<'list[tuple[str]]'>`. Each tuple represents one row
-                  of the 'args' .
-                * 4. Single object (such as `int`, `float`, `str`, etc) escapes
-                  to one literal string `<'str'>`.
-            - When 'itemize=False', regardless of the 'args' type, all
-              escapes to one single literal string `<'str'>`.
+        :param many `<'bool'>`: Whether the 'args' is multi-row data. Defaults to `False`.
+        - `many=False`: The 'itemize' parameter determines how to escape the 'args'.
+        - `many=True`: The 'itemize' parameter is ignored, and the 'args' data type determines how escape is done.
+            - 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes to `<'list[str]'>`.
+            - 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to `<'list[str]'>`.
+            - 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes to `<'list[tuple[str]]'>`.
+            - 4. Single object (such as `int`, `float`, `str`, etc) escapes to one literal string `<'str'>`.
 
-        :raises `<'EscapeTypeError'>`: If any error occurs during escaping.
+        :param itemize `<'bool'>`: Whether to escape items of the 'args' individually. Defaults to `True`.
+        - `itemize=False`: Always escapes to one single literal string `<'str'>`, regardless of the 'args' type.
+        - `itemize=True`: The 'args' data type determines how escape is done.
+            - 1. Sequence or Mapping (e.g. `list`, `tuple`, `dict`, etc) escapes to `<'tuple[str]'>`.
+            - 2. `pd.Series` and 1-dimensional `np.ndarray` escapes to `<'tuple[str]'>`.
+            - 3. `pd.DataFrame` and 2-dimensional `np.ndarray` escapes to `<'list[tuple[str]]'>`.
+            - 4. Single object (such as `int`, `float`, `str`, etc) escapes to one literal string `<'str'>`.
 
-        ## Returns
-        - If returns a `<'str'>`, it represents a single literal string.
-          The 'sql' should only have one '%s' placeholder.
-        - If returns a `<'tuple'>`, it represents a single row of literal
-          strings. The 'sql' should have '%s' placeholders equal to the
-          tuple length.
-        - If returns a `<'list'>`, it represents multiple rows of literal
-          string(s). The 'sql' should have '%s' placeholders equal to the
-          item count in each row.
+        :returns `<'str/tuple/list'>`:
+        - If returns `<'str'>`, it represents a single literal string.
+        - If returns `<'tuple'>`, it represents a single row of literal strings.
+        - If returns `<'list'>`, it represents multiple rows of literal strings.
+
+        :raises `<'EscapeTypeError'>`: If escape fails due to unsupported type.
         """
         return escape(args, many, itemize)
 
     # Special Methods -------------------------------------------------------------------------
     def __repr__(self) -> str:
         return (
-            "<%s(free=%d, used=%d, total=%d, min_size=%d, max_size=%d, recycle=%s)>"
+            "<%s (free=%d, used=%d, total=%d, min_size=%d, max_size=%d, recycle=%s)>"
             % (
                 self.__class__.__name__,
                 self._free,

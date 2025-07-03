@@ -121,11 +121,11 @@ cdef class Pool:
     cpdef object release(self, object conn)
     cdef inline PoolSyncConnection _acquire_sync_conn(self)
     cdef inline bint _release_sync_conn(self, PoolSyncConnection conn) except -1
+    cdef inline bint _close_sync_conn(self) except -1
     # Close
     cpdef object close(self)
     cpdef bint terminate(self) except -1
     cpdef bint closed(self) except -1
-    cdef inline bint _close_sync_conn(self) except -1
     cdef inline bint _verify_open(self) except -1
     # Query
     cpdef object escape_args(self, object args, bint many=?, bint itemize=?)
