@@ -62,7 +62,7 @@ UNSIGNED_INT64_COLUMN: cython.uchar = 254
 @cython.cfunc
 @cython.inline(True)
 def gen_connect_attrs(attrs: list[str]) -> bytes:
-    """(cfunc) Generate connect attributes for Connection `<'bytes'>`."""
+    """(cfunc) Generate the 'connect_attrs' for a connection `<'bytes'>`."""
     arr: list = []
     for i in attrs:
         attr = encode_str(i, "utf-8")  # type: ignore
