@@ -21,6 +21,6 @@ cdef class SSL:
         object _verify_mode
         object _cipher
         object _context
-    # Methods
+    # Internal
     cdef inline bint _create_ssl_context(self) except -1
     cdef inline object _validate_path(self, object path, str arg_name)

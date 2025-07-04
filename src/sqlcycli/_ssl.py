@@ -28,29 +28,26 @@ SSL_ENABLED_C: cython.bint = SSL_ENABLED
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl(obj: object) -> cython.bint:
-    """Check if the 'obj' is an instance of 'SSL' `<'bool'>`."""
+    """Determine if the pass-in object is a `sqlcycli.SSL` configuration. `<'bool'>`."""
     return isinstance(obj, SSL) if SSL_ENABLED_C else False
 
 
 @cython.ccall
 @cython.exceptval(-1, check=False)
 def is_ssl_ctx(obj: object) -> cython.bint:
-    """Check if the 'obj' is an instance of 'ssl.SSLContext' `<'bool'>`."""
+    """Determine if the pass-in object is a `ssl.SSLContext` configuration. `<'bool'>`."""
     return isinstance(obj, _py_ssl.SSLContext) if SSL_ENABLED_C else False
 
 
 # SSL -----------------------------------------------------------------------------------------
 @cython.cclass
 class SSL:
-    """Represents the SSL Configuration for MySQL.
+    """Configure and produce an SSLContext for MySQL connections.
 
-    It takes the responsibility of creating the SSLContext
-    for MySQL from 'PyMySQL' package's <'Connection'> class.
-
-    ## Notice
-    Please access the generated <'SSLContext'> through `context` attribute.
-    If Python `ssl` module is not available, a `RuntimeWarning` will be
-    issued and the context attribute will be `None`.
+    Handles CA certificates, client cert/key, verification modes, and cipher
+    suites. Access the resulting `ssl.SSLContext` via the `context` property.
+    If Python's `ssl` module is unavailable, a warning is issued and `context`
+    property will always be `None`.
     """
 
     _has_ca: cython.bint
@@ -75,24 +72,21 @@ class SSL:
         verify_mode: bool | Literal["Required", "Optional", "None"] | None = None,
         cipher: str | None = None,
     ) -> None:
-        """The SSL Configuration for MySQL
+        """Configure and produce an SSLContext for MySQL connections.
 
-        It takes the responsibility of creating the SSLContext
-        for MySQL from 'PyMySQL' package's <'Connection'> class.
+        Handles CA certificates, client cert/key, verification modes, and cipher
+        suites. Access the resulting `ssl.SSLContext` via the `context` property.
+        If Python's `ssl` module is unavailable, a warning is issued and `context`
+        property will always be `None`.
 
-        :param ca_file `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted CA certificate. Defaults to `None`.
-        :param ca_path `<'str/bytes/Path'>`: The path to the directory contains CA certificate files. Defaults to `None`.
-        :param cert_file: `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted client certificate. Defaults to `None`.
-        :param cert_key: `<'str/bytes/Path'>`: The path to the file that contains a PEM-formatted private key for the client certificate. Defaults to `None`.
-        :param cert_key_password: `<'str/bytes/bytearray'>`: The password for the client certificate private key. Defaults to `None`.
-        :param verify_server_identity: `<'bool'>`: Whether to verify the server's identity. Defaults to `False`.
-        :param verify_server_mode: `<'bool/str'>`: How to verify the server's certificate. Defaults to `None`.
-        :param cipher: `<'str'>`: The cipher to use for the SSL communication. Defaults to `None`.
-
-        ## Notice
-        Please access the final <'SSLContext'> through `context` attribute.
-        If Python `ssl` module is not available, a `RuntimeWarning` will be
-        issued and the context attribute will be `None`.
+        :param ca_file `<'str/bytes/Path'>`: Path to a PEM-formatted CA certificate file.. Defaults to `None`.
+        :param ca_path `<'str/bytes/Path'>`: Path to a directory of CA certificate files. Defaults to `None`.
+        :param cert_file: `<'str/bytes/Path'>`: Path to a PEM-formatted client certificate file. Defaults to `None`.
+        :param cert_key: `<'str/bytes/Path'>`: Path to a PEM-formatted private key for the client certificate. Defaults to `None`.
+        :param cert_key_password: `<'str/bytes/bytearray'>`: Password for the private key, if encrypted.. Defaults to `None`.
+        :param verify_server_identity: `<'bool'>`: Whether to verify the server's hostname against its certificate. Defaults to `False`.
+        :param verify_server_mode: `<'bool/str'>`: Certificate verification mode. Defaults to `None`.
+        :param cipher: `<'str'>`: OpenSSL cipher string to restrict the cipher suites. Defaults to `None`.
         """
         self._has_ca = ca_file is not None or ca_path is not None
         self._ca_file = self._validate_path(ca_file, "ca_file")
@@ -122,19 +116,19 @@ class SSL:
     # Property --------------------------------------------------------------------------------
     @property
     def context(self) -> object | None:
-        """Access the generated `<'SSLContext'>`.
-
-        ## Notice
-        If Python `ssl` module is not available, returns `None`.
-        """
+        """Retrieve the configured SSLContext `<'SSLContext/None'>`."""
         return self._context
 
-    # Methods ---------------------------------------------------------------------------------
+    # Internal --------------------------------------------------------------------------------
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _create_ssl_context(self) -> cython.bint:
-        """(cfunc) Generate the 'SSLContext'."""
+        """(Internal) Build the SSLContext according to current parameters.
+
+        Loads CA certificates, sets verification policies,
+        client cert/key, and cipher suites.
+        """
         # . ca certificate
         context = _py_ssl.create_default_context(
             cafile=self._ca_file, capath=self._ca_path
@@ -188,9 +182,13 @@ class SSL:
     @cython.cfunc
     @cython.inline(True)
     def _validate_path(self, path: object, arg_name: str) -> object:
-        """(cfunc) Expand '~' and '~user' constructions and validate path existence.
-        If user or $HOME is unknown, do nothing. Only
-        applies to <'str'> or <'Path'> objects."""
+        """(Internal) Expand and verify a filesystem path `<'str/PathLike'>`.
+
+        Expands `~` and `~user`, then checks that the path exists.
+
+        :param path `<'str/bytes/PathLike'>`: The path to validate.
+        :param arg_name `<'str'>`: Name of the parameter for error messages.
+        """
         if path is None:
             return None
         try:
@@ -207,6 +205,7 @@ class SSL:
             )
         return path
 
+    # Special Methods -------------------------------------------------------------------------
     def __repr__(self) -> str:
         if self._context is None:
             return "<%s(SSL Disabled)>." % self.__class__.__name__
