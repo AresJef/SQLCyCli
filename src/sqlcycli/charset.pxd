@@ -9,6 +9,7 @@ cdef class Charset:
         bytes _encoding
         char* _encoding_c
         bint _is_default
+        Py_ssize_t _hashcode
     # Methods
     cpdef bint is_binary(self)
 
@@ -20,10 +21,10 @@ cdef class Charsets:
         dict _by_name_n_collation
     # Add Charset
     cpdef bint add(self, Charset charset) except -1
-    cdef inline bint _add_by_id(self, Charset charset) except -1
-    cdef inline bint _add_by_name(self, Charset charset) except -1
-    cdef inline bint _add_by_collation(self, Charset charset) except -1
-    cdef inline bint _add_by_name_n_collation(self, Charset charset) except -1
+    cdef inline bint _index_by_id(self, Charset charset) except -1
+    cdef inline bint _index_by_name(self, Charset charset) except -1
+    cdef inline bint _index_by_collation(self, Charset charset) except -1
+    cdef inline bint _index_by_name_n_collation(self, Charset charset) except -1
     cdef inline str _gen_charset_n_collate_key(self, object name, object collation)
     # Access Charset
     cpdef Charset by_id(self, object id)

@@ -26,7 +26,7 @@ __all__ = [
 # Charset(s) ----------------------------------------------------------------------------------
 @cython.cclass
 class Charset:
-    """Represents the charset for MySQL."""
+    """Represents a MySQL character set."""
 
     _id: cython.int
     _name: str
@@ -34,23 +34,28 @@ class Charset:
     _encoding: bytes
     _encoding_c: cython.pchar
     _is_default: cython.bint
+    _hashcode: cython.Py_ssize_t
 
     def __init__(
         self,
-        id: int,
+        id: cython.int,
         name: str,
         collation: str,
         is_default: cython.bint = False,
     ) -> None:
-        """Charset for MySQL.
+        """The MySQL character set
 
-        :param id `<'int'>`: The id of the charset.
-        :param name `<'str'>`: The name of the charset.
-        :param collation `<'str'>`: The collation of the charset.
-        :param is_default `<'bool'>`: Whether belongs to the defualt charsets of MySQL. Defaults to `False`.
+        :param id `<'int'>`: Numeric MySQL charset identifier.
+        :param name `<'str'>`: The charset name (e.g., `"utf8mb4"`).
+        :param collation `<'str'>`: The collation name (e.g., `"utf8mb4_general_ci"`).
+        :param is_default `<'bool'>`: Whether the charset is one of MySQL's defaults. Defaults to `False`.
         """
         self._id = id
+        if name is None:
+            raise AssertionError("Charset name cannot be 'None'.")
         self._name = name.lower().strip()
+        if collation is None:
+            raise AssertionError("Charset collation cannot be 'None'.")
         self._collation = collation.lower().strip()
         if self._name in ("utf8mb4", "utf8mb3"):
             self._encoding = b"utf8"
@@ -64,37 +69,38 @@ class Charset:
             self._encoding = self._name.encode("ascii", "strict")
         self._encoding_c = self._encoding
         self._is_default = is_default
+        self._hashcode = -1
 
     # Property ---------------------------------------------------------------------
     @property
     def id(self) -> int:
-        "The 'ID' of the charset `<'int'>`."
+        """Numeric MySQL charset identifier `<'int'>`."""
         return self._id
 
     @property
     def name(self) -> str:
-        "The 'name' of the charset `<'str'>`."
+        """The charset name (e.g., `"utf8mb4"`) `<'str'>`."""
         return self._name
 
     @property
     def collation(self) -> str:
-        "The 'collation' of the charset `<'str'>`."
+        """The collation name (e.g., `"utf8mb4_general_ci"`) `<'str'>`."""
         return self._collation
 
     @property
     def is_default(self) -> bool:
-        "Whether is MySQL default charset `<'bool'>`."
+        """Whether the charset is one of MySQL's defaults. `<'bool'>`."""
         return self._is_default
 
     @property
     def encoding(self) -> bytes:
-        "The 'encoding' of the charset `<'bytes'>`."
+        """The Python encoding of the charset `<'bytes'>`."""
         return self._encoding
 
     # Methods ----------------------------------------------------------------------
     @cython.ccall
     def is_binary(self) -> cython.bint:
-        "Whether the charset is binary `<'bool'>`."
+        """Check if this charset is the MySQL binary charset (ID == 63). `<'bool'>`."""
         return self._id == 63
 
     def __repr__(self) -> str:
@@ -105,36 +111,26 @@ class Charset:
             self._encoding,
         )
 
-    def __getitem__(self, idx: cython.int) -> int | str | bytes:
-        if idx == 0:
-            return self._id
-        if idx == 1:
-            return self._name
-        if idx == 2:
-            return self._collation
-        if idx == 3:
-            return self._encoding
-        raise errors.CharsetIndexError(
-            "<'%s'>\nIndex out of bounds, must between 0 and 3."
-            % self.__class__.__name__
-        )
-
     def __eq__(self, o: object) -> bool:
         if isinstance(o, Charset):
+            _o: Charset = o
             return (
-                self._id == o.id
-                and self._name == o.name
-                and self._collation == o.collation
+                self._id == _o._id
+                and self._name == _o._name
+                and self._collation == _o._collation
+                and self._is_default == _o._is_default
             )
         return NotImplemented
 
     def __hash__(self) -> int:
-        return hash((self.__class__.__name__, self._id, self._name, self._collation))
+        if self._hashcode == -1:
+            self._hashcode = id(self)
+        return self._hashcode
 
 
 @cython.cclass
 class Charsets:
-    """Represent the collection of MySQL charsets."""
+    """Collection for managing all the MySQL charsets."""
 
     _by_id: dict[int, Charset]
     _by_name: dict[str, Charset]
@@ -142,7 +138,7 @@ class Charsets:
     _by_name_n_collation: dict[str, Charset]
 
     def __init__(self) -> None:
-        """The collection of MySQL charsets."""
+        """Collection for managing all the MySQL charsets."""
         self._by_id = {}
         self._by_name = {}
         self._by_collation = {}
@@ -154,82 +150,75 @@ class Charsets:
     def add(self, charset: Charset) -> cython.bint:
         """Add MySQL charset to the collection.
 
-        :param charset `<'Charset'>`: An instance of `Charset`.
+        :param charset `<'Charset'>`: The charset instance to add.
         """
-        self._add_by_id(charset)
-        self._add_by_name(charset)
-        self._add_by_collation(charset)
-        self._add_by_name_n_collation(charset)
+        if charset is None:
+            raise AssertionError("charset cannot be 'None'.")
+        self._index_by_id(charset)
+        self._index_by_name(charset)
+        self._index_by_collation(charset)
+        self._index_by_name_n_collation(charset)
         return True
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _add_by_id(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by ID."""
-        id: object = charset._id
-        if dict_contains(self._by_id, id):
-            raise errors.CharsetDuplicatedError(
-                "<'%s'>\nCharset %s already exist by ID."
-                % (self.__class__.__name__, charset)
-            )
-        dict_setitem(self._by_id, id, charset)
+    def _index_by_id(self, charset: Charset) -> cython.bint:
+        """(internal) Index MySQL charset by its id.
+
+        :param charset `<'Charset'>`: The charset instance to index.
+        """
+        dict_setitem(self._by_id, charset._id, charset)
         return True
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _add_by_name(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by name."""
-        if not charset._is_default:
-            return True  # exit
-        name: str = charset._name
-        if dict_contains(self._by_name, name):
-            raise errors.CharsetDuplicatedError(
-                "<'%s'>\nCharset %s already exist by name."
-                % (self.__class__.__name__, charset)
-            )
-        dict_setitem(self._by_name, name, charset)
+    def _index_by_name(self, charset: Charset) -> cython.bint:
+        """(internal) Index MySQL charset by its name.
+
+        :param charset `<'Charset'>`: The charset instance to index.
+        """
+        if charset._is_default:
+            dict_setitem(self._by_name, charset._name, charset)
         return True
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _add_by_collation(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by collation."""
-        collation: str = charset._collation
-        if dict_contains(self._by_collation, collation):
-            raise errors.CharsetDuplicatedError(
-                "<'%s'>\nCharset %s already exist by collation."
-                % (self.__class__.__name__, charset)
-            )
-        dict_setitem(self._by_collation, collation, charset)
+    def _index_by_collation(self, charset: Charset) -> cython.bint:
+        """(internal) Index MySQL charset by its collation.
+
+        :param charset `<'Charset'>`: The charset instance to index.
+        """
+        dict_setitem(self._by_collation, charset._collation, charset)
         return True
 
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
-    def _add_by_name_n_collation(self, charset: Charset) -> cython.bint:
-        """(cfunc) Add MySQL charset by collation."""
-        key: str = self._gen_charset_n_collate_key(charset._name, charset._collation)
-        if dict_contains(self._by_name_n_collation, key):
-            raise errors.CharsetDuplicatedError(
-                "<'%s'>\nCharset %s already exist by name & collation."
-                % (self.__class__.__name__, charset)
-            )
-        dict_setitem(self._by_name_n_collation, key, charset)
+    def _index_by_name_n_collation(self, charset: Charset) -> cython.bint:
+        """(internal) Index MySQL charset by its name and collation.
+
+        :param charset `<'Charset'>`: The charset instance to index.
+        """
+        dict_setitem(
+            self._by_name_n_collation,
+            self._gen_charset_n_collate_key(charset._name, charset._collation),
+            charset,
+        )
         return True
 
     @cython.cfunc
     @cython.inline(True)
     def _gen_charset_n_collate_key(self, name: object, collation: object) -> str:
-        """(cfunc) Generate 'name:collation' key `<'str'>."""
+        """(internal) Generate a unique lookup key from name and collation `<'str'>."""
         return "%s:%s" % (name, collation)
 
     # Access Charset ---------------------------------------------------------------
     @cython.ccall
     def by_id(self, id: object) -> Charset:
-        """Get MySQL charset by id `<'Charset'>`.
+        """Retrieve a Charset by its MySQL ID `<'Charset'>`.
 
         :param id `<'int'>`: The ID of the charset.
         """
@@ -243,7 +232,7 @@ class Charsets:
 
     @cython.ccall
     def by_name(self, name: object) -> Charset:
-        """Get MySQL charset by name `<'Charset'>`.
+        """Retrieve a default Charset by its name `<'Charset'>`.
 
         :param name `<'str'>`: The name of the charset.
         """
@@ -260,7 +249,7 @@ class Charsets:
 
     @cython.ccall
     def by_collation(self, collation: object) -> Charset:
-        """Get MySQL charset by collation `<'Charset'>`.
+        """Retrieve a Charset by its collation `<'Charset'>`.
 
         :param collation `<'str'>`: The collation of the charset.
         """
@@ -277,7 +266,7 @@ class Charsets:
 
     @cython.ccall
     def by_name_n_collation(self, name: object, collation: object) -> Charset:
-        """Get MySQL charset by name and collation `<'Charset'>`.
+        """Retrieve a Charset by both its name and collation combination `<'Charset'>`.
 
         :param name `<'str'>`: The name of the charset.
         :param collation `<'str'>`: The collation of the charset.
@@ -313,13 +302,13 @@ _charsets: Charsets = Charsets()
 # Functions -----------------------------------------------------------------------------------
 @cython.ccall
 def all_charsets() -> Charsets:
-    """Get the collection of all the MySQL charsets `<'Charsets'>`."""
+    """Retrieve the collection of all the MySQL charsets `<'Charsets'>`."""
     return _charsets
 
 
 @cython.ccall
 def by_id(id: object) -> Charset:
-    """Get MySQL charset by id `<'Charset'>`.
+    """Retrieve a Charset by its MySQL ID `<'Charset'>`.
 
     :param id `<'int'>`: The ID of the charset.
     """
@@ -328,7 +317,7 @@ def by_id(id: object) -> Charset:
 
 @cython.ccall
 def by_name(name: object) -> Charset:
-    """Get MySQL charset by name `<'Charset'>`.
+    """Retrieve a default Charset by its name `<'Charset'>`.
 
     :param name `<'str'>`: The name of the charset.
     """
@@ -337,7 +326,7 @@ def by_name(name: object) -> Charset:
 
 @cython.ccall
 def by_collation(collation: object) -> Charset:
-    """Get MySQL charset by collation `<'Charset'>`.
+    """Retrieve a Charset by its collation `<'Charset'>`.
 
     :param collation `<'str'>`: The collation of the charset.
     """
@@ -346,7 +335,7 @@ def by_collation(collation: object) -> Charset:
 
 @cython.ccall
 def by_name_n_collation(name: str | Any, collation: str | Any) -> Charset:
-    """Get MySQL charset by name and collation `<'Charset'>`.
+    """Retrieve a Charset by both its name and collation combination `<'Charset'>`.
 
     :param name `<'str'>`: The name of the charset.
     :param collation `<'str'>`: The collation of the charset.
