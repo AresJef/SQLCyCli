@@ -2,7 +2,7 @@
 def escape(
     data: object,
     many: bool = False,
-    itemize: bool = False,
+    itemize: bool = True,
 ) -> str | tuple[str] | list[str | tuple[str]]: ...
 
 # Decode --------------------------------------------------------------------------------------
