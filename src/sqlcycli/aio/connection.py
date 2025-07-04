@@ -523,7 +523,7 @@ class Cursor:
     def description(self) -> tuple[tuple] | None:
         """Returns a tuple of of 7-item tuples, each contains
         the following information describing the columns in
-        the result set `<'tuple[tuple]/None'>`.:
+        the result set `<'tuple[tuple]/None'>`.
         ```python
         - "name"
         - "type_code"
