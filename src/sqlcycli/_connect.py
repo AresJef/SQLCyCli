@@ -11,6 +11,7 @@ from cython.cimports.sqlcycli.aio import connection as async_conn, pool as aio_p
 from os import PathLike
 from typing import Generator, Any
 from asyncio import AbstractEventLoop
+from pandas import DataFrame
 from sqlcycli._ssl import SSL
 from sqlcycli._auth import AuthPlugin
 from sqlcycli._optionfile import OptionFile
@@ -23,7 +24,7 @@ __all__ = ["connect", "ConnectionManager", "create_pool", "PoolManager"]
 # Connection ----------------------------------------------------------------------------------
 @cython.cclass
 class ConnectionManager:
-    """The Context Manager for both `sync` and `async` Connection."""
+    """The context manager for creating and closing a [sync/async] connection."""
 
     # . connection
     _conn_sync: sync_conn.BaseConnection
@@ -36,13 +37,13 @@ class ConnectionManager:
     def __init__(
         self,
         kwargs: dict[str, Any],
-        cursor: type[sync_conn.Cursor | async_conn.Cursor] | None,
+        cursor: type | None,
         loop: AbstractEventLoop | None,
     ) -> None:
-        """The Context Manager for both `sync` and `async` Connection.
+        """The context manager for creating and closing a [sync/async] connection.
 
-        For information about the arguments, please
-        refer to the 'connect()' function.
+        - For detail information about the arguments,
+          please refer to the `connect()` function.
         """
         # Connection
         self._conn_sync = None
@@ -67,8 +68,8 @@ class ConnectionManager:
         self._conn_sync = None
 
     # Async -------------------------------------------------------------------------------------
-    async def _acquire_async_conn(self) -> async_conn.BaseConnection:
-        """(internal) Acquire an `async` connection `<'BaseConnection'>`."""
+    async def _create_async_conn(self) -> async_conn.BaseConnection:
+        """(internal) Acquire an [async] connection `<'BaseConnection'>`."""
         conn: async_conn.BaseConnection = async_conn.Connection(
             cursor=aio_pool.validate_async_cursor(self._cursor),
             loop=self._loop,
@@ -78,10 +79,10 @@ class ConnectionManager:
         return conn
 
     def __await__(self) -> Generator[Any, Any, async_conn.BaseConnection]:
-        return self._acquire_async_conn().__await__()
+        return self._create_async_conn().__await__()
 
     async def __aenter__(self) -> async_conn.BaseConnection:
-        self._conn_async = await self._acquire_async_conn()
+        self._conn_async = await self._create_async_conn()
         return self._conn_async
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -121,7 +122,7 @@ def connect(
     max_allowed_packet: int | str | None = None,
     sql_mode: str | None = None,
     init_command: str | None = None,
-    cursor: type[sync_conn.Cursor | async_conn.Cursor] | None = sync_conn.Cursor,
+    cursor: type[sync_conn.Cursor | tuple | dict | DataFrame] | None = sync_conn.Cursor,
     client_flag: int | Any = 0,
     program_name: str | None = None,
     option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -133,8 +134,8 @@ def connect(
     decode_json: bool = False,
     loop: AbstractEventLoop | None = None,
 ) -> ConnectionManager:
-    """Connect to the server and acquire a `sync` or `async`
-    connection through context manager `<'ConnectionManager'>`.
+    """Establish a [sync/async] connection to the server
+    through context manager `<'ConnectionManager'>`.
 
     :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
     :param port `<'int'>`: The port of the server. Defaults to `3306`.
@@ -157,8 +158,9 @@ def connect(
     :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
     :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
     :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
-    :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+    :param cursor `<'type[Cursor]/None'>`: The default cursor class (type) to use. Defaults to `<'Cursor'>`.
+        Determines the data type of the fetched result set.
+        Also accepts: 1. `tuple` => `Cursor`; 2. `dict` => `DictCursor`; 3. `DataFrame` => `DfCursor`;
 
     :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
     :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
@@ -168,18 +170,17 @@ def connect(
             to <'OptionFile'>, with option group defaults to 'client'.
 
     :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
-        - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
+        - Supports both `sqlcycli.SSL` or pre-configured `ssl.SSLContext` object.
 
     :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
         - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
         - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
     :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
-    :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-    :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
-    :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
-    :param loop `<'AbstractEventLoop/None'>`: The event loop for the `async` connection. Defaults to `None`.
-        - Only applicable for `async` connection. `sync` connection will ignore this argument.
+    :param use_decimal `<'bool'>`: DECIMAL columns are decoded as `decimal.Decimal` if `True`, else as `float`. Defaults to `False`.
+    :param decode_bit `<'bool'>`: BIT columns are decoded as `int` if `True`, else kept as the original `bytes`. Defaults to `False`.
+    :param decode_json `<'bool'>`: JSON columns are deserialized if `True`, else kept as the original JSON string. Defaults to `False`.
+    :param loop `<'AbstractEventLoop/None'>`: The event loop for the [async] connection. Defaults to `None`.
 
     ## Example (sync):
     >>> with connect("localhost", 3306, "root", "password") as conn:
@@ -232,7 +233,7 @@ def connect(
 # Pool ----------------------------------------------------------------------------------------
 @cython.cclass
 class PoolManager:
-    """The Context Manager for Pool."""
+    """The context manager for creating and closing a connection pool."""
 
     # . pool
     _pool: aio_pool.Pool
@@ -245,10 +246,10 @@ class PoolManager:
         kwargs: dict[str, Any],
         cursor: type[sync_conn.Cursor | async_conn.Cursor] | None,
     ) -> None:
-        """The Context Manager for Pool.
+        """The context manager for creating and closing a connection pool.
 
-        For information about the arguments, please
-        refer to the 'create_pool()' function.
+        - For detail information about the arguments,
+          please refer to the 'create_pool()' function.
         """
         # Pool
         self._pool = None
@@ -270,7 +271,9 @@ class PoolManager:
 
     # Async -------------------------------------------------------------------------------------
     async def _create_and_fill_pool(self) -> aio_pool.Pool:
-        """(internal) Create a pool and fill free connections `<'Pool'>`."""
+        """(internal) Create a new pool and fill with free
+        connections up to `Pool.min_size` limit `<'Pool'>`.
+        """
         pool: aio_pool.Pool = aio_pool.Pool(
             cursor=aio_pool.validate_async_cursor(self._cursor), **self._kwargs
         )
@@ -321,7 +324,7 @@ def create_pool(
     max_allowed_packet: int | str | None = None,
     sql_mode: str | None = None,
     init_command: str | None = None,
-    cursor: type[sync_conn.Cursor | async_conn.Cursor] | None = sync_conn.Cursor,
+    cursor: type[sync_conn.Cursor | tuple | dict | DataFrame] | None = sync_conn.Cursor,
     client_flag: int | Any = 0,
     program_name: str | None = None,
     option_file: str | bytes | PathLike | OptionFile | None = None,
@@ -332,15 +335,15 @@ def create_pool(
     decode_bit: bool = False,
     decode_json: bool = False,
 ) -> PoolManager:
-    """Create a connection pool to manage and maintain `async`
-    connections through context manager `<'PoolManager'>`.
+    """Create a pool that manages and maintains both the synchronize and asynchronize
+    connections to the server through context manager `<'PoolManager'>`.
 
-    :param min_size `<'int'>`: The minimum number of active connections to maintain. Defaults to `0`.
-    :param max_size `<'int'>`: The maximum number of active connections to maintain. Defaults to `10`.
-    :param recycle `<'int/None'>`: The recycle time in seconds. Defaults to `None`.
-        - If set to positive integer, the pool will automatically close
-          and remove any connections idling more than the 'recycle' time.
-        - If 'recycle=None' (Default), recycling is disabled.
+    :param min_size `<'int'>`: The minimum number of [async] connections to maintain. Defaults to `0`.
+    :param max_size `<'int'>`: The maximum number of [async] connections to maintain. Defaults to `10`.
+    :param recycle `<'int/None'>`: The connection recycle time in seconds. Defaults to `None`.
+        When set to a positive integer, the pool will automatically close
+        and remove any connections idling more than the `recycle` time.
+        Any other values disables the recycling feature.
 
     :param host `<'str/None'>`: The host of the server. Defaults to `'localhost'`.
     :param port `<'int'>`: The port of the server. Defaults to `3306`.
@@ -363,27 +366,28 @@ def create_pool(
     :param max_allowed_packet `<'int/str/None'>`: The max size of packet sent to server in bytes. Defaults to `None` (16MB).
     :param sql_mode `<'str/None'>`: The default SQL_MODE for the connection. Defaults to `None`.
     :param init_command `<'str/None'>`: The initial SQL statement to run when connection is established. Defaults to `None`.
-    :param cursor `<'type[Cursor]/None'>`: The default cursor type (class) to use. Defaults to `<'Cursor'>`.
-            Also accepts: 'tuple' => 'Cursor' / 'dict' => 'DictCursor' / 'DataFrame' => 'DfCursor'.
+    :param cursor `<'type[Cursor]/None'>`: The default cursor class (type) to use. Defaults to `<'Cursor'>`.
+        Determines the data type of the fetched result set.
+        Also accepts: 1. `tuple` => `Cursor`; 2. `dict` => `DictCursor`; 3. `DataFrame` => `DfCursor`;
 
     :param client_flag `<'int'>`: Custom flags to sent to server, see 'constants.CLIENT'. Defaults to `0`.
     :param program_name `<'str/None'>`: The program name for the connection. Defaults to `None`.
     :param option_file `<'OptionFile/PathLike/None>`: The MySQL option file to load connection parameters. Defaults to `None`.
         - Recommand use <'OptionFile'> to load MySQL option file.
         - If passed str/bytes/PathLike argument, it will be automatically converted
-          to <'OptionFile'>, with option group defaults to 'client'.
+            to <'OptionFile'>, with option group defaults to 'client'.
 
     :param ssl `<'SSL/ssl.SSLContext/None'>`: The SSL configuration for the connection. Defaults to `None`.
-        - Supports both <'SSL'> or pre-configured <'ssl.SSLContext'> object.
+        - Supports both `sqlcycli.SSL` or pre-configured `ssl.SSLContext` object.
 
     :param auth_plugin `<'AuthPlugin/dict/None'>`: The authentication plugins handlers. Defaults to `None`.
         - Recommand use <'AuthPlugin'> to setup MySQL authentication plugin handlers.
         - If passed dict argument, it will be automatically converted to <'AuthPlugin'>.
 
     :param server_public_key `<'bytes/None'>`: The public key for the server authentication. Defaults to `None`.
-    :param use_decimal `<'bool'>`: If `True` use <'Decimal'> to represent DECIMAL column data, else use <'float'>. Defaults to `False`.
-    :param decode_bit `<'bool'>`: If `True` decode BIT column data to <'int'>, else keep as original bytes. Defaults to `False`.
-    :param decode_json `<'bool'>`: If `True` deserialize JSON column data, else keep as original json string. Defaults to `False`.
+    :param use_decimal `<'bool'>`: DECIMAL columns are decoded as `decimal.Decimal` if `True`, else as `float`. Defaults to `False`.
+    :param decode_bit `<'bool'>`: BIT columns are decoded as `int` if `True`, else kept as the original `bytes`. Defaults to `False`.
+    :param decode_json `<'bool'>`: JSON columns are deserialized if `True`, else kept as the original JSON string. Defaults to `False`.
     """
     return PoolManager(
         {
