@@ -23,5 +23,5 @@ cdef class OptionFile:
         SSL _ssl
     # Methods
     cdef inline bint _load_options(self) except -1
-    cdef inline object _access_option(self, object cfg, str value, object default)
+    cdef inline object _access_option(self, object cfg, str key, object default)
     cdef inline object _validate_path(self, object path, str arg_name)

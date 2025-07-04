@@ -17,9 +17,18 @@ from sqlcycli._ssl import SSL
 __all__ = ["OptionFile"]
 
 
-# Parser --------------------------------------------------------------------------------------
-class _Parser(RawConfigParser):
-    """Custom parser for MySQL option file."""
+# Custom Parser -------------------------------------------------------------------------------
+class ConfigParser(RawConfigParser):
+    """Custom configuration parser for MySQL option files.
+
+    Extends `configparser.RawConfigParser` to handle MySQL-style option files by:
+      - Allowing options without an explicit value (`allow_no_value=True`).
+      - Stripping matching surrounding quotes from option values.
+      - Normalizing option names to lowercase with hyphens (e.g. `max_connections` → `max-connections`).
+
+    :param kwargs: Any keyword arguments supported by `RawConfigParser`.
+        Note that `allow_no_value` is always set to `True`.
+    """
 
     def __init__(self, **kwargs):
         kwargs["allow_no_value"] = True
@@ -44,10 +53,10 @@ class _Parser(RawConfigParser):
 # MysqlOption ---------------------------------------------------------------------------------
 @cython.cclass
 class OptionFile:
-    """Represents the configuration form MySQL option file (my.cnf or my.ini).
+    """Load MySQL client options from an option file (e.g., my.cnf or my.ini).
 
-    It takes the responsibility of reading local MySQL option file
-    from the 'PyMySQL' package's <'Connection'> class.
+    Reads the specified file and section to populate connection settings
+    such as host, port, credentials, charset, socket, packet size, and SSL.
     """
 
     # File
@@ -73,13 +82,13 @@ class OptionFile:
         opt_file: str | bytes | PathLike,
         opt_group: str = "client",
     ) -> None:
-        """the configuration form MySQL option file (my.cnf or my.ini).
+        """Load MySQL client options from an option file (e.g., my.cnf or my.ini).
 
-        It takes the responsibility of reading local MySQL option file
-        from the 'PyMySQL' package's <'Connection'> class.
+        Reads the specified file and section to populate connection settings
+        such as host, port, credentials, charset, socket, packet size, and SSL.
 
-        :param opt_file `<'str/bytes/Path'>`: The path to the MySQL option file (my.cnf or my.ini).
-        :param opt_group `<'str'>`: The 'group' to read from the MySQL option file. Defaults to `'client'`.
+        :param opt_file `<'str/bytes/PathLike'>`: Path to the MySQL option file (my.cnf or my.ini).
+        :param opt_group `<'str'>`: Section name within the option file to read. Defaults to `"client"`.
         """
         self._opt_file = self._validate_path(opt_file, "opt_file")
         self._opt_group = opt_group
@@ -100,71 +109,67 @@ class OptionFile:
 
     @property
     def opt_group(self) -> str:
-        """The 'group' to read from the MySQL option file `<'str'>`."""
+        """Section name used within the option file `<'str'>`."""
         return self._opt_group
 
     @property
-    def host(self) -> str:
-        """The 'host' from the MySQL option `<'str'>`."""
+    def host(self) -> str | None:
+        """The 'host' from the MySQL option `<'str/None'>`."""
         return self._host
 
     @property
-    def port(self) -> int:
+    def port(self) -> int | None:
         """The 'port' from the MySQL option `<'int'>`."""
         return self._port if self._port != -1 else None
 
     @property
-    def user(self) -> str:
-        """The 'user' from the MySQL option `<'str'>`."""
+    def user(self) -> str | None:
+        """The 'user' from the MySQL option `<'str/None'>`."""
         return self._user
 
     @property
-    def password(self) -> str:
-        """The 'password' from the MySQL option `<'str'>`."""
+    def password(self) -> str | None:
+        """The 'password' from the MySQL option `<'str/None'>`."""
         return self._password
 
     @property
-    def database(self) -> str:
-        """The 'database' from the MySQL option `<'str'>`."""
+    def database(self) -> str | None:
+        """The 'database' from the MySQL option `<'str/None'>`."""
         return self._database
 
     @property
-    def charset(self) -> str:
-        """The 'default-character-set' from the MySQL option `<'str'>`."""
+    def charset(self) -> str | None:
+        """The 'default-character-set' from the MySQL option `<'str/None'>`."""
         return self._charset
 
     @property
-    def bind_address(self) -> str:
-        """The 'bind-address' from the MySQL option `<'str'>`."""
+    def bind_address(self) -> str | None:
+        """The 'bind-address' from the MySQL option `<'str/None'>`."""
         return self._bind_address
 
     @property
-    def unix_socket(self) -> str:
-        """The 'socket' from the MySQL option `<'str'>`."""
+    def unix_socket(self) -> str | None:
+        """The 'socket' from the MySQL option `<'str/None'>`."""
         return self._unix_socket
 
     @property
-    def max_allowed_packet(self) -> str:
-        """The 'max-allowed-packet' from the MySQL option `<'str'>`."""
+    def max_allowed_packet(self) -> str | None:
+        """The 'max-allowed-packet' from the MySQL option `<'str/None'>`."""
         return self._max_allowed_packet
 
     @property
-    def ssl(self) -> SSL:
-        """The 'SSL' from the MySQL option `<'SSL'>`.
-
-        ## Notice
-        If Python `ssl` module is not available, returns `None`.
-        """
+    def ssl(self) -> SSL | None:
+        """The 'SSL' from the MySQL option `<'SSL/None'>`."""
         return self._ssl
 
-    # Methods ---------------------------------------------------------------------------------
+    # Options ---------------------------------------------------------------------------------
     @cython.cfunc
     @cython.inline(True)
     @cython.exceptval(-1, check=False)
     def _load_options(self) -> cython.bint:
-        """(cfunc) Load settings from MySQL option file."""
+        """(Internal) Parse and load all options from the file/section into attributes."""
         # Parse options
-        cfg = _Parser()
+        cfg = ConfigParser()
         cfg.read(self._opt_file)
         if not cfg.has_section(self._opt_group):
             raise ValueError(
@@ -203,19 +208,29 @@ class OptionFile:
 
     @cython.cfunc
     @cython.inline(True)
-    def _access_option(self, cfg: _Parser, value: str, default: object) -> object:
-        """(cfunc) Access the settings in the MySQL options `<'object'>`"""
+    def _access_option(self, cfg: ConfigParser, key: str, default: object) -> object:
+        """(internal) Access the settings in the MySQL options `<'object'>`
+
+        Safely access an option value, returning a default on error.
+
+        :param cfg `<'_Parser'>`: Parser instance.
+        :param key `<'str'>`: Option name (normalized).
+        :param default `<'object'>`: Value to return if the option is missing or invalid.
+        """
         try:
-            return cfg.get(self._opt_group, value)
+            return cfg.get(self._opt_group, key)
         except Exception:
             return default
 
     @cython.cfunc
     @cython.inline(True)
     def _validate_path(self, path: object, arg_name: str) -> object:
-        """(cfunc) Expand '~' and '~user' constructions and validate 
-        path existence. If user or $HOME is unknown, do nothing. 
-        Only applies to <'str'> or <'Path'> objects.
+        """(internal) Expand and verify that a filesystem path exists.
+
+        Expands `~` and `~user`. Raises if the path is not found.
+
+        :param path `<'str/bytes/PathLike'>`: Input path.
+        :param arg_name `<'str'>`: Name of the argument for error messages.
         """
         if path is None:
             return None
@@ -233,6 +248,7 @@ class OptionFile:
             )
         return path
 
+    # Special Methods -------------------------------------------------------------------------
     def __repr__(self) -> str:
         reprs = {
             "opt_file": self._opt_file,
