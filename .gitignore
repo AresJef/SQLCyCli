@@ -1,16 +1,45 @@
+# OS generated files #
+######################
+$RECYCLE.BIN
+$Recycle.Bin
+System Volume Information
+ehthumbs.db
+desktop.ini
+Thumbs.db
+lost+found
+.DocumentRevisions-V100
+.TemporaryItems
+.fseventsd
+.icloud
+.iCloud
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+.Trash-*
+.trashed-*
+~*
+*~
+.~lock.*
+*.part
+*.filepart
+.csync_journal.db
+.csync_journal.db.tmp
+
 # Compiled source #
-###################
+######################
 *.com
 *.class
 *.dll
 *.o
 *.c
 *.so
+*.swn
+*.swp
+*.swo
 
 # Packages #
 ######################
-# it's better to unpack these files and commit the raw source
-# git has its own built in compression methods
 *.7z
 *.dmg
 *.iso
@@ -19,13 +48,9 @@
 *.tar
 *.zip
 
-# Build #
-############
-*.egg-info
-*.tar.gz
-*.whl
-/build
-/dist
+# Html #
+######################
+*.html
 
 # Logs and databases #
 ######################
@@ -34,26 +59,17 @@
 *.sql
 *.sqlite
 
-# OS generated files #
-######################
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# vscode settings #
+# IDE settings #
 ######################
 /.vscode
 /.idea
 /.venv
 
-# Path #
+# Python #
 ######################
-*__pycache__
-
-# Html #
-######################
-*.html
+__pycache__
+/build
+/dist
+*.egg-info
+*.tar.gz
+*.whl
